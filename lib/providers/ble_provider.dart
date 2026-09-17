@@ -8,7 +8,7 @@ import '../services/simulator_pendant_source.dart';
 
 /// Set this to true to use your PC microphone as the pendant source for testing.
 /// Be sure to set this back to false before committing!
-const bool kUseSimulator = true;
+const bool kUseSimulator = false;
 
 /// Singleton pendant source. Its status is watched via [pendantStatusProvider].
 final pendantProvider = Provider<AudioSource>((ref) {
