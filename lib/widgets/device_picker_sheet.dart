@@ -244,6 +244,7 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
           ],
         ),
       ),
+    ),
     );
   }
 }

@@ -141,4 +141,7 @@ abstract class AudioSource {
 
   /// Forget the stored device id so the next connect() re-scans.
   Future<void> forgetDevice();
+
+  /// Clean up and release any resources.
+  void dispose();
 }
