@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../models/transcript.dart';
 import '../screens/chat_screen.dart';
-import '../theme.dart';
 
 /// One completed memory card: a warm-beige initial tile, the session title,
 /// the tail of its transcript and the close time. Swipe-to-delete when
@@ -55,10 +54,8 @@ class _ConversationTileState extends State<ConversationTile> {
         duration: const Duration(milliseconds: 200),
         width: double.maxFinite,
         decoration: BoxDecoration(
-          color: kTanuSurface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: TanuTheme.softShadow,
-          border: Border.all(color: kTanuLine),
+          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
@@ -70,8 +67,8 @@ class _ConversationTileState extends State<ConversationTile> {
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
-                    color: kTanuRed,
-                    child: const Icon(Icons.delete, color: Colors.white),
+                    color: CupertinoColors.destructiveRed.resolveFrom(context),
+                    child: const Icon(CupertinoIcons.delete, color: CupertinoColors.white),
                   ),
                   onDismissed: (_) => widget.onDelete!(),
                   child: _body(context),
@@ -95,11 +92,12 @@ class _ConversationTileState extends State<ConversationTile> {
         revealedAt.isAfter(
             DateTime.now().subtract(const Duration(minutes: 1)));
 
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         HapticFeedback.selectionClick();
         Navigator.of(context).push(
-          MaterialPageRoute(
+          CupertinoPageRoute(
             fullscreenDialog: true,
             builder: (_) => SessionDetailPage(session: session),
           ),
@@ -115,15 +113,15 @@ class _ConversationTileState extends State<ConversationTile> {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: kTanuChip,
+                color: CupertinoColors.systemGrey5.resolveFrom(context),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 title.isEmpty
                     ? 'T'
                     : title.characters.first.toUpperCase(),
-                style: const TextStyle(
-                  color: kTanuInk,
+                style: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -138,8 +136,8 @@ class _ConversationTileState extends State<ConversationTile> {
                     title.isEmpty ? 'Untitled memory' : title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: kTanuInk,
+                    style: TextStyle(
+                      color: CupertinoColors.label.resolveFrom(context),
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -149,21 +147,21 @@ class _ConversationTileState extends State<ConversationTile> {
                     tail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kTanuMuted, fontSize: 13),
+                    style: TextStyle(color: CupertinoColors.secondaryLabel.resolveFrom(context), fontSize: 13),
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(
                         time,
-                        style: const TextStyle(color: kTanuMuted, fontSize: 14),
+                        style: TextStyle(color: CupertinoColors.secondaryLabel.resolveFrom(context), fontSize: 14),
                       ),
                       if (session.segmentCount > 0) ...[
                         const SizedBox(width: 8),
                         Text(
                           '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                            color: kTanuMuted,
+                          style: TextStyle(
+                            color: CupertinoColors.secondaryLabel.resolveFrom(context),
                             fontSize: 14,
                           ),
                         ),
@@ -174,13 +172,13 @@ class _ConversationTileState extends State<ConversationTile> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: kTanuWarm.withValues(alpha: 0.14),
+                            color: CupertinoColors.activeBlue.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
                             'New',
                             style: TextStyle(
-                              color: kTanuWarm,
+                              color: CupertinoColors.activeBlue,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -191,7 +189,7 @@ class _ConversationTileState extends State<ConversationTile> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20, color: kTanuMuted),
+            Icon(CupertinoIcons.chevron_right, size: 20, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
           ],
         ),
       ),

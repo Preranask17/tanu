@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/audio_source.dart';
@@ -15,14 +15,14 @@ class ConnectionStatusBar extends ConsumerWidget {
 
     final (color, icon, text) = switch (status.state) {
       PendantState.connected => (
-          kTanuGreen,
-          Icons.bluetooth_connected,
+          CupertinoColors.systemGreen.resolveFrom(context),
+          CupertinoIcons.bluetooth,
           status.deviceName ?? 'Connected',
         ),
-      PendantState.reconnecting => (kTanuWarm, Icons.sync, 'Reconnecting...'),
-      PendantState.scanning => (kTanuWarm, Icons.radar, 'Looking for pendant...'),
-      PendantState.connecting => (kTanuWarm, Icons.sync, 'Connecting...'),
-      PendantState.disconnected => (kTanuRed, Icons.bluetooth_disabled, 'Not connected'),
+      PendantState.reconnecting => (CupertinoColors.systemOrange.resolveFrom(context), CupertinoIcons.arrow_2_circlepath, 'Reconnecting...'),
+      PendantState.scanning => (CupertinoColors.activeBlue.resolveFrom(context), CupertinoIcons.antenna_radiowaves_left_right, 'Looking for pendant...'),
+      PendantState.connecting => (CupertinoColors.activeBlue.resolveFrom(context), CupertinoIcons.arrow_2_circlepath, 'Connecting...'),
+      PendantState.disconnected => (CupertinoColors.systemGrey.resolveFrom(context), CupertinoIcons.bluetooth, 'Not connected'),
     };
 
     return Padding(
@@ -38,9 +38,9 @@ class ConnectionStatusBar extends ConsumerWidget {
             ),
           ),
           if (status.batteryPercent != null) ...[
-            Icon(Icons.battery_full, size: 15, color: kTanuWarm),
+            Icon(CupertinoIcons.battery_100, size: 15, color: CupertinoColors.systemGrey.resolveFrom(context)),
             const SizedBox(width: 4),
-            Text('${status.batteryPercent}%', style: const TextStyle(fontSize: 13)),
+            Text('${status.batteryPercent}%', style: TextStyle(fontSize: 13, color: CupertinoColors.label.resolveFrom(context))),
           ],
         ],
       ),

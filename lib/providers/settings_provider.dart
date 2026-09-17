@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
@@ -15,12 +16,14 @@ class AppSettings {
     this.model = kMistralModel,
     this.deviceName = kPendantName,
     this.sttBackend = SttBackend.cloud,
+    this.themeMode = ThemeMode.system,
   });
 
   final String apiKey;
   final String model;
   final String deviceName;
   final SttBackend sttBackend;
+  final ThemeMode themeMode;
 
   bool get hasApiKey => apiKey.isNotEmpty;
 
@@ -29,12 +32,14 @@ class AppSettings {
     String? model,
     String? deviceName,
     SttBackend? sttBackend,
+    ThemeMode? themeMode,
   }) {
     return AppSettings(
       apiKey: apiKey ?? this.apiKey,
       model: model ?? this.model,
       deviceName: deviceName ?? this.deviceName,
       sttBackend: sttBackend ?? this.sttBackend,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -43,6 +48,7 @@ class AppSettings {
         'model': model,
         'deviceName': deviceName,
         'sttBackend': sttBackend.name,
+        'themeMode': themeMode.name,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -51,6 +57,8 @@ class AppSettings {
         deviceName: json['deviceName'] as String? ?? kPendantName,
         sttBackend: SttBackend.values.asNameMap()[json['sttBackend']] ??
             SttBackend.cloud,
+        themeMode: ThemeMode.values.asNameMap()[json['themeMode']] ??
+            ThemeMode.system,
       );
 }
 
@@ -82,6 +90,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void setSttBackend(SttBackend backend) {
     state = state.copyWith(sttBackend: backend);
+    _save();
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    state = state.copyWith(themeMode: mode);
     _save();
   }
 

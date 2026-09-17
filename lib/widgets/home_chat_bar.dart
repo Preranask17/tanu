@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/conversation_provider.dart';
 import '../screens/chat_screen.dart';
-import '../theme.dart';
 
 /// The floating home row Omi keeps above its bottom nav: a rounded memory bar
 /// and a round record button. Tapping either opens the live memory page;
@@ -27,7 +26,7 @@ class HomeChatBar extends ConsumerWidget {
 class _ChatPill extends StatelessWidget {
   void _openLive(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+      CupertinoPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
     );
   }
 
@@ -42,18 +41,26 @@ class _ChatPill extends StatelessWidget {
       child: Container(
         height: 62,
         decoration: BoxDecoration(
-          color: kTanuInk,
+          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
           borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: CupertinoColors.systemGrey5.resolveFrom(context)),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
             const SizedBox(width: 18),
-            Expanded(
+            const Expanded(
               child: Text(
                 'Live memory…',
                 style: TextStyle(
-                  color: kTanuBg.withValues(alpha: 0.75),
-                  fontSize: 15,
+                  color: CupertinoColors.systemGrey,
+                  fontSize: 16,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -68,11 +75,11 @@ class _ChatPill extends StatelessWidget {
                 height: 44,
                 margin: const EdgeInsets.only(right: 8),
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: kTanuBg,
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemGrey5.resolveFrom(context),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.mic, size: 17, color: kTanuInk),
+                child: const Icon(CupertinoIcons.mic_solid, size: 17, color: CupertinoColors.activeBlue),
               ),
             ),
           ],
@@ -94,7 +101,7 @@ class _RecordButton extends StatelessWidget {
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.of(context).push(
-          MaterialPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+          CupertinoPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
         );
       },
       onLongPress: () => _showOptions(context),
@@ -104,55 +111,35 @@ class _RecordButton extends StatelessWidget {
         height: 62,
         alignment: Alignment.center,
         decoration: const BoxDecoration(
-          color: kTanuWarm,
+          color: CupertinoColors.activeBlue,
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.add, size: 28, color: Colors.white),
+        child: const Icon(CupertinoIcons.add, size: 28, color: CupertinoColors.white),
       ),
     );
   }
 
   void _showOptions(BuildContext context) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet<void>(
+    // Use the native iOS action sheet for the microphone test option
+    showCupertinoModalPopup<void>(
       context: context,
-      backgroundColor: kTanuSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kTanuLine,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.mic, color: kTanuWarm),
-                title: const Text('Microphone test'),
-                subtitle: Text(
-                  'Listen from the phone mic and see the words land',
-                  style: TextStyle(color: kTanuMuted, fontSize: 13),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  ref.read(conversationProvider.notifier).microphoneTest();
-                },
-              ),
-            ],
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('Developer Options'),
+        message: const Text('These options are useful for debugging your pendant audio.'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              ref.read(conversationProvider.notifier).microphoneTest();
+            },
+            child: const Text('Microphone test'),
           ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('Cancel'),
         ),
       ),
     );

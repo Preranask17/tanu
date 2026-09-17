@@ -44,22 +44,26 @@ class TanuTheme {
 
   static const Color primary = ink;
 
-  static CupertinoThemeData light() {
+  static CupertinoThemeData getTheme(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    final primaryInk = isDark ? CupertinoColors.white : CupertinoColors.black;
+    final primaryBg = isDark ? CupertinoColors.black : bg;
+
     return CupertinoThemeData(
-      brightness: Brightness.light,
-      primaryColor: primary,
-      primaryContrastingColor: bg,
-      barBackgroundColor: bg.withValues(alpha: 0.8), // Translucent for frosted glass
-      scaffoldBackgroundColor: bg,
+      brightness: brightness,
+      primaryColor: CupertinoColors.activeBlue,
+      primaryContrastingColor: primaryBg,
+      barBackgroundColor: primaryBg.withValues(alpha: 0.8), // Translucent for frosted glass
+      scaffoldBackgroundColor: primaryBg,
       textTheme: CupertinoTextThemeData(
-        primaryColor: ink,
+        primaryColor: primaryInk,
         textStyle: GoogleFonts.inter(
-          color: ink,
+          color: primaryInk,
           fontSize: 17,
           letterSpacing: -0.41,
         ),
         actionTextStyle: GoogleFonts.inter(
-          color: primary,
+          color: CupertinoColors.activeBlue,
           fontSize: 17,
           fontWeight: FontWeight.w500,
           letterSpacing: -0.41,
@@ -70,13 +74,13 @@ class TanuTheme {
           letterSpacing: -0.24,
         ),
         navTitleTextStyle: GoogleFonts.inter(
-          color: ink,
+          color: primaryInk,
           fontSize: 17,
           fontWeight: FontWeight.w600,
           letterSpacing: -0.41,
         ),
         navLargeTitleTextStyle: GoogleFonts.inter(
-          color: ink,
+          color: primaryInk,
           fontSize: 34,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,

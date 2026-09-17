@@ -104,7 +104,7 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
 
     return SafeArea(
       child: Container(
-        color: CupertinoColors.systemBackground,
+        color: CupertinoColors.systemBackground.resolveFrom(context),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
@@ -117,14 +117,15 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                 height: 5,
                 margin: const EdgeInsets.only(bottom: 16, top: 4),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey4,
+                  color: CupertinoColors.systemGrey4.resolveFrom(context),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
             ),
-            const Text(
+            Text(
               'Connect your pendant',
               style: TextStyle(
+                color: CupertinoColors.label.resolveFrom(context),
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
               ),
@@ -134,9 +135,9 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
               scanning
                   ? 'Scanning for nearby Bluetooth devices…'
                   : 'Pick your pendant from the list below.',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
-                color: CupertinoColors.systemGrey,
+                color: CupertinoColors.systemGrey.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 16),
@@ -147,9 +148,9 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.destructiveRed.withValues(alpha: 0.1),
+                  color: CupertinoColors.destructiveRed.resolveFrom(context).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: CupertinoColors.destructiveRed.withValues(alpha: 0.3)),
+                  border: Border.all(color: CupertinoColors.destructiveRed.resolveFrom(context).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -158,9 +159,9 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                     Expanded(
                       child: Text(
                         _error!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: CupertinoColors.destructiveRed,
+                          color: CupertinoColors.destructiveRed.resolveFrom(context),
                         ),
                       ),
                     ),
@@ -182,7 +183,7 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                                   Text(
                                     'Looking…',
                                     style: TextStyle(
-                                      color: CupertinoColors.systemGrey,
+                                      color: CupertinoColors.systemGrey.resolveFrom(context),
                                     ),
                                   ),
                                 ],
@@ -192,15 +193,15 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                                     ? 'No devices found.'
                                     : 'Try again.',
                                 style: TextStyle(
-                                  color: CupertinoColors.systemGrey,
+                                  color: CupertinoColors.systemGrey.resolveFrom(context),
                                 ),
                               ),
                       )
                     : ListView.separated(
                         itemCount: devices.length,
-                        separatorBuilder: (_, _) => const Divider(
+                        separatorBuilder: (_, _) => Container(
                           height: 1,
-                          color: CupertinoColors.systemGrey5,
+                          color: CupertinoColors.systemGrey5.resolveFrom(context),
                         ),
                         itemBuilder: (context, index) {
                           final d = devices[index];
@@ -278,13 +279,13 @@ class _DeviceRow extends StatelessWidget {
                 children: [
                   Text(
                     device.displayName,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    style: TextStyle(color: CupertinoColors.label.resolveFrom(context), fontWeight: FontWeight.w600, fontSize: 16),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${device.id}   ·   ${device.rssi} dBm',
-                    style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey),
+                    style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey.resolveFrom(context)),
                   ),
                 ],
               ),
@@ -294,7 +295,7 @@ class _DeviceRow extends StatelessWidget {
             else
               Icon(
                 connected ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.chevron_right,
-                color: connected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey4,
+                color: connected ? CupertinoColors.activeBlue.resolveFrom(context) : CupertinoColors.systemGrey4.resolveFrom(context),
               ),
           ],
         ),

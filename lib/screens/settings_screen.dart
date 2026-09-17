@@ -40,6 +40,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 CupertinoListSection.insetGrouped(
+                  header: const Text('APPEARANCE'),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: CupertinoSlidingSegmentedControl<ThemeMode>(
+                          groupValue: ref.watch(settingsProvider).themeMode,
+                          onValueChanged: (mode) {
+                            if (mode != null) {
+                              ref.read(settingsProvider.notifier).setThemeMode(mode);
+                            }
+                          },
+                          children: const {
+                            ThemeMode.system: Text('System'),
+                            ThemeMode.light: Text('Light'),
+                            ThemeMode.dark: Text('Dark'),
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                CupertinoListSection.insetGrouped(
                   header: const Text('PENDANT'),
                   children: [
                     CupertinoListTile(

@@ -73,6 +73,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         : conversation.conversations.reversed.toList();
 
     return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
       child: Stack(
         children: [
           CustomScrollView(
@@ -216,15 +217,8 @@ class _LiveCaptureCard extends ConsumerWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: CupertinoColors.systemBackground,
+            color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: CupertinoColors.systemGrey.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,15 +374,8 @@ class _ConnectionCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
+          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.systemGrey.withValues(alpha: 0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
         ),
         child: Row(
           children: [

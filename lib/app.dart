@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +11,7 @@ import 'abstractions/audio_source.dart';
 import 'providers/ble_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'providers/navigation_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
@@ -153,11 +155,18 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     final index = ref.watch(navigationTabProvider);
     final status = ref.watch(pendantStatusProvider).value;
     final connected = status?.isConnected ?? false;
+    final settings = ref.watch(settingsProvider);
+    final platformBrightness = MediaQuery.platformBrightnessOf(context);
+    final brightness = settings.themeMode == ThemeMode.dark
+        ? Brightness.dark
+        : (settings.themeMode == ThemeMode.light
+            ? Brightness.light
+            : platformBrightness);
 
     return CupertinoApp(
       title: 'Tanu',
       debugShowCheckedModeBanner: false,
-      theme: TanuTheme.light(),
+      theme: TanuTheme.getTheme(brightness),
       home: CupertinoTabScaffold(
         controller: CupertinoTabController(initialIndex: index),
         tabBar: CupertinoTabBar(

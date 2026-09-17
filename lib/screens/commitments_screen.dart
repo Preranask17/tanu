@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/commitment.dart';
 import '../providers/commitment_provider.dart';
-import '../theme.dart';
 import '../widgets/connection_status_bar.dart';
 
 class CommitmentsScreen extends ConsumerStatefulWidget {
@@ -14,7 +13,6 @@ class CommitmentsScreen extends ConsumerStatefulWidget {
 }
 
 class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _actionCtrl = TextEditingController();
   final _personCtrl = TextEditingController();
   DateTime? _due;
@@ -27,20 +25,29 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
     super.dispose();
   }
 
-  Future<void> _pickDue() async {
-    final selected = await showDatePicker(
+  void _pickDue() {
+    showCupertinoModalPopup<void>(
       context: context,
-      initialDate: _due ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
+      builder: (BuildContext context) => Container(
+        height: 250,
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        child: SafeArea(
+          top: false,
+          child: CupertinoDatePicker(
+            initialDateTime: _due ?? DateTime.now(),
+            minimumDate: DateTime.now().subtract(const Duration(days: 1)),
+            maximumDate: DateTime.now().add(const Duration(days: 365 * 3)),
+            mode: CupertinoDatePickerMode.date,
+            onDateTimeChanged: (DateTime newDate) {
+              setState(() => _due = newDate);
+            },
+          ),
+        ),
+      ),
     );
-    if (selected != null) {
-      setState(() => _due = selected);
-    }
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _submit() {
     final action = _actionCtrl.text.trim();
     if (action.isEmpty) return;
     setState(() => _submitting = true);
@@ -67,68 +74,79 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
 
     final currentDate = Commitment.today();
 
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 100; // Keyboard avoiding + Nav bar + bottom bar padding
+
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
+      child: Stack(
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Text(
-              'To-do & commitments',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: kTanuInk),
-            ),
-          ),
-          const ConnectionStatusBar(),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                if (overdue.isNotEmpty) ...[
-                  _SectionHeader('Needs attention', icon: Icons.schedule, color: kTanuRed),
-                  ...overdue.map((c) => _CommitmentTile(
-                        commitment: c,
-                        dueText: _dueLabel(c, currentDate),
-                        highlight: true,
-                      )),
-                  const SizedBox(height: 8),
-                ],
-                if (active.isNotEmpty) ...[
-                  if (overdue.isNotEmpty) _SectionHeader('Upcoming'),
-                  ...active.map((c) => _CommitmentTile(
-                        commitment: c,
-                        dueText: _dueLabel(c, currentDate),
-                      )),
-                  const SizedBox(height: 8),
-                ],
-                if (done.isNotEmpty) ...[
-                  _SectionHeader('Done'),
-                  ...done.map((c) => _CommitmentTile(
-                        commitment: c,
-                        dueText: _dueLabel(c, currentDate),
-                        done: true,
-                      )),
-                  const SizedBox(height: 8),
-                ],
-                if (commitments.isEmpty)
-                  const _EmptyState()
-                else ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'These surface automatically when Tanu hears you commit to something — or add your own below.',
-                    style: TextStyle(fontSize: 13, color: kTanuInk.withValues(alpha: 0.6), height: 1.4),
+          CustomScrollView(
+            slivers: [
+              const CupertinoSliverNavigationBar(
+                largeTitle: Text('Commitments'),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const ConnectionStatusBar(),
+                      if (overdue.isNotEmpty)
+                        CupertinoListSection.insetGrouped(
+                          header: const Text('NEEDS ATTENTION'),
+                          children: overdue.map((c) => _CommitmentTile(
+                            commitment: c,
+                            dueText: _dueLabel(c, currentDate),
+                            highlight: true,
+                          )).toList(),
+                        ),
+                      if (active.isNotEmpty)
+                        CupertinoListSection.insetGrouped(
+                          header: const Text('UPCOMING'),
+                          children: active.map((c) => _CommitmentTile(
+                            commitment: c,
+                            dueText: _dueLabel(c, currentDate),
+                          )).toList(),
+                        ),
+                      if (done.isNotEmpty)
+                        CupertinoListSection.insetGrouped(
+                          header: const Text('DONE'),
+                          children: done.map((c) => _CommitmentTile(
+                            commitment: c,
+                            dueText: _dueLabel(c, currentDate),
+                            done: true,
+                          )).toList(),
+                        ),
+                      if (commitments.isEmpty)
+                        const _EmptyState()
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          child: Text(
+                            'These surface automatically when Tanu hears you commit to something — or add your own below.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey.resolveFrom(context), height: 1.4),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
-          _ManualAddBar(
-            formKey: _formKey,
-            actionCtrl: _actionCtrl,
-            personCtrl: _personCtrl,
-            due: _due,
-            submitting: _submitting,
-            onPickDue: _pickDue,
-            onSubmit: _submit,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.paddingOf(context).bottom + 50,
+            child: _ManualAddBar(
+              actionCtrl: _actionCtrl,
+              personCtrl: _personCtrl,
+              due: _due,
+              submitting: _submitting,
+              onPickDue: _pickDue,
+              onSubmit: _submit,
+            ),
           ),
         ],
       ),
@@ -152,38 +170,6 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.label, {this.icon, this.color});
-
-  final String label;
-  final IconData? icon;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 4),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 15, color: color),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
-              color: color ?? kTanuInk.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CommitmentTile extends ConsumerWidget {
   const _CommitmentTile({
     required this.commitment,
@@ -199,38 +185,38 @@ class _CommitmentTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = kTanuInk;
     final notifier = ref.read(commitmentsProvider.notifier);
-    return Card(
-      color: highlight ? kTanuInk.withValues(alpha: 0.06) : null,
-      child: ListTile(
-        onTap: () => notifier.toggleDone(commitment.id),
-        leading: Checkbox(
-          value: done || commitment.done,
-          onChanged: (_) => notifier.toggleDone(commitment.id),
-          activeColor: color,
+    final isDone = done || commitment.done;
+    return CupertinoListTile(
+      backgroundColor: highlight ? CupertinoColors.destructiveRed.resolveFrom(context).withValues(alpha: 0.1) : null,
+      onTap: () => notifier.toggleDone(commitment.id),
+      leading: Icon(
+        isDone ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+        color: isDone ? CupertinoColors.systemGrey : CupertinoColors.activeBlue,
+        size: 24,
+      ),
+      title: Text(
+        commitment.action,
+        style: TextStyle(
+          color: isDone ? CupertinoColors.secondaryLabel.resolveFrom(context) : CupertinoColors.label.resolveFrom(context),
+          decoration: isDone ? TextDecoration.lineThrough : null,
+          fontWeight: isDone ? FontWeight.w400 : FontWeight.w600,
         ),
-        title: Text(
-          commitment.action,
-          style: TextStyle(
-            color: done ? kTanuInk.withValues(alpha: 0.45) : kTanuInk,
-            decoration: done ? TextDecoration.lineThrough : null,
-            fontWeight: done ? FontWeight.w400 : FontWeight.w600,
-          ),
-        ),
-        subtitle: dueText.isEmpty
-            ? null
-            : Text(
-                dueText,
-                style: TextStyle(
-                  color: highlight ? kTanuRed : kTanuInk.withValues(alpha: 0.6),
-                  fontSize: 12,
-                ),
+      ),
+      subtitle: dueText.isEmpty
+          ? null
+          : Text(
+              dueText,
+              style: TextStyle(
+                color: highlight ? CupertinoColors.destructiveRed.resolveFrom(context) : CupertinoColors.secondaryLabel.resolveFrom(context),
+                fontSize: 12,
               ),
-        trailing: IconButton(
-          icon: const Icon(Icons.close, size: 18),
-          onPressed: () => notifier.remove(commitment.id),
-        ),
+            ),
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minSize: 0,
+        onPressed: () => notifier.remove(commitment.id),
+        child: const Icon(CupertinoIcons.clear_thick, size: 18, color: CupertinoColors.systemGrey),
       ),
     );
   }
@@ -242,20 +228,20 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       child: Column(
         children: [
-          const Icon(Icons.celebration_outlined, size: 40, color: kTanuWarm),
+          const Icon(CupertinoIcons.sparkles, size: 40, color: CupertinoColors.activeBlue),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No commitments yet',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: kTanuInk),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: CupertinoColors.label.resolveFrom(context)),
           ),
           const SizedBox(height: 4),
           Text(
             'Say “I’ll send the file tomorrow” and Tanu will note it here.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: kTanuInk.withValues(alpha: 0.6)),
+            style: TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
           ),
         ],
       ),
@@ -265,7 +251,6 @@ class _EmptyState extends StatelessWidget {
 
 class _ManualAddBar extends StatelessWidget {
   const _ManualAddBar({
-    required this.formKey,
     required this.actionCtrl,
     required this.personCtrl,
     required this.due,
@@ -274,7 +259,6 @@ class _ManualAddBar extends StatelessWidget {
     required this.onSubmit,
   });
 
-  final GlobalKey<FormState> formKey;
   final TextEditingController actionCtrl;
   final TextEditingController personCtrl;
   final DateTime? due;
@@ -286,44 +270,73 @@ class _ManualAddBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      color: kTanuSurface,
-      child: Form(
-        key: formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: actionCtrl,
-              decoration: InputDecoration(
-                labelText: 'New commitment',
-                hintText: 'e.g. Send Rahul the deck',
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.check, color: kTanuWarm),
-                  onPressed: submitting ? null : onSubmit,
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
+        border: Border(top: BorderSide(color: CupertinoColors.separator.resolveFrom(context))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: CupertinoTextField(
+                  controller: actionCtrl,
+                  placeholder: 'New commitment...',
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemBackground.resolveFrom(context),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: CupertinoColors.systemGrey4.resolveFrom(context)),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => onSubmit(),
                 ),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Say what you’ll do' : null,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => onSubmit(),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: personCtrl,
-                    decoration: const InputDecoration(labelText: 'For who? (optional)'),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: submitting ? null : onSubmit,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: submitting ? CupertinoColors.systemGrey.resolveFrom(context) : CupertinoColors.activeBlue.resolveFrom(context),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(CupertinoIcons.arrow_up, color: CupertinoColors.white, size: 20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: CupertinoTextField(
+                  controller: personCtrl,
+                  placeholder: 'For who? (optional)',
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemBackground.resolveFrom(context),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: CupertinoColors.systemGrey4.resolveFrom(context)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: onPickDue,
-                  child: Text(due == null ? 'Pick date' : _shortDate(due!)),
+              ),
+              const SizedBox(width: 8),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: CupertinoColors.systemBackground.resolveFrom(context),
+                borderRadius: BorderRadius.circular(16),
+                onPressed: onPickDue,
+                child: Text(
+                  due == null ? 'Pick date' : _shortDate(due!),
+                  style: TextStyle(color: CupertinoColors.label.resolveFrom(context), fontSize: 14),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

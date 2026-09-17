@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transcript.dart';
@@ -182,11 +182,11 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemBackground,
+                        color: CupertinoColors.systemBackground.resolveFrom(context),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: CupertinoColors.systemGrey.withValues(alpha: 0.15),
+                            color: CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.15),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           )
@@ -226,7 +226,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                         )),
                   if (_messages.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    const Divider(color: CupertinoColors.systemGrey4),
+                    Container(height: 1, color: CupertinoColors.systemGrey4.resolveFrom(context)),
                     const SizedBox(height: 16),
                     const Text('Memory Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: CupertinoColors.systemGrey)),
                     const SizedBox(height: 12),
@@ -254,9 +254,9 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                       placeholder: 'Ask about this memory...',
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemBackground,
+                        color: CupertinoColors.systemBackground.resolveFrom(context),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: CupertinoColors.systemGrey4),
+                        border: Border.all(color: CupertinoColors.systemGrey4.resolveFrom(context)),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
@@ -268,7 +268,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: _isGenerating ? CupertinoColors.systemGrey : CupertinoColors.activeBlue,
+                        color: _isGenerating ? CupertinoColors.systemGrey.resolveFrom(context) : CupertinoColors.activeBlue.resolveFrom(context),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(CupertinoIcons.arrow_up, color: CupertinoColors.white, size: 20),
@@ -297,11 +297,11 @@ class _ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isUser ? CupertinoColors.activeBlue : CupertinoColors.systemBackground,
+          color: isUser ? CupertinoColors.activeBlue.resolveFrom(context) : CupertinoColors.systemBackground.resolveFrom(context),
           borderRadius: BorderRadius.circular(16),
           boxShadow: isUser ? null : [
             BoxShadow(
-              color: CupertinoColors.systemGrey.withValues(alpha: 0.1),
+              color: CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             )
@@ -309,7 +309,7 @@ class _ChatBubble extends StatelessWidget {
         ),
         child: Text(
           message.content,
-          style: TextStyle(color: isUser ? CupertinoColors.white : CupertinoColors.label, fontSize: 15, height: 1.4),
+          style: TextStyle(color: isUser ? CupertinoColors.white : CupertinoColors.label.resolveFrom(context), fontSize: 15, height: 1.4),
         ),
       ),
     );
@@ -447,9 +447,9 @@ class _SegmentRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground,
+              color: CupertinoColors.systemBackground.resolveFrom(context),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: CupertinoColors.systemGrey5),
+              border: Border.all(color: CupertinoColors.systemGrey5.resolveFrom(context)),
             ),
             child: Text(
               text.isEmpty ? '…' : text,
@@ -472,7 +472,7 @@ class _ModelLoadingChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey5,
+        color: CupertinoColors.systemGrey5.resolveFrom(context),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
