@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,9 +12,9 @@ import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../screens/chat_screen.dart';
 import '../theme.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/device_picker_sheet.dart';
+import '../widgets/home_chat_bar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -50,10 +51,8 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _openDevicePicker() {
-    showModalBottomSheet<void>(
+    showCupertinoModalPopup<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => const DevicePickerSheet(),
     );
   }
@@ -62,7 +61,9 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final status = ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    
+    // Calculate padding for the persistent bottom chat bar
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 62 + 16; 
 
     final recent = conversation.conversations.length > 3
         ? conversation.conversations
@@ -71,60 +72,106 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
             .toList()
         : conversation.conversations.reversed.toList();
 
-    return RefreshIndicator(
-      onRefresh: () async =>
-          ref.read(conversationProvider.notifier).reloadFromStorage(),
-      color: kTanuWarm,
-      child: CustomScrollView(
-        controller: _scroll,
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: 8,
-                bottom: 92 +
-                    kBottomNavChatBarGap +
-                    bottomInset +
-                    62 +
-                    16,
+    return CupertinoPageScaffold(
+      child: Stack(
+        children: [
+          CustomScrollView(
+            controller: _scroll,
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
+              CupertinoSliverNavigationBar(
+                largeTitle: const Text('Capture'),
+                trailing: _PendantStatusIndicator(status: status, onConnect: _openDevicePicker),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (conversation.active != null ||
-                      conversation.isListening ||
-                      conversation.liveTranscript.isNotEmpty)
-                    _LiveCaptureCard(
-                      status: status,
-                      conversation: conversation,
-                    ),
-                  if (!status.isConnected && conversation.active == null)
-                    _ConnectionCard(onConnect: _openDevicePicker),
-                  if (conversation.active == null &&
-                      conversation.conversations.isEmpty)
-                    _EmptyState(connected: status.isConnected)
-                  else ...[
-                    const SizedBox(height: 20),
-                    _SectionHeader(
-                      title: 'Conversations',
-                      pillLabel: 'View All',
-                      interactive: true,
-                      onPillTap: () => ref
-                          .read(navigationTabProvider.notifier)
-                          .goToConversations(),
-                    ),
-                    const SizedBox(height: 4),
-                    for (final (i, session) in recent.indexed)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: ConversationTile(session: session, isNew: i == 0),
-                      ),
-                  ],
-                ],
+              CupertinoSliverRefreshControl(
+                onRefresh: () async =>
+                    ref.read(conversationProvider.notifier).reloadFromStorage(),
               ),
-            ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 16, bottom: bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (conversation.active != null ||
+                          conversation.isListening ||
+                          conversation.liveTranscript.isNotEmpty)
+                        _LiveCaptureCard(
+                          status: status,
+                          conversation: conversation,
+                        ),
+                      if (!status.isConnected && conversation.active == null)
+                        _ConnectionCard(onConnect: _openDevicePicker),
+                      if (conversation.active == null &&
+                          conversation.conversations.isEmpty)
+                        _EmptyState(connected: status.isConnected)
+                      else ...[
+                        const SizedBox(height: 32),
+                        _SectionHeader(
+                          title: 'Recent Memories',
+                          pillLabel: 'View All',
+                          interactive: true,
+                          onPillTap: () => ref
+                              .read(navigationTabProvider.notifier)
+                              .goToConversations(),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final (i, session) in recent.indexed)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: ConversationTile(session: session, isNew: i == 0),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.paddingOf(context).bottom + 50 + 16, // Tab bar height + padding
+            child: const HomeChatBar(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendantStatusIndicator extends StatelessWidget {
+  const _PendantStatusIndicator({required this.status, required this.onConnect});
+  final PendantStatus status;
+  final VoidCallback onConnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = status.isConnected;
+    
+    final Widget leading;
+    if (!connected) {
+      leading = Icon(CupertinoIcons.bluetooth, size: 20, color: CupertinoColors.systemGrey);
+    } else if (status.state == PendantState.reconnecting) {
+      leading = Icon(CupertinoIcons.arrow_2_circlepath, size: 20, color: CupertinoColors.systemOrange);
+    } else {
+      leading = Icon(CupertinoIcons.bluetooth, size: 20, color: CupertinoColors.systemGreen);
+    }
+
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: onConnect,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          leading,
+          if (connected && status.batteryPercent != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              '${status.batteryPercent}%',
+              style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey),
+            ),
+          ],
         ],
       ),
     );
@@ -156,23 +203,28 @@ class _LiveCaptureCard extends ConsumerWidget {
             : '');
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
           HapticFeedback.selectionClick();
           Navigator.of(context).push(
-            MaterialPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+            CupertinoPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
           );
         },
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: kTanuSurface,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: TanuTheme.softShadow,
-            border: Border.all(color: kTanuLine),
+            color: CupertinoColors.systemBackground,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: CupertinoColors.systemGrey.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,62 +232,63 @@ class _LiveCaptureCard extends ConsumerWidget {
               Row(
                 children: [
                   _Equalizer(
-                    color: kTanuInk,
+                    color: CupertinoColors.activeBlue,
                     level: conversation.micLevel,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       label,
                       style: const TextStyle(
-                        color: kTanuInk,
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   Text(
                     status.deviceName ?? 'Pendant',
-                    style: const TextStyle(fontSize: 12, color: kTanuMuted),
+                    style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey),
                   ),
                 ],
               ),
               if (active != null && active.segments.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 0,
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(conversationProvider.notifier).forceEndSession();
                     },
-                    style: TextButton.styleFrom(
-                      foregroundColor: kTanuWarm,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(0, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.post_add, size: 18),
-                    label: const Text(
-                      'New memory',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.add_circled, size: 18),
+                        SizedBox(width: 4),
+                        Text(
+                          'New memory',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ],
               if (preview.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
                   preview,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontStyle: words.isNotEmpty
                         ? FontStyle.italic
                         : FontStyle.normal,
-                    color: kTanuInk.withValues(alpha: 0.85),
-                    fontSize: 16,
-                    height: 1.35,
+                    color: CupertinoColors.label.withValues(alpha: 0.8),
+                    fontSize: 17,
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -247,7 +300,7 @@ class _LiveCaptureCard extends ConsumerWidget {
   }
 }
 
-/// Animated 4-bar voice meter, Tanu-colored.
+/// Animated 4-bar voice meter.
 class _Equalizer extends StatefulWidget {
   const _Equalizer({required this.color, required this.level});
 
@@ -303,7 +356,7 @@ class _EqualizerState extends State<_Equalizer>
                                     i * 0.9 + t * frequencies[i] + phases[i])),
                 margin: const EdgeInsets.symmetric(horizontal: 1.5),
                 decoration: BoxDecoration(
-                  color: widget.color.withValues(alpha: 0.9),
+                  color: widget.color,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -322,20 +375,25 @@ class _ConnectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: kTanuSurface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: TanuTheme.softShadow,
-          border: Border.all(color: kTanuLine),
+          color: CupertinoColors.systemBackground,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: CupertinoColors.systemGrey.withValues(alpha: 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Icon(Icons.bluetooth_disabled, color: kTanuMuted, size: 24),
-            const SizedBox(width: 14),
+            const Icon(CupertinoIcons.bluetooth, color: CupertinoColors.systemGrey, size: 28),
+            const SizedBox(width: 16),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,22 +401,23 @@ class _ConnectionCard extends StatelessWidget {
                   Text(
                     'No pendant yet',
                     style: TextStyle(
-                      color: kTanuInk,
-                      fontSize: 15,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  SizedBox(height: 4),
                   Text(
                     'Connect your pendant to start talking.',
-                    style: TextStyle(color: kTanuMuted, fontSize: 13),
+                    style: TextStyle(color: CupertinoColors.systemGrey, fontSize: 14),
                   ),
                 ],
               ),
             ),
-            FilledButton(
+            CupertinoButton.filled(
               onPressed: onConnect,
-              child: const Text('Scan'),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              borderRadius: BorderRadius.circular(20),
+              child: const Text('Scan', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -383,34 +442,25 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
             style: const TextStyle(
-              color: kTanuInk,
               fontSize: 20,
               fontWeight: FontWeight.w700,
             ),
           ),
-          InkWell(
-            onTap: interactive ? onPillTap : null,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: kTanuChip,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Text(
-                pillLabel,
-                style: TextStyle(
-                  color: interactive ? kTanuInk : kTanuMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: interactive ? onPillTap : null,
+            child: Text(
+              pillLabel,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -428,18 +478,18 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.record_voice_over_outlined, color: kTanuMuted, size: 36),
-            const SizedBox(height: 12),
+            const Icon(CupertinoIcons.mic_slash, color: CupertinoColors.systemGrey, size: 48),
+            const SizedBox(height: 16),
             Text(
               connected
-                  ? 'Listening… speak or tap + to view a memory'
+                  ? 'Listening… speak to capture a memory.'
                   : 'Nothing here yet.\nConnect your pendant and say something.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: kTanuMuted, height: 1.5),
+              style: const TextStyle(color: CupertinoColors.systemGrey, height: 1.5, fontSize: 16),
             ),
           ],
         ),

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,153 +29,130 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final capture = ref.watch(devCaptureProvider);
     final stats = ref.watch(pendantStatsProvider);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      children: [
-        _Section('Pendant'),
-        _Tile(
-          leading: Icon(
-            Icons.bluetooth,
-            color: status.isConnected ? kTanuGreen : kTanuMuted,
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
+      child: CustomScrollView(
+        slivers: [
+          const CupertinoSliverNavigationBar(
+            largeTitle: Text('Settings'),
           ),
-          title: status.deviceName ?? 'Pendant',
-          subtitle: _stateLabel(status.state),
-          onTap: status.isConnected
-              ? null
-              : () => _openDevicePicker(context),
-          trailing: status.isConnected
-              ? TextButton(
-                  onPressed: () => ref.read(pendantForgetProvider)(),
-                  child: const Text('Forget'),
-                )
-              : _InlineButton(label: 'Scan & connect', onTap: () => _openDevicePicker(context)),
-        ),
-        if (status.batteryPercent != null)
-          _Tile(
-            leading: const Icon(Icons.battery_charging_full, color: kTanuWarm),
-            title: 'Battery',
-            subtitle: '${status.batteryPercent}%',
-        ),
-        const SizedBox(height: 12),
-
-        _Section('Voice model'),
-        const _SttBackendToggle(),
-        const SizedBox(height: 12),
-        const _VoiceModelGroup(),
-        const SizedBox(height: 12),
-
-        _Section('Data'),
-        Card(
-          child: _Tile(
-            leading: const Icon(Icons.delete_forever_outlined, color: kTanuRed),
-            title: 'Delete all local data',
-            subtitle: 'Conversations & commitments',
-            titleColor: kTanuRed,
-            onTap: () => _confirmDeleteAll(),
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        _Section('Developer'),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              dividerColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-            ),
-            child: ExpansionTile(
-              onExpansionChanged: (open) =>
-                  setState(() => _developerOpen = open),
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-              childrenPadding: const EdgeInsets.only(bottom: 10),
-              leading: const Icon(Icons.developer_mode, color: kTanuWarm),
-              title: const Text('Developer tools'),
-              trailing: AnimatedRotation(
-                turns: _developerOpen ? 0.5 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.expand_more, color: kTanuMuted),
-              ),
+          SliverToBoxAdapter(
+            child: Column(
               children: [
-                const Divider(height: 1, indent: 56),
-                _Tile(
-                  leading: const Icon(Icons.mic, color: kTanuWarm),
-                  title: 'Microphone test',
-                  subtitle: 'Listen from the phone mic and see the words land',
-                  trailing: null,
-                  onTap: () =>
-                      ref.read(conversationProvider.notifier).microphoneTest(),
-                ),
-                const Divider(height: 1, indent: 56),
-                _Tile(
-                  leading: Icon(
-                    capture.recording
-                        ? Icons.stop_circle_outlined
-                        : Icons.fiber_manual_record,
-                    color: capture.recording ? kTanuRed : kTanuWarm,
-                  ),
-                  title: capture.recording ? 'Stop wav capture' : 'Record pendant audio',
-                  subtitle: capture.recording
-                      ? '${_fmtSize(capture.bytes)} written so far'
-                      : (capture.path == null
-                          ? 'Save the decoded pendant stream to a .wav file'
-                          : 'last: ${capture.path!.split('/').last}'),
-                  trailing: null,
-                  onTap: () =>
-                      ref.read(devCaptureProvider.notifier).toggle(),
-                ),
-                const Divider(height: 1, indent: 56),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: ValueListenableBuilder<PendantStats>(
-                    valueListenable: stats,
-                    builder: (context, s, _) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.show_chart, color: kTanuWarm, size: 20),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Live audio stats',
-                              style: TextStyle(
-                                color: kTanuInk,
-                                fontWeight: FontWeight.w600,
-                              ),
+                CupertinoListSection.insetGrouped(
+                  header: const Text('PENDANT'),
+                  children: [
+                    CupertinoListTile(
+                      leading: Icon(
+                        CupertinoIcons.bluetooth,
+                        color: status.isConnected ? CupertinoColors.systemGreen : CupertinoColors.systemGrey,
+                      ),
+                      title: Text(status.deviceName ?? 'Pendant'),
+                      subtitle: Text(_stateLabel(status.state)),
+                      trailing: status.isConnected
+                          ? CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () => ref.read(pendantForgetProvider)(),
+                              child: const Text('Forget', style: TextStyle(fontSize: 15)),
+                            )
+                          : CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () => _openDevicePicker(context),
+                              child: const Text('Scan & connect', style: TextStyle(fontSize: 15)),
                             ),
-                          ],
+                    ),
+                    if (status.batteryPercent != null)
+                      CupertinoListTile(
+                        leading: const Icon(CupertinoIcons.battery_100, color: CupertinoColors.systemGreen),
+                        title: const Text('Battery'),
+                        additionalInfo: Text('${status.batteryPercent}%'),
+                      ),
+                  ],
+                ),
+                CupertinoListSection.insetGrouped(
+                  header: const Text('VOICE MODEL'),
+                  children: const [
+                    _SttBackendToggle(),
+                    _VoiceModelGroup(),
+                  ],
+                ),
+                CupertinoListSection.insetGrouped(
+                  header: const Text('DATA'),
+                  children: [
+                    CupertinoListTile(
+                      leading: const Icon(CupertinoIcons.delete_solid, color: CupertinoColors.destructiveRed),
+                      title: const Text('Delete all local data', style: TextStyle(color: CupertinoColors.destructiveRed)),
+                      subtitle: const Text('Conversations & commitments'),
+                      onTap: () => _confirmDeleteAll(),
+                    ),
+                  ],
+                ),
+                CupertinoListSection.insetGrouped(
+                  header: const Text('DEVELOPER'),
+                  children: [
+                    CupertinoListTile(
+                      leading: const Icon(CupertinoIcons.chevron_left_slash_chevron_right),
+                      title: const Text('Developer tools'),
+                      trailing: AnimatedRotation(
+                        turns: _developerOpen ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(CupertinoIcons.chevron_down, color: CupertinoColors.systemGrey),
+                      ),
+                      onTap: () => setState(() => _developerOpen = !_developerOpen),
+                    ),
+                    if (_developerOpen) ...[
+                      CupertinoListTile(
+                        leading: const Icon(CupertinoIcons.mic_fill, color: CupertinoColors.activeBlue),
+                        title: const Text('Microphone test'),
+                        subtitle: const Text('Listen from the phone mic'),
+                        onTap: () => ref.read(conversationProvider.notifier).microphoneTest(),
+                      ),
+                      CupertinoListTile(
+                        leading: Icon(
+                          capture.recording ? CupertinoIcons.stop_circle_fill : CupertinoIcons.circle_fill,
+                          color: capture.recording ? CupertinoColors.destructiveRed : CupertinoColors.activeBlue,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'notify: ${s.notifySubscribed ? 'on' : 'off'}'
-                          ' · ${s.codecLabel}'
-                          ' · ${s.packets} pkt / ${s.frames} frames'
-                          ' / ${_fmtSize(s.bytes)}'
-                          '${s.decodeFailures > 0 ? ' · ${s.decodeFailures} decode fails' : ''}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: kTanuMuted,
-                            height: 1.4,
+                        title: Text(capture.recording ? 'Stop wav capture' : 'Record pendant audio'),
+                        subtitle: Text(
+                          capture.recording
+                              ? '${_fmtSize(capture.bytes)} written so far'
+                              : (capture.path == null
+                                  ? 'Save decoded stream to .wav'
+                                  : 'last: ${capture.path!.split('/').last}'),
+                        ),
+                        onTap: () => ref.read(devCaptureProvider.notifier).toggle(),
+                      ),
+                      CupertinoListTile(
+                        title: const Text('Live audio stats'),
+                        subtitle: ValueListenableBuilder<PendantStats>(
+                          valueListenable: stats,
+                          builder: (context, s, _) => Text(
+                            'notify: ${s.notifySubscribed ? 'on' : 'off'}'
+                            ' · ${s.codecLabel}'
+                            ' · ${s.packets} pkt / ${s.frames} frames'
+                            ' / ${_fmtSize(s.bytes)}'
+                            '${s.decodeFailures > 0 ? ' · ${s.decodeFailures} decode fails' : ''}',
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'Tanu · MVP build\nAll data stays on this device.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey),
                   ),
                 ),
+                const SizedBox(height: 50), // bottom nav padding
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 28),
-        const Center(
-          child: Text(
-            'Tanu · MVP build\nAll data stays on this device.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: kTanuMuted),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -193,19 +171,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _confirmDeleteAll() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('Delete everything?'),
         content: const Text(
             'This removes your conversation history and all commitments locally.'),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kTanuRed),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -222,121 +200,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 }
 
 void _openDevicePicker(BuildContext context) {
-  showModalBottomSheet<void>(
+  showCupertinoModalPopup<void>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     builder: (_) => const DevicePickerSheet(),
   );
 }
 
-class _Section extends StatelessWidget {
-  const _Section(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6, top: 10),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: kTanuInk.withValues(alpha: 0.55),
-        ),
-      ),
-    );
-  }
-}
-
-/// Omi-style settings row: circle icon, title, subtitle, chevron/control.
-class _Tile extends StatelessWidget {
-  const _Tile({
-    required this.leading,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-    this.onTap,
-    this.titleColor = kTanuInk,
-  });
-
-  final Widget leading;
-  final String title;
-  final String subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final Color titleColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: kTanuChip,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: IconTheme.merge(
-                data: const IconThemeData(size: 20),
-                child: leading,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: titleColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 13, color: kTanuMuted),
-                  ),
-                ],
-              ),
-            ),
-            if (trailing != null)
-              trailing!
-            else if (onTap != null)
-              const Icon(Icons.chevron_right, size: 20, color: kTanuMuted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineButton extends StatelessWidget {
-  const _InlineButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton(onPressed: onTap, child: Text(label));
-  }
-}
-
-/// Cloud/on-device STT preference. Flipping it persists to settings and, when a
-/// conversation is live, hot-swaps the recognizer mid-session.
 class _SttBackendToggle extends ConsumerWidget {
   const _SttBackendToggle();
 
@@ -347,21 +216,12 @@ class _SttBackendToggle extends ConsumerWidget {
     final isCloud = settings.sttBackend == SttBackend.cloud;
     final activeLabel = engine.modelLabel;
 
-    return Card(
-      child: SwitchListTile(
+    return CupertinoListTile(
+      leading: const Icon(CupertinoIcons.cloud),
+      title: const Text('Cloud STT (Deepgram)'),
+      subtitle: Text(isCloud ? 'Streaming to $activeLabel' : 'On-device $activeLabel'),
+      trailing: CupertinoSwitch(
         value: isCloud,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        secondary: const Icon(Icons.cloud_outlined, color: kTanuWarm),
-        title: const Text(
-          'Cloud STT (Deepgram)',
-          style: TextStyle(fontWeight: FontWeight.w600, color: kTanuInk),
-        ),
-        subtitle: Text(
-          isCloud
-              ? 'Streaming to $activeLabel'
-              : 'On-device $activeLabel · works offline',
-          style: const TextStyle(fontSize: 13, color: kTanuMuted),
-        ),
         onChanged: (useCloud) {
           final next = useCloud ? SttBackend.cloud : SttBackend.onDevice;
           ref.read(settingsProvider.notifier).setSttBackend(next);
@@ -378,47 +238,46 @@ class _VoiceModelGroup extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final model = ref.watch(sttModelProvider);
-    return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Tile(
-            leading: const Icon(Icons.record_voice_over, color: kTanuWarm),
-            title: 'On-device speech',
-            subtitle: _modelSubtitle(model),
-            trailing: _trailing(context, ref, model),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CupertinoListTile(
+          leading: const Icon(CupertinoIcons.waveform_circle_fill),
+          title: const Text('On-device speech'),
+          subtitle: Text(_modelSubtitle(model)),
+          trailing: _trailing(context, ref, model),
+        ),
+        if (model.phase == SttModelPhase.downloading) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LinearProgressIndicator(
+                  value: model.percent == null ? null : (model.percent! / 100),
+                  color: CupertinoColors.activeBlue,
+                  backgroundColor: CupertinoColors.systemGrey5,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${model.downloadedBytes ~/ (1024 * 1024)} / '
+                  '${model.totalBytes ~/ (1024 * 1024)} MB',
+                  style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+                ),
+              ],
+            ),
           ),
-          if (model.phase == SttModelPhase.downloading) ...[
-            const Divider(height: 1, indent: 56),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: LinearProgressIndicator(
-                value: model.percent == null ? null : (model.percent! / 100),
-                color: kTanuWarm,
-                backgroundColor: kTanuChip,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Text(
-                '${model.downloadedBytes ~/ (1024 * 1024)} / '
-                '${model.totalBytes ~/ (1024 * 1024)} MB',
-                style: const TextStyle(fontSize: 12, color: kTanuMuted),
-              ),
-            ),
-          ],
-          if (model.error != null) ...[
-            const Divider(height: 1, indent: 56),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                model.error!,
-                style: const TextStyle(fontSize: 12, color: kTanuRed),
-              ),
-            ),
-          ],
         ],
-      ),
+        if (model.error != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              model.error!,
+              style: const TextStyle(fontSize: 12, color: CupertinoColors.destructiveRed),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -437,13 +296,15 @@ class _VoiceModelGroup extends ConsumerWidget {
   Widget? _trailing(BuildContext context, WidgetRef ref, SttModelState model) {
     if (model.busy) return const SizedBox.shrink();
     return switch (model.phase) {
-      SttModelPhase.ready => TextButton(
+      SttModelPhase.ready => CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () => _confirmDeleteModel(context, ref),
-          child: const Text('Delete'),
+          child: const Text('Delete', style: TextStyle(color: CupertinoColors.destructiveRed, fontSize: 15)),
         ),
-      SttModelPhase.missing => FilledButton(
+      SttModelPhase.missing => CupertinoButton(
+          padding: EdgeInsets.zero,
           onPressed: () => ref.read(sttModelProvider.notifier).download(),
-          child: const Text('Download'),
+          child: const Text('Download', style: TextStyle(fontSize: 15)),
         ),
       _ => null,
     };
@@ -451,19 +312,19 @@ class _VoiceModelGroup extends ConsumerWidget {
 
   Future<void> _confirmDeleteModel(
       BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => CupertinoAlertDialog(
         title: const Text('Delete speech model?'),
         content: const Text(
             'It will be re-downloaded the next time you need it.'),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: kTanuRed),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),

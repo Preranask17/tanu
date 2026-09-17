@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Tanu's Minimalist Monolith palette — ultra-clean, high-contrast, professional.
@@ -36,87 +36,51 @@ class TanuTheme {
   /// Standard soft shadow for floating elements.
   static final List<BoxShadow> softShadow = [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
+      color: CupertinoColors.black.withValues(alpha: 0.04),
       blurRadius: 24,
       offset: const Offset(0, 8),
     ),
   ];
 
-  static ThemeData light() {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: ink,
+  static const Color primary = ink;
+
+  static CupertinoThemeData light() {
+    return CupertinoThemeData(
       brightness: Brightness.light,
-      surface: surface,
-    );
-
-    final base = ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
+      primaryColor: primary,
+      primaryContrastingColor: bg,
+      barBackgroundColor: bg.withValues(alpha: 0.8), // Translucent for frosted glass
       scaffoldBackgroundColor: bg,
-      textTheme: GoogleFonts.interTextTheme(),
-    );
-
-    return base.copyWith(
-      appBarTheme: AppBarTheme(
-        backgroundColor: bg,
-        foregroundColor: ink,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(
+      textTheme: CupertinoTextThemeData(
+        primaryColor: ink,
+        textStyle: GoogleFonts.inter(
           color: ink,
-          fontSize: 24,
+          fontSize: 17,
+          letterSpacing: -0.41,
+        ),
+        actionTextStyle: GoogleFonts.inter(
+          color: primary,
+          fontSize: 17,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -0.41,
+        ),
+        tabLabelTextStyle: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -0.24,
+        ),
+        navTitleTextStyle: GoogleFonts.inter(
+          color: ink,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.41,
+        ),
+        navLargeTitleTextStyle: GoogleFonts.inter(
+          color: ink,
+          fontSize: 34,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
         ),
-      ),
-      cardTheme: CardThemeData(
-        color: surface,
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-      dividerTheme: const DividerThemeData(color: line),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: surface,
-        hintStyle: const TextStyle(color: muted),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: line),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: line),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: ink, width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: ink,
-          foregroundColor: bg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.2),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: ink),
-      ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: ink,
-        contentTextStyle: GoogleFonts.inter(color: bg, fontWeight: FontWeight.w500),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      listTileTheme: const ListTileThemeData(
-        iconColor: ink,
-        textColor: ink,
-        contentPadding: EdgeInsets.symmetric(horizontal: 20),
       ),
     );
   }

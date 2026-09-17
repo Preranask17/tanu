@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,38 +26,34 @@ class ChatPage extends ConsumerWidget {
     final model = ref.watch(sttModelProvider);
     final engine = ref.watch(sttEngineProvider);
 
-    return Scaffold(
-      backgroundColor: kTanuBg,
-      appBar: AppBar(
-        title: Text(
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
           conversation.active?.title.isNotEmpty == true
               ? conversation.active!.title
               : 'Tanu',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          ValueListenableBuilder<bool>(
-            valueListenable: engine.warmingUp,
-            builder: (context, warming, _) {
-              final show = model.busy || warming;
-              if (!show) return const SizedBox.shrink();
-              final title = model.phase == SttModelPhase.downloading
-                  ? model.label
-                  : 'Loading model…';
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: _ModelLoadingChip(title: title),
-              );
-            },
-          ),
-        ],
+        trailing: ValueListenableBuilder<bool>(
+          valueListenable: engine.warmingUp,
+          builder: (context, warming, _) {
+            final show = model.busy || warming;
+            if (!show) return const SizedBox.shrink();
+            final title = model.phase == SttModelPhase.downloading
+                ? model.label
+                : 'Loading model…';
+            return _ModelLoadingChip(title: title);
+          },
+        ),
       ),
-      body: SafeArea(
+      child: SafeArea(
         top: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 50), // navigation bar height padding
             const ConnectionStatusBar(),
             const SizedBox(height: 2),
             Padding(
@@ -164,16 +161,16 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    return Scaffold(
-      backgroundColor: kTanuBg,
-      appBar: AppBar(
-        title: Text(
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.systemGroupedBackground,
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
           session.title.isEmpty ? 'Memory' : session.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      body: SafeArea(
+      child: SafeArea(
         child: Column(
           children: [
             Expanded(
@@ -185,28 +182,32 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: kTanuSurface,
+                        color: CupertinoColors.systemBackground,
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: TanuTheme.softShadow,
+                        boxShadow: [
+                          BoxShadow(
+                            color: CupertinoColors.systemGrey.withValues(alpha: 0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.auto_awesome, size: 16, color: kTanuInk),
+                              Icon(CupertinoIcons.sparkles, size: 16, color: CupertinoColors.activeBlue),
                               SizedBox(width: 8),
-                              Text('AI Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTanuInk)),
+                              Text('AI Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: CupertinoColors.activeBlue)),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(session.summary!, style: const TextStyle(height: 1.4, fontSize: 15, color: kTanuInk)),
+                          Text(session.summary!, style: const TextStyle(height: 1.4, fontSize: 15)),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    const Divider(color: kTanuLine),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                   ],
                   if (session.segments.isEmpty)
                     const Center(
@@ -214,7 +215,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                         padding: EdgeInsets.all(32.0),
                         child: Text(
                           'Nothing was captured in this session.',
-                          style: TextStyle(color: kTanuMuted),
+                          style: TextStyle(color: CupertinoColors.systemGrey),
                         ),
                       ),
                     )
@@ -225,48 +226,53 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                         )),
                   if (_messages.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    const Divider(color: kTanuLine),
+                    const Divider(color: CupertinoColors.systemGrey4),
                     const SizedBox(height: 16),
-                    const Text('Memory Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTanuMuted)),
+                    const Text('Memory Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: CupertinoColors.systemGrey)),
                     const SizedBox(height: 12),
                     ..._messages.map((m) => _ChatBubble(message: m)),
                   ],
                   if (_isGenerating)
                     const Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: kTanuInk)),
+                      child: Center(child: CupertinoActivityIndicator(radius: 12)),
                     ),
                 ],
               ),
             ),
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              decoration: const BoxDecoration(
-                color: kTanuBg,
-                border: Border(top: BorderSide(color: kTanuLine)),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGroupedBackground,
+                border: Border(top: BorderSide(color: CupertinoColors.separator.resolveFrom(context))),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: CupertinoTextField(
                       controller: _chatCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Ask about this memory...',
-                        filled: true,
-                        fillColor: kTanuSurface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kTanuInk)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      placeholder: 'Ask about this memory...',
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemBackground,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: CupertinoColors.systemGrey4),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
                     onPressed: _isGenerating ? null : _send,
-                    icon: const Icon(Icons.arrow_upward),
-                    style: IconButton.styleFrom(backgroundColor: kTanuInk, foregroundColor: kTanuBg),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _isGenerating ? CupertinoColors.systemGrey : CupertinoColors.activeBlue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(CupertinoIcons.arrow_up, color: CupertinoColors.white, size: 20),
+                    ),
                   ),
                 ],
               ),
@@ -291,13 +297,19 @@ class _ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isUser ? kTanuInk : kTanuSurface,
+          color: isUser ? CupertinoColors.activeBlue : CupertinoColors.systemBackground,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: isUser ? null : TanuTheme.softShadow,
+          boxShadow: isUser ? null : [
+            BoxShadow(
+              color: CupertinoColors.systemGrey.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            )
+          ],
         ),
         child: Text(
           message.content,
-          style: TextStyle(color: isUser ? kTanuBg : kTanuInk, fontSize: 15, height: 1.4),
+          style: TextStyle(color: isUser ? CupertinoColors.white : CupertinoColors.label, fontSize: 15, height: 1.4),
         ),
       ),
     );
@@ -318,15 +330,15 @@ class _ChatWelcome extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              status.isConnected ? Icons.record_voice_over : Icons.mic_none,
-              size: 44,
-              color: kTanuWarm,
+              status.isConnected ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+              size: 48,
+              color: CupertinoColors.systemBlue,
             ),
             const SizedBox(height: 16),
             const Text(
               'Connect your pendant over Bluetooth and just talk.\nTanu transcribes into a memory, right here.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: kTanuInk, height: 1.5),
+              style: TextStyle(fontSize: 16, height: 1.5),
             ),
           ],
         ),
@@ -363,14 +375,13 @@ class _SessionTranscript extends StatelessWidget {
                   _offsetLabel(session.segments.isNotEmpty
                       ? livePartialMs(session)
                       : 0),
-                  style: const TextStyle(fontSize: 12, color: kTanuMuted),
+                  style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     livePartial.trim(),
                     style: const TextStyle(
-                      color: kTanuInk,
                       fontSize: 15,
                       fontStyle: FontStyle.italic,
                       height: 1.35,
@@ -386,9 +397,9 @@ class _SessionTranscript extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.mic, size: 14, color: kTanuWarm),
+                Icon(CupertinoIcons.mic_fill, size: 14, color: CupertinoColors.activeBlue),
                 SizedBox(width: 6),
-                Text('Listening…', style: TextStyle(color: kTanuWarm)),
+                Text('Listening…', style: TextStyle(color: CupertinoColors.activeBlue)),
               ],
             ),
           ),
@@ -428,7 +439,7 @@ class _SegmentRow extends StatelessWidget {
           width: 44,
           child: Text(
             _offsetLabel(segment.startMs),
-            style: const TextStyle(fontSize: 12, color: kTanuMuted),
+            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
           ),
         ),
         const SizedBox(width: 10),
@@ -436,13 +447,13 @@ class _SegmentRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: kTanuSurface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kTanuLine),
+              color: CupertinoColors.systemBackground,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: CupertinoColors.systemGrey5),
             ),
             child: Text(
               text.isEmpty ? '…' : text,
-              style: const TextStyle(color: kTanuInk, height: 1.4, fontSize: 15),
+              style: const TextStyle(height: 1.4, fontSize: 15),
             ),
           ),
         ),
@@ -461,7 +472,7 @@ class _ModelLoadingChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: kTanuChip,
+        color: CupertinoColors.systemGrey5,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -470,14 +481,14 @@ class _ModelLoadingChip extends StatelessWidget {
           const SizedBox(
             width: 10,
             height: 10,
-            child: CircularProgressIndicator(strokeWidth: 1.8, color: kTanuWarm),
+            child: CupertinoActivityIndicator(radius: 5),
           ),
           const SizedBox(width: 6),
           Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
-              color: kTanuInk.withValues(alpha: 0.7),
+              color: CupertinoColors.systemGrey,
             ),
           ),
         ],

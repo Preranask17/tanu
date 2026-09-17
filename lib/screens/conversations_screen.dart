@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,7 +6,6 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../theme.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../widgets/conversation_tile.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
@@ -61,7 +61,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   @override
   Widget build(BuildContext context) {
     final sessions = ref.watch(conversationProvider).conversations;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 16;
     final query = _query.text.trim().toLowerCase();
 
     final visible = sessions.where((s) {
@@ -84,80 +84,80 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       groups[label]!.add(session);
     }
 
-    return Column(
-      children: [
-        if (_searching)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: TextField(
-              controller: _query,
-              autofocus: true,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Search memories',
-                prefixIcon: const Icon(Icons.search, color: kTanuMuted),
-                suffixIcon: _query.text.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.close, color: kTanuMuted),
-                        onPressed: () {
+    return CupertinoPageScaffold(
+      child: sessions.isEmpty
+          ? const _EmptyConversations()
+          : CustomScrollView(
+              controller: _scroll,
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
+                CupertinoSliverNavigationBar(
+                  largeTitle: const Text('Memories'),
+                  trailing: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: toggleSearch,
+                    child: Icon(
+                      _searching ? CupertinoIcons.clear_circled_solid : CupertinoIcons.search,
+                    ),
+                  ),
+                ),
+                CupertinoSliverRefreshControl(
+                  onRefresh: () async =>
+                      ref.read(conversationProvider.notifier).reloadFromStorage(),
+                ),
+                if (_searching)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: CupertinoSearchTextField(
+                        controller: _query,
+                        autofocus: true,
+                        onChanged: (_) => setState(() {}),
+                        onSuffixTap: () {
                           _query.clear();
                           setState(() {});
                         },
                       ),
-              ),
-            ),
-          ),
-        Expanded(
-          child: sessions.isEmpty
-              ? _EmptyConversations()
-              : RefreshIndicator(
-                  onRefresh: () async =>
-                      ref.read(conversationProvider.notifier).reloadFromStorage(),
-                  color: kTanuWarm,
-                  child: CustomScrollView(
-                    controller: _scroll,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverPadding(
-                        padding: EdgeInsets.only(
-                          top: _searching ? 12 : 4,
-                          left: 8,
-                          right: 8,
-                          bottom: kBottomNavBarHeight + bottomInset + 16,
-                        ),
-                        sliver: visible.isEmpty
-                            ? const SliverToBoxAdapter(child: _NoMatches())
-                            : SliverList(
-                                delegate: SliverChildListDelegate([
-                                  for (final label in order) ...[
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                          8, 16, 8, 0),
-                                      child: _DayHeader(label: label),
-                                    ),
-                                    for (final session in groups[label]!)
-                                      ConversationTile(
-                                        session: session,
-                                        isNew:
-                                            session.status ==
-                                                ConversationStatus.completed &&
-                                            (session.finishedAt ?? session.startedAt)
-                                                .isAfter(DateTime.now().subtract(
-                                                    const Duration(minutes: 1))),
-                                        onDelete: () => ref
-                                            .read(conversationProvider.notifier)
-                                            .removeSession(session.id),
-                                      ),
-                                  ],
-                                ]),
-                              ),
-                      ),
-                    ],
+                    ),
                   ),
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    top: _searching ? 4 : 12,
+                    left: 16,
+                    right: 16,
+                    bottom: bottomInset,
+                  ),
+                  sliver: visible.isEmpty && query.isNotEmpty
+                      ? const SliverToBoxAdapter(child: _NoMatches())
+                      : SliverList(
+                          delegate: SliverChildListDelegate([
+                            for (final label in order) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16, bottom: 4),
+                                child: _DayHeader(label: label),
+                              ),
+                              for (final session in groups[label]!)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: ConversationTile(
+                                    session: session,
+                                    isNew:
+                                        session.status ==
+                                            ConversationStatus.completed &&
+                                        (session.finishedAt ?? session.startedAt)
+                                            .isAfter(DateTime.now().subtract(
+                                                const Duration(minutes: 1))),
+                                    onDelete: () => ref
+                                        .read(conversationProvider.notifier)
+                                        .removeSession(session.id),
+                                  ),
+                                ),
+                            ],
+                          ]),
+                        ),
                 ),
-        ),
-      ],
+              ],
+            ),
     );
   }
 }
@@ -170,14 +170,14 @@ class _DayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 4, left: 4),
       child: Text(
         label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 12,
+        style: const TextStyle(
+          fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: kTanuInk.withValues(alpha: 0.55),
+          color: CupertinoColors.systemGrey,
         ),
       ),
     );
@@ -194,7 +194,7 @@ class _NoMatches extends StatelessWidget {
       child: Center(
         child: Text(
           'No matches for that search.',
-          style: TextStyle(color: kTanuMuted),
+          style: TextStyle(color: CupertinoColors.systemGrey),
         ),
       ),
     );
@@ -212,18 +212,18 @@ class _EmptyConversations extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.forum_outlined, color: kTanuMuted, size: 36),
-            const SizedBox(height: 12),
+            const Icon(CupertinoIcons.archivebox, color: CupertinoColors.systemGrey, size: 48),
+            const SizedBox(height: 16),
             const Text(
               'No memories yet.\nConnect your pendant and start talking.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: kTanuMuted, height: 1.5),
+              style: TextStyle(color: CupertinoColors.systemGrey, height: 1.5, fontSize: 16),
             ),
-            const SizedBox(height: 16),
-            FilledButton(
+            const SizedBox(height: 24),
+            CupertinoButton.filled(
               onPressed: () =>
                   ref.read(navigationTabProvider.notifier).goToHome(),
-              child: const Text('Go to Home'),
+              child: const Text('Go to Home', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           ],
         ),

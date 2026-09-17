@@ -140,4 +140,7 @@ class FakeAudioSource implements AudioSource {
 
   @override
   Stream<Uint8List> get utterances => _utterances.stream;
+
+  @override
+  void dispose() {}
 }

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -151,138 +151,54 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       (prev, next) => _syncForegroundTask(next),
     );
     final index = ref.watch(navigationTabProvider);
-
-    return MaterialApp(
-      title: 'Tanu',
-      debugShowCheckedModeBanner: false,
-      theme: TanuTheme.light(),
-      home: Scaffold(
-        appBar: _AppBar(
-          index: index,
-          onSearch: () => _conversationsKey.currentState?.toggleSearch(),
-        ),
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  // IndexedStack keeps all tabs alive and prewarmed, so the
-                  // pendant reconnect + model warm-up happen once at launch.
-                  child: IndexedStack(
-                    index: index,
-                    children: [
-                      HomeScreen(key: _homeKey),
-                      ConversationsScreen(key: _conversationsKey),
-                      const SettingsScreen(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (index == 0)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: kBottomNavBarHeight +
-                    kBottomNavChatBarGap +
-                    bottomNavBarReservedInset(context),
-                child: const HomeChatBar(),
-              ),
-            BottomNavBar(onTabTap: _onTabTap),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Transparent app bar Omi keeps over each tab. The device/status pill stays
-/// on the left like Omi's battery widget; each tab adds its own action(s).
-class _AppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _AppBar({required this.index, required this.onSearch});
-
-  final int index;
-  final VoidCallback onSearch;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(56);
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      title: _TabStatusTitle(index: index),
-      actions: [
-        if (index == 1)
-          IconButton(
-            tooltip: 'Search conversations',
-            onPressed: onSearch,
-            icon: const Icon(Icons.search, color: kTanuInk),
-          ),
-      ],
-    );
-  }
-}
-
-class _TabStatusTitle extends ConsumerWidget {
-  const _TabStatusTitle({required this.index});
-
-  final int index;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(pendantStatusProvider).value;
     final connected = status?.isConnected ?? false;
 
-    final Widget leading;
-    if (!connected) {
-      leading = Icon(Icons.bluetooth_disabled, size: 17, color: kTanuMuted);
-    } else if (status!.state == PendantState.reconnecting) {
-      leading = Icon(Icons.sync, size: 17, color: kTanuWarm);
-    } else {
-      leading = Icon(Icons.bluetooth_connected, size: 17, color: kTanuGreen);
-    }
-
-    final name = switch (status?.state) {
-      PendantState.scanning => 'Scanning…',
-      PendantState.connecting => 'Connecting…',
-      PendantState.reconnecting => 'Reconnecting…',
-      PendantState.connected =>
-        (status!.deviceName != null && status.deviceName!.isNotEmpty)
-            ? status.deviceName!
-            : 'Pendant',
-      PendantState.disconnected || null => 'Not connected',
-    };
-
-    final battery = (connected && status!.batteryPercent != null)
-        ? status.batteryPercent!
-        : null;
-
-    return Row(
-      children: [
-        leading,
-        const SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: connected ? kTanuInk : kTanuMuted,
+    return CupertinoApp(
+      title: 'Tanu',
+      debugShowCheckedModeBanner: false,
+      theme: TanuTheme.light(),
+      home: CupertinoTabScaffold(
+        controller: CupertinoTabController(initialIndex: index),
+        tabBar: CupertinoTabBar(
+          onTap: (i) {
+            if (i == index) {
+              _onTabTap(i, true);
+            } else {
+              ref.read(navigationTabProvider.notifier).goTo(i);
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(CupertinoIcons.mic),
+              activeIcon: Icon(CupertinoIcons.mic_solid),
+              label: 'Capture',
             ),
-          ),
+            BottomNavigationBarItem(
+              icon: Icon(CupertinoIcons.archivebox),
+              activeIcon: Icon(CupertinoIcons.archivebox_fill),
+              label: 'Memories',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(CupertinoIcons.settings),
+              activeIcon: Icon(CupertinoIcons.settings_solid),
+              label: 'Settings',
+            ),
+          ],
         ),
-        if (battery != null) ...[
-          const SizedBox(width: 8),
-          Icon(Icons.battery_std, size: 15, color: kTanuMuted),
-          const SizedBox(width: 2),
-          Text(
-            '$battery%',
-            style: const TextStyle(fontSize: 13, color: kTanuMuted),
-          ),
-        ],
-      ],
+        tabBuilder: (context, i) {
+          switch (i) {
+            case 0:
+              return HomeScreen(key: _homeKey);
+            case 1:
+              return ConversationsScreen(key: _conversationsKey);
+            case 2:
+              return const SettingsScreen();
+            default:
+              return const SizedBox.shrink();
+          }
+        },
+      ),
     );
   }
 }

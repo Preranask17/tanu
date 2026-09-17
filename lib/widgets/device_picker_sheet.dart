@@ -1,11 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ble_device.dart';
 import '../providers/ble_provider.dart';
-import '../theme.dart';
 
 /// Bottom sheet that scans for nearby BLE devices and lets the user pick the
 /// pendant. The device name is never assumed — anything connectable shows up.
@@ -103,9 +103,8 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
     final scanning = _scanning || devicesAsync.isLoading;
 
     return SafeArea(
-      child: Material(
-        color: kTanuBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: Container(
+        color: CupertinoColors.systemBackground,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
@@ -115,20 +114,19 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
             Center(
               child: Container(
                 width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
+                height: 5,
+                margin: const EdgeInsets.only(bottom: 16, top: 4),
                 decoration: BoxDecoration(
-                  color: kTanuInk.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
+                  color: CupertinoColors.systemGrey4,
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
             ),
-            Text(
+            const Text(
               'Connect your pendant',
-              style: const TextStyle(
-                fontSize: 20,
+              style: TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: kTanuInk,
               ),
             ),
             const SizedBox(height: 4),
@@ -136,33 +134,33 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
               scanning
                   ? 'Scanning for nearby Bluetooth devices…'
                   : 'Pick your pendant from the list below.',
-              style: TextStyle(
-                fontSize: 13,
-                color: kTanuInk.withValues(alpha: 0.6),
+              style: const TextStyle(
+                fontSize: 15,
+                color: CupertinoColors.systemGrey,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
             if (_error != null)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: kTanuInk.withValues(alpha: 0.05),
+                  color: CupertinoColors.destructiveRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kTanuInk.withValues(alpha: 0.2)),
+                  border: Border.all(color: CupertinoColors.destructiveRed.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, size: 18, color: kTanuInk),
-                    const SizedBox(width: 8),
+                    const Icon(CupertinoIcons.exclamationmark_triangle_fill, size: 20, color: CupertinoColors.destructiveRed),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _error!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: kTanuInk.withValues(alpha: 0.8),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: CupertinoColors.destructiveRed,
                         ),
                       ),
                     ),
@@ -179,19 +177,12 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                             ? Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const SizedBox(
-                                    width: 26,
-                                    height: 26,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.4,
-                                      color: kTanuInk,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
+                                  const CupertinoActivityIndicator(radius: 14),
+                                  const SizedBox(height: 16),
                                   Text(
                                     'Looking…',
                                     style: TextStyle(
-                                      color: kTanuInk.withValues(alpha: 0.7),
+                                      color: CupertinoColors.systemGrey,
                                     ),
                                   ),
                                 ],
@@ -201,15 +192,15 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                                     ? 'No devices found.'
                                     : 'Try again.',
                                 style: TextStyle(
-                                  color: kTanuInk.withValues(alpha: 0.7),
+                                  color: CupertinoColors.systemGrey,
                                 ),
                               ),
                       )
                     : ListView.separated(
                         itemCount: devices.length,
-                        separatorBuilder: (_, _) => Divider(
+                        separatorBuilder: (_, _) => const Divider(
                           height: 1,
-                          color: kTanuInk.withValues(alpha: 0.08),
+                          color: CupertinoColors.systemGrey5,
                         ),
                         itemBuilder: (context, index) {
                           final d = devices[index];
@@ -225,19 +216,21 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                TextButton.icon(
-                  onPressed: _connectingId != null ? null : _restartScan,
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('Scan again'),
+                Expanded(
+                  child: CupertinoButton(
+                    onPressed: _connectingId != null ? null : () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
                 ),
-                FilledButton(
-                  onPressed:
-                      _connectingId != null ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: CupertinoButton.filled(
+                    onPressed: _connectingId != null ? null : _restartScan,
+                    child: const Text('Scan again', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ],
             ),
@@ -266,32 +259,46 @@ class _DeviceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    return GestureDetector(
       onTap: enabled ? onTap : null,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: Icon(
-        Icons.watch_outlined,
-        color: kTanuInk.withValues(alpha: 0.7),
-      ),
-      title: Text(
-        device.displayName,
-        style: const TextStyle(fontWeight: FontWeight.w600, color: kTanuInk),
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        '${device.id}   ·   ${device.rssi} dBm',
-        style: TextStyle(fontSize: 12, color: kTanuInk.withValues(alpha: 0.55)),
-      ),
-      trailing: connecting
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2.2, color: kTanuInk),
-            )
-          : Icon(
-              connected ? Icons.check_circle : Icons.chevron_right,
-              color: kTanuInk.withValues(alpha: 0.7),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        child: Row(
+          children: [
+            const Icon(
+              CupertinoIcons.device_laptop,
+              color: CupertinoColors.systemGrey,
+              size: 28,
             ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    device.displayName,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${device.id}   ·   ${device.rssi} dBm',
+                    style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey),
+                  ),
+                ],
+              ),
+            ),
+            if (connecting)
+              const CupertinoActivityIndicator()
+            else
+              Icon(
+                connected ? CupertinoIcons.checkmark_alt_circle_fill : CupertinoIcons.chevron_right,
+                color: connected ? CupertinoColors.activeBlue : CupertinoColors.systemGrey4,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
