@@ -223,10 +223,12 @@ class BluetoothPendantSource implements AudioSource {
   /// [discoveredDevices], best signal first, deduped by MAC.
   @override
   Future<void> startScanForDevices() async {
+    if (FlutterBluePlus.isScanningNow) {
+      await stopScanForDevices();
+    }
+
     _scanAutoStop?.cancel();
     _scanAutoStop = Timer(const Duration(seconds: 20), stopScanForDevices);
-
-    if (FlutterBluePlus.isScanningNow) return;
 
     _scanResultsSub?.cancel();
     _scanResultsSub = FlutterBluePlus.onScanResults.listen(_onScanResults);
