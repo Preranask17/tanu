@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../abstractions/audio_source.dart';
 import '../models/ble_device.dart';
 import '../services/ble/bluetooth_pendant_source.dart';
+import '../services/simulator_pendant_source.dart';
+
+/// Set this to true to use your PC microphone as the pendant source for testing.
+/// Be sure to set this back to false before committing!
+const bool kUseSimulator = true;
 
 /// Singleton pendant source. Its status is watched via [pendantStatusProvider].
 final pendantProvider = Provider<AudioSource>((ref) {
-  final source = BluetoothPendantSource();
+  final source = kUseSimulator ? SimulatorPendantSource() : BluetoothPendantSource();
   ref.onDispose(source.dispose);
   return source;
 });
