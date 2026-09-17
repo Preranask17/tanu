@@ -94,7 +94,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                       const ConnectionStatusBar(),
                       if (overdue.isNotEmpty)
                         CupertinoListSection.insetGrouped(
-                          header: const Text('NEEDS ATTENTION'),
+                          header: const Text('Needs attention'),
                           children: overdue.map((c) => _CommitmentTile(
                             commitment: c,
                             dueText: _dueLabel(c, currentDate),
@@ -103,7 +103,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                         ),
                       if (active.isNotEmpty)
                         CupertinoListSection.insetGrouped(
-                          header: const Text('UPCOMING'),
+                          header: const Text('Upcoming'),
                           children: active.map((c) => _CommitmentTile(
                             commitment: c,
                             dueText: _dueLabel(c, currentDate),
@@ -111,7 +111,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                         ),
                       if (done.isNotEmpty)
                         CupertinoListSection.insetGrouped(
-                          header: const Text('DONE'),
+                          header: const Text('Done'),
                           children: done.map((c) => _CommitmentTile(
                             commitment: c,
                             dueText: _dueLabel(c, currentDate),

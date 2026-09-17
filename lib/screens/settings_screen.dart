@@ -40,7 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 CupertinoListSection.insetGrouped(
-                  header: const Text('APPEARANCE'),
+                  header: const Text('Appearance'),
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -64,7 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 CupertinoListSection.insetGrouped(
-                  header: const Text('PENDANT'),
+                  header: const Text('Pendant'),
                   children: [
                     CupertinoListTile(
                       leading: Icon(
@@ -94,14 +94,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 CupertinoListSection.insetGrouped(
-                  header: const Text('VOICE MODEL'),
+                  header: const Text('Voice Model'),
                   children: const [
                     _SttBackendToggle(),
                     _VoiceModelGroup(),
                   ],
                 ),
                 CupertinoListSection.insetGrouped(
-                  header: const Text('DATA'),
+                  header: const Text('Data'),
                   children: [
                     CupertinoListTile(
                       leading: const Icon(CupertinoIcons.delete_solid, color: CupertinoColors.destructiveRed),
@@ -112,7 +112,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 CupertinoListSection.insetGrouped(
-                  header: const Text('DEVELOPER'),
+                  header: const Text('Developer'),
                   children: [
                     CupertinoListTile(
                       leading: const Icon(CupertinoIcons.chevron_left_slash_chevron_right),

@@ -1,46 +1,40 @@
-# Changelog
+# Tanu App - Changelog & Architecture Updates
 
-All notable changes to this project will be documented in this file.
+This document outlines the end-to-end changes made during the latest development sprint. The app was transformed from a basic audio dictation tool into an intelligent, polished iOS-style AI memory assistant.
 
-## [Unreleased] - MVP build
-### Changed
-- **Architectural Shift (UI Framework)**: Fully migrated from Material Design to native Cupertino (iOS) styling across the entire app.
-- **Theme**: Removed all Material colors and themes (`kTanuBg`, `kTanuInk`, etc.). Implemented `CupertinoThemeData` utilizing system colors (`CupertinoColors.systemBackground`, `CupertinoColors.systemGroupedBackground`, `CupertinoColors.activeBlue`, etc.) to provide an authentic, modern iOS 18 minimalistic and rich aesthetic.
-- **Complete iOS 18 Design Language Update:**
-  - Migrated entire app structure from `MaterialApp` to pure `CupertinoApp` (iOS 18 style).
+---
+
+## 1. Core Audio Pipeline & On-Device Models
+* **Silero VAD (1.8 MB):** Integrated the ultra-lightweight Silero VAD v4 model (1.8 MB) to detect human speech locally on-device. Fixed an initialization crash in `moonshine_stt_engine.dart` by explicitly setting the window size to `512`.
+* **Moonshine STT (44 MB):** Integrated the `moonshine-tiny-en.tar.bz2` (44 MB) on-device speech-to-text model for robust offline audio processing.
+* **Deepgram Cloud STT:** Maintained support for streaming to Deepgram (nova-3) for high-fidelity cloud transcription.
+* **PCM Alignment Fix:** Addressed audio phase-shifting (chipmunk/slowed down audio) in `SimulatorPendantSource`. Implemented a byte-alignment buffer to gracefully handle odd-byte-length audio chunks, ensuring perfectly aligned 16-bit PCM frames.
+* **Bluetooth Scan Retry:** Fixed an issue where the "Scan again" button in the `BluetoothPendantSource` would remain disabled or silently fail. It now forcefully stops any existing scans before instantly restarting.
+
+## 2. Safe Hardware Simulation
+* **Simulator Toggle:** Implemented a clean `kUseSimulator` toggle in `ble_provider.dart`. This allows the team to seamlessly switch between the physical hardware (`BluetoothPendantSource`) and the local desktop microphone (`SimulatorPendantSource`) without breaking production code.
+
+## 3. Complete iOS 18 Design Language Update (UI/UX)
+* **Architectural Shift (UI Framework)**: Fully migrated from Material Design to native Cupertino (iOS 18) styling across the entire app.
+* **Theme & Typography**: Removed all Material colors and themes (`kTanuBg`, `kTanuInk`, etc.). Implemented `CupertinoThemeData` utilizing system colors and `GoogleFonts.inter` (to cleanly mimic Apple's SF Pro) to provide an authentic, modern iOS 18 aesthetic.
+* **Dynamic Dark/Light Mode Engine:**
+  - Integrated `CupertinoDynamicColor.resolveFrom(context)` throughout the codebase to ensure responsive color mapping for elements like containers, text, and custom pills.
+  - Implemented `AppSettings` (via Riverpod + Hive) for real-time appearance toggling (System, Light, Dark).
+  - Fixed hardcoded Material colors that caused text and icons to render improperly in Dark Mode across `chat_screen.dart`, `state_indicator.dart`, and `connection_status_bar.dart`.
+* **Native iOS Components:**
   - Adopted `CupertinoPageScaffold`, `CupertinoSliverNavigationBar`, and `CupertinoListSection.insetGrouped` across all screens.
   - Redesigned `CommitmentsScreen`, `ChatScreen`, `SettingsScreen`, and `HomeScreen` with native iOS styling, removing all Material artifacts (e.g. `Divider`, `Card`, `ListTile`).
   - Swapped all `Icons.*` for native `CupertinoIcons.*`.
-- **Dynamic Dark/Light Mode Engine:**
-  - Integrated `CupertinoDynamicColor.resolveFrom(context)` throughout the codebase to ensure responsive color mapping for elements like containers, text, and custom pills.
-  - Implemented `AppSettings` (via Riverpod + Hive) for real-time appearance toggling (System, Light, Dark).
   - Replaced standard ListViews with CustomScrollViews to support bouncy physics.
-  - Revamped action buttons and status cards using `CupertinoButton` and subtle iOS-styled container borders and shadows.
-- **Conversations Screen (Memory List)**:
-  - Migrated to `CupertinoPageScaffold` with `CupertinoSliverNavigationBar`.
-  - Converted the Search bar to `CupertinoSearchTextField`.
-  - Adjusted the layout to seamlessly integrate with native iOS safe areas and scrolling physics.
-- **Settings Screen**:
-  - Added a new `APPEARANCE` section with a `CupertinoSlidingSegmentedControl` to toggle between System, Light, and Dark modes.
-  - Refactored entire layout from standard `ListView` to `CupertinoListSection.insetGrouped` for the classic iOS settings appearance.
-  - Replaced custom tiles with `CupertinoListTile`.
-  - Replaced standard toggles with `CupertinoSwitch`.
-  - Converted all dialogs (delete confirmations, etc.) to `CupertinoAlertDialog` invoked via `showCupertinoDialog`.
-- **Chat Screen & Session Detail (Live Memory)**:
-  - Migrated to `CupertinoPageScaffold`.
-  - Replaced standard AppBar with `CupertinoNavigationBar` (inline middle titles for pushed pages).
-  - Redesigned chat bubbles to use iOS styling (Blue for user, Grey/White for assistant).
-  - Migrated text input to `CupertinoTextField` with an integrated rounded `CupertinoButton` for the send action.
-  - Replaced `CircularProgressIndicator` with `CupertinoActivityIndicator`.
-- **Device Picker Sheet**:
-  - Converted from a Material `BottomSheet` to an iOS-styled modal popup invoked via `showCupertinoModalPopup`.
-  - Styled with native background colors, rounded top edges, and standard Cupertino typography.
+* **Device Picker Sheet**: Converted from a Material `BottomSheet` to an iOS-styled modal popup invoked via `showCupertinoModalPopup`.
 
-### Fixed
-- **Bluetooth Scan Retry**: Fixed the `BluetoothPendantSource` to allow the user to successfully retry scanning for devices when the initial scan times out or fails. The "Scan again" button is now fully functional.
-- **Dark Mode UI Inconsistencies**: Fixed hardcoded Material colors and missing `resolveFrom(context)` calls in `chat_screen.dart`, `state_indicator.dart`, and `connection_status_bar.dart` that caused text and icons to render improperly in Dark Mode.
-- **Material Icon Crashes**: Replaced leftover Material `Icons.*` with `CupertinoIcons.*` in `state_indicator.dart` and `connection_status_bar.dart`.
+## 4. Tanu Intelligence (AI Architecture)
+* **Memory Processor:** Rewrote the isolated `CommitmentExtractor` into a unified `MemoryProcessor` within `mistral_agent_engine.dart`. It now parses the raw transcript and requests a single JSON payload containing: a Title, a Summary, and To-Dos.
+* **Mock Fallbacks:** Added safety fallbacks to `MistralAgentEngine`. If no `MISTRAL_API_KEY` is provided, the engine will simulate a processing delay and return mock AI data.
+* **State Management:** Created `agent_provider.dart` to cleanly expose the Mistral Engine to Riverpod. 
+* **Background Processing:** Updated `conversation_provider.dart`. When a session closes, it triggers a background task to process the memory via the `MemoryProcessor`, updates the Hive storage with the new AI summary, and pipes any extracted action items into the `CommitmentsProvider`.
 
-### Added
-- **Dark Mode Support**: Full support for iOS dark mode natively.
-- Comprehensive changelog documentation (`CHANGELOG.md`) to track architectural updates and features for the team.
+## 5. Interactive Memory Chat
+* **Session Detail Upgrade:** Transformed `SessionDetailPage` (`chat_screen.dart`) from a static, read-only list of words into an interactive memory assistant.
+* **Chat Interface:** Added an AI Summary card at the top, and a sticky chat input field at the bottom.
+* **Contextual Q&A:** Users can type questions about their specific memory. The app passes the question and the memory's transcript to Mistral, streaming the contextual answer directly into a chat bubble history.
