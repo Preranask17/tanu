@@ -234,11 +234,28 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   /// --- Transcript stream (Omi-style in-place merge) ----------------------
 
+  static final _hallucinations = {
+    'thank you.',
+    'thank you',
+    'thank you!',
+    'bye.',
+    'bye',
+    'thanks for watching.',
+    'thanks for watching!',
+    'subtitles by amara.org',
+    'you',
+    'you.',
+  };
+
+  bool _isHallucination(String text) {
+    return _hallucinations.contains(text.toLowerCase());
+  }
+
   /// Live partial sentence: writes into the last (open) segment in place and
   /// only opens a new segment id when the previous one was locked.
   void _onPartial(String text) {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _micTestActive) return;
+    if (trimmed.isEmpty || _isHallucination(trimmed) || _micTestActive) return;
     if (!_continuousStarted) return;
     final session = state.active;
     if (session == null) return;
@@ -269,7 +286,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
   /// appends one if no partial previewed it. Resets the idle timer.
   void _onUtterance(String text) {
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _micTestActive) return;
+    if (trimmed.isEmpty || _isHallucination(trimmed) || _micTestActive) return;
     if (!_continuousStarted) return;
     final session = state.active;
     if (session == null) return;
