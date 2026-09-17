@@ -59,7 +59,7 @@ final class ModelDownloadCoordinator {
   static Future<File?> ensure({void Function(String)? onEvent}) {
     final task = _singleton._tasks[kMoonshineBundleFileName];
     if (task != null) {
-      onEvent?.call('downloading $kMoonshineModelLabel… (already running)');
+      onEvent?.call('downloading models… (already running)');
       return task.done;
     }
     final started = _ActiveTask(onEvent);
@@ -96,8 +96,9 @@ final class _ActiveTask {
       return null;
     }
 
-    for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt++) {
+      for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt++) {
       try {
+        await _ensureVad(onEvent);
         final file = await _downloadAndExtract();
         if (file != null) {
           ok = true;
@@ -112,10 +113,29 @@ final class _ActiveTask {
         }
       }
       onEvent?.call(
-          'downloading $kMoonshineModelLabel… retry $attempt/$_maxDownloadAttempts');
+          'downloading models… retry $attempt/$_maxDownloadAttempts');
       await Future<void>.delayed(Duration(seconds: 2 * attempt));
     }
     return null;
+  }
+
+  Future<void> _ensureVad(void Function(String)? onEvent) async {
+    final support = await getApplicationSupportDirectory();
+    final file = File('${support.path}/$kSileroVadFileName');
+    if (file.existsSync() && file.lengthSync() > 0) return;
+    
+    onEvent?.call('downloading VAD model…');
+    final client = http.Client();
+    try {
+      final response = await client.get(Uri.parse(kSileroVadUrl));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+      } else {
+        throw HttpException('vad download failed: ${response.statusCode}');
+      }
+    } finally {
+      client.close();
+    }
   }
 
   /// The model directory sherpa_onnx reads from: `appSupport/<bundle-stem>`,

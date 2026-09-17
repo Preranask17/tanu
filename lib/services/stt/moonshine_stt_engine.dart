@@ -64,6 +64,8 @@ class MoonshineSttEngine implements ContinuousSttEngine {
   Timer? _partialTimer;
   String _lastPartialText = '';
   final Stopwatch _lastMicEmit = Stopwatch()..start();
+  
+  VoiceActivityDetector? _vad;
 
   /// Silence-cut clips awaiting their accurate final pass, each carrying the
   /// best live hypothesis captured at flush time. If the decoder returns empty
@@ -412,6 +414,24 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     if (_continuousActive) return true;
     if (!await _ensureWorker(onEvent)) return false;
 
+    try {
+      await initBindingsAsync();
+      final support = await getApplicationSupportDirectory();
+      final vadPath = '${support.path}/$kSileroVadFileName';
+      _vad = VoiceActivityDetector(
+        config: VadModelConfig(
+          sileroVad: SileroVadModelConfig(model: vadPath),
+          sampleRate: _sampleRate,
+        ),
+        bufferSizeInSeconds: 30,
+      );
+    } catch (e) {
+      debugPrint('[tanu] vad init failed: $e');
+      _lastError = 'vad init failed: $e';
+      onEvent?.call('vad error: $e');
+      return false;
+    }
+
     _continuousActive = true;
     _onUtteranceCb = onUtterance;
     _onPartialCb = onPartial;
@@ -450,16 +470,20 @@ class MoonshineSttEngine implements ContinuousSttEngine {
       _onMicLevelCb?.call(level);
     }
 
+    _vad?.acceptWaveform(samples);
+    final isSpeaking = _vad?.isDetected() ?? (level >= _vadThreshold);
+    while (_vad != null && !_vad!.isEmpty()) {
+      _vad!.pop(); // we don't need the extracted segments, just the state
+    }
+
     final ms = samples.length * 1000 ~/ _sampleRate;
     if (!_vadSpeech) {
-      if (level < _vadThreshold) {
-        _noiseFloor = _noiseFloor * 0.94 + level * 0.06;
+      if (!isSpeaking) {
+        if (_vad == null) _noiseFloor = _noiseFloor * 0.94 + level * 0.06;
         return;
       }
       // Speech just started: open a fresh utterance.
-      debugPrint(
-          '[tanu] vad speech onset level=${level.toStringAsFixed(4)} '
-          'threshold=${_vadThreshold.toStringAsFixed(4)}');
+      debugPrint('[tanu] vad speech onset');
       _vadSpeech = true;
       _pendingSamples.clear();
       _utteranceMs = 0;
@@ -471,7 +495,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     _pendingSamples.addAll(samples);
     _utteranceMs += ms;
     _vadSilenceMs =
-        level >= _vadThreshold ? 0 : _vadSilenceMs + ms;
+        isSpeaking ? 0 : _vadSilenceMs + ms;
 
     if (_utteranceMs >= _maxUtteranceMs ||
         _vadSilenceMs >= _silenceFlushMs) {
@@ -605,6 +629,8 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     _onMicLevelCb = null;
     _onEventCb = null;
     _pendingSamples.clear();
+    _vad?.free();
+    _vad = null;
   }
 
   @override
@@ -632,6 +658,8 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     _transcribeQueue.clear();
     await _shutdownWorker();
     _startFuture = null;
+    _vad?.free();
+    _vad = null;
   }
 
   Future<void> _releaseMic() async {

@@ -35,6 +35,10 @@ const String kMoonshineBundleUrl =
     'sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2';
 const String kMoonshineBundleFileName = 'moonshine-tiny-en.tar.bz2';
 
+const String kSileroVadUrl = 
+    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
+const String kSileroVadFileName = 'silero_vad.onnx';
+
 /// The archive extracts into a directory of the same stem name inside app
 /// support; these are the three files sherpa_onnx loads, with the bytes the
 /// archive should contain. `decoder_model_merged.ort` is the merged-decoder
