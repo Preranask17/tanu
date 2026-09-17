@@ -420,7 +420,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
       final vadPath = '${support.path}/$kSileroVadFileName';
       _vad = VoiceActivityDetector(
         config: VadModelConfig(
-          sileroVad: SileroVadModelConfig(model: vadPath),
+          sileroVad: SileroVadModelConfig(model: vadPath, windowSize: 512),
           sampleRate: _sampleRate,
         ),
         bufferSizeInSeconds: 30,
