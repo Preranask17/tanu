@@ -83,12 +83,20 @@ class SimulatorPendantSource implements AudioSource {
         numChannels: 1,
       ));
       
+      var remainder = <int>[];
       _micSub = stream.listen((chunk) {
-        _pcmAudioCtrl.add(chunk);
-        _stats.value = _stats.value.copyWith(
-          bytes: _stats.value.bytes + chunk.length,
-          packets: _stats.value.packets + 1,
-        );
+        final allBytes = remainder.isEmpty ? chunk : Uint8List.fromList(remainder + chunk);
+        final emitLength = allBytes.length - (allBytes.length % 2);
+        
+        if (emitLength > 0) {
+          final emitChunk = Uint8List.sublistView(allBytes, 0, emitLength);
+          _pcmAudioCtrl.add(emitChunk);
+          _stats.value = _stats.value.copyWith(
+            bytes: _stats.value.bytes + emitLength,
+            packets: _stats.value.packets + 1,
+          );
+        }
+        remainder = allBytes.sublist(emitLength);
       });
 
       _status.value = const PendantStatus(
