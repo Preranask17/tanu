@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - MVP build
 ### Changed
 - **Architectural Shift (UI Framework)**: Fully migrated from Material Design to native Cupertino (iOS) styling across the entire app.
-- **Theme**: Removed all Material colors and themes (`kTanuBg`, `kTanuInk`, etc.). Implemented `CupertinoThemeData` utilizing system colors (`CupertinoColors.systemBackground`, `CupertinoColors.systemGroupedBackground`, `CupertinoColors.activeBlue`, etc.) to provide an authentic, modern iOS 27 minimalistic and rich aesthetic.
+- **Theme**: Removed all Material colors and themes (`kTanuBg`, `kTanuInk`, etc.). Implemented `CupertinoThemeData` utilizing system colors (`CupertinoColors.systemBackground`, `CupertinoColors.systemGroupedBackground`, `CupertinoColors.activeBlue`, etc.) to provide an authentic, modern iOS 18 minimalistic and rich aesthetic.
 - **Complete iOS 18 Design Language Update:**
   - Migrated entire app structure from `MaterialApp` to pure `CupertinoApp` (iOS 18 style).
   - Adopted `CupertinoPageScaffold`, `CupertinoSliverNavigationBar`, and `CupertinoListSection.insetGrouped` across all screens.
