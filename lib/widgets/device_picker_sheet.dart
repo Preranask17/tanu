@@ -230,7 +230,7 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 TextButton.icon(
-                  onPressed: scanning ? null : _restartScan,
+                  onPressed: _connectingId != null ? null : _restartScan,
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Scan again'),
                 ),

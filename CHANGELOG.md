@@ -7,7 +7,7 @@ This document outlines the end-to-end changes made during the latest development
 ## 1. Core Audio Pipeline & BLE Fixes
 * **Silero VAD Window Size Fix:** Fixed an initialization crash in `moonshine_stt_engine.dart` by explicitly setting the window size for the Silero VAD v4 model to `512` (previously it was defaulting to an incompatible size).
 * **PCM Alignment Fix:** Addressed audio phase-shifting (chipmunk/slowed down audio) in `SimulatorPendantSource`. Implemented a byte-alignment buffer to gracefully handle odd-byte-length audio chunks, ensuring perfectly aligned 16-bit PCM frames.
-* **Scan Again Fix:** Fixed a bug in `BluetoothPendantSource` where the "Scan again" button in the device picker would silently fail if the system thought it was already scanning. It now forcefully stops any existing scans before restarting.
+* **Scan Again Fix:** Fixed an issue where the "Scan again" button would remain disabled for 20 seconds while a scan was running. It is now always clickable, instantly cancelling the old scan and forcing a fresh one.
 
 ## 2. Safe Hardware Simulation
 * **Simulator Toggle:** Implemented a clean `kUseSimulator` toggle in `ble_provider.dart`. This allows the team to seamlessly switch between the physical hardware (`BluetoothPendantSource`) and the local desktop microphone (`SimulatorPendantSource`) without polluting or breaking the production hardware code.
