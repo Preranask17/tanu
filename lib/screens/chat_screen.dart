@@ -5,6 +5,8 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
 import '../providers/ble_provider.dart';
+import '../providers/agent_provider.dart';
+import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../theme.dart';
 import '../widgets/connection_status_bar.dart';
@@ -84,13 +86,84 @@ class ChatPage extends ConsumerWidget {
 }
 
 /// Read-only transcript of a completed memory.
-class SessionDetailPage extends StatelessWidget {
+class SessionDetailPage extends ConsumerStatefulWidget {
   const SessionDetailPage({super.key, required this.session});
 
   final ConversationSession session;
 
   @override
+  ConsumerState<SessionDetailPage> createState() => _SessionDetailPageState();
+}
+
+class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
+  final _chatCtrl = TextEditingController();
+  final List<ChatMessage> _messages = [];
+  bool _isGenerating = false;
+  final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _chatCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _chatCtrl.text.trim();
+    if (text.isEmpty || _isGenerating) return;
+
+    _chatCtrl.clear();
+    setState(() {
+      _messages.add(ChatMessage(role: 'user', content: text));
+      _isGenerating = true;
+    });
+    _scrollToBottom();
+
+    final engine = ref.read(mistralEngineProvider);
+    try {
+      final reply = await engine.prompt(
+        widget.session.transcriptText,
+        history: [
+          const ChatMessage(
+            role: 'system',
+            content: 'You are an AI assistant helping a user recall details from their memory. Use the provided transcript context to answer.',
+          ),
+          ..._messages,
+        ],
+      );
+      if (mounted) {
+        setState(() {
+          _messages.add(ChatMessage(role: 'assistant', content: reply));
+          _isGenerating = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _messages.add(ChatMessage(role: 'assistant', content: 'Failed to query memory: $e'));
+          _isGenerating = false;
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
     return Scaffold(
       backgroundColor: kTanuBg,
       appBar: AppBar(
@@ -101,21 +174,131 @@ class SessionDetailPage extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        top: false,
-        child: session.segments.isEmpty
-            ? const Center(
-                child: Text(
-                  'Nothing was captured in this session.',
-                  style: TextStyle(color: kTanuMuted),
-                ),
-              )
-            : ListView.separated(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                controller: _scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: session.segments.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, i) =>
-                    _SegmentRow(segment: session.segments[i]),
+                children: [
+                  if (session.summary != null && session.summary!.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: kTanuSurface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: TanuTheme.softShadow,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.auto_awesome, size: 16, color: kTanuInk),
+                              SizedBox(width: 8),
+                              Text('AI Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTanuInk)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(session.summary!, style: const TextStyle(height: 1.4, fontSize: 15, color: kTanuInk)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(color: kTanuLine),
+                    const SizedBox(height: 16),
+                  ],
+                  if (session.segments.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Text(
+                          'Nothing was captured in this session.',
+                          style: TextStyle(color: kTanuMuted),
+                        ),
+                      ),
+                    )
+                  else
+                    ...session.segments.map((s) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _SegmentRow(segment: s),
+                        )),
+                  if (_messages.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    const Divider(color: kTanuLine),
+                    const SizedBox(height: 16),
+                    const Text('Memory Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: kTanuMuted)),
+                    const SizedBox(height: 12),
+                    ..._messages.map((m) => _ChatBubble(message: m)),
+                  ],
+                  if (_isGenerating)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: kTanuInk)),
+                    ),
+                ],
               ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              decoration: const BoxDecoration(
+                color: kTanuBg,
+                border: Border(top: BorderSide(color: kTanuLine)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _chatCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Ask about this memory...',
+                        filled: true,
+                        fillColor: kTanuSurface,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: kTanuInk)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onSubmitted: (_) => _send(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _isGenerating ? null : _send,
+                    icon: const Icon(Icons.arrow_upward),
+                    style: IconButton.styleFrom(backgroundColor: kTanuInk, foregroundColor: kTanuBg),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatBubble extends StatelessWidget {
+  const _ChatBubble({required this.message});
+  final ChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.role == 'user';
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isUser ? kTanuInk : kTanuSurface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isUser ? null : TanuTheme.softShadow,
+        ),
+        child: Text(
+          message.content,
+          style: TextStyle(color: isUser ? kTanuBg : kTanuInk, fontSize: 15, height: 1.4),
+        ),
       ),
     );
   }

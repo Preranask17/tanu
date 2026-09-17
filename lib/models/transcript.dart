@@ -80,6 +80,7 @@ class ConversationSession {
     this.finishedAt,
     this.status = ConversationStatus.inProgress,
     this.segments = const [],
+    this.summary,
   });
 
   final String id;
@@ -88,6 +89,7 @@ class ConversationSession {
   final DateTime? finishedAt;
   final ConversationStatus status;
   final List<TranscriptSegment> segments;
+  final String? summary;
 
   String get transcriptText => segments.map((s) => s.text).join(' ').trim();
 
@@ -95,10 +97,10 @@ class ConversationSession {
 
   ConversationSession copyWith({
     String? title,
-    DateTime? startedAt,
     DateTime? finishedAt,
     ConversationStatus? status,
     List<TranscriptSegment>? segments,
+    String? summary,
   }) {
     return ConversationSession(
       id: id,
@@ -107,16 +109,17 @@ class ConversationSession {
       finishedAt: finishedAt ?? this.finishedAt,
       status: status ?? this.status,
       segments: segments ?? this.segments,
+      summary: summary ?? this.summary,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
-        'startedAt': startedAt.toIso8601String(),
         'finishedAt': finishedAt?.toIso8601String(),
         'status': status.name,
         'segments': segments.map((s) => s.toJson()).toList(),
+        'summary': summary,
       };
 
   factory ConversationSession.fromJson(Map<String, dynamic> json) {
@@ -135,6 +138,7 @@ class ConversationSession {
           : DateTime.tryParse(json['finishedAt'] as String),
       status: status ?? ConversationStatus.completed,
       segments: segments,
+      summary: json['summary'] as String?,
     );
   }
 }

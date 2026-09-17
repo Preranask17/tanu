@@ -35,7 +35,11 @@ class MistralAgentEngine implements AgentEngine {
     List<ChatMessage>? history,
   }) async {
     if (apiKey.isEmpty) {
-      throw AgentException('No Mistral API key configured');
+      await Future.delayed(const Duration(seconds: 1));
+      if (history != null && history.any((m) => m.content.contains('"title"'))) {
+        return '{"title": "Mock Chat Memory", "summary": "This is a mock summary generated because no Mistral API key was provided.", "commitments": []}';
+      }
+      return 'This is a mock AI response since no API key is provided. You said: "$transcript"';
     }
 
     final messages = <Map<String, String>>[
@@ -104,13 +108,26 @@ class AgentCommitment {
   final String? due;
 }
 
-/// Single-shot Mistral call asking the model to output commitment JSON.
-class CommitmentExtractor {
-  CommitmentExtractor(this._engine);
+/// Typed result of memory processing.
+class MemoryResult {
+  const MemoryResult({
+    required this.title,
+    required this.summary,
+    required this.commitments,
+  });
+
+  final String title;
+  final String summary;
+  final List<AgentCommitment> commitments;
+}
+
+/// Single-shot Mistral call asking the model to process a memory into a JSON summary.
+class MemoryProcessor {
+  MemoryProcessor(this._engine);
 
   final MistralAgentEngine _engine;
 
-  Future<List<AgentCommitment>> extract(String conversation) async {
+  Future<MemoryResult> process(String conversation) async {
     try {
       final raw = await _engine.prompt(
         conversation,
@@ -118,32 +135,41 @@ class CommitmentExtractor {
           ChatMessage(
             role: 'system',
             content: '''
-You extract commitments from a user's conversation. Given the conversation,
-find any commitment, reminder, or to-do the user expressed and reply with ONLY
-a JSON object shaped like:
-{"commitments": [{"is_commitment": true, "action": "...", "person": "...", "due": "YYYY-MM-DD"}]}
-Return {"commitments": []} if none. No commentary, no markdown.
+You process a user's transcribed conversation memory.
+Given the conversation transcript, extract a title, a short summary, and any commitments or action items.
+Reply with ONLY a JSON object shaped exactly like this:
+{
+  "title": "A short 3-4 word title",
+  "summary": "A 1-2 sentence concise summary.",
+  "commitments": [{"is_commitment": true, "action": "...", "person": "...", "due": "YYYY-MM-DD"}]
+}
+No commentary, no markdown.
 ''',
           ),
         ],
       );
       return _parse(raw);
     } catch (e) {
-      return const [];
+      return MemoryResult(
+        title: 'Memory',
+        summary: 'Failed to process memory: $e',
+        commitments: const [],
+      );
     }
   }
 
-  List<AgentCommitment> _parse(String raw) {
+  MemoryResult _parse(String raw) {
     final start = raw.indexOf('{');
     final end = raw.lastIndexOf('}');
-    if (start == -1 || end == -1) return const [];
+    if (start == -1 || end == -1) {
+      return const MemoryResult(title: 'Memory', summary: 'Could not parse response', commitments: []);
+    }
     final jsonStr = raw.substring(start, end + 1);
 
     try {
       final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
       final items = decoded['commitments'] as List<dynamic>?;
-      if (items == null) return const [];
-      return items.map((item) {
+      final commitments = items?.map((item) {
         final m = item as Map<String, dynamic>;
         return AgentCommitment(
           isCommitment: m['is_commitment'] as bool? ?? true,
@@ -151,9 +177,15 @@ Return {"commitments": []} if none. No commentary, no markdown.
           person: m['person'] as String?,
           due: m['due'] as String?,
         );
-      }).toList();
+      }).toList() ?? [];
+
+      return MemoryResult(
+        title: decoded['title'] as String? ?? 'Memory',
+        summary: decoded['summary'] as String? ?? '',
+        commitments: commitments,
+      );
     } catch (_) {
-      return const [];
+      return const MemoryResult(title: 'Memory', summary: 'Could not parse response', commitments: []);
     }
   }
 }

@@ -56,11 +56,12 @@ class _ConversationTileState extends State<ConversationTile> {
         width: double.maxFinite,
         decoration: BoxDecoration(
           color: kTanuSurface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: TanuTheme.softShadow,
           border: Border.all(color: kTanuLine),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           child: widget.onDelete == null
               ? _body(context)
               : Dismissible(
@@ -87,9 +88,9 @@ class _ConversationTileState extends State<ConversationTile> {
     final time = '${revealedAt.hour % 12 == 0 ? 12 : revealedAt.hour % 12}:'
         '${revealedAt.minute.toString().padLeft(2, '0')} '
         '${revealedAt.hour < 12 ? 'AM' : 'PM'}';
-    final tail = session.segments.isEmpty
-        ? 'Empty memory'
-        : session.segments.last.text.trim();
+    final tail = session.summary?.isNotEmpty == true
+        ? session.summary!
+        : (session.segments.isEmpty ? 'Empty memory' : session.segments.last.text.trim());
     final newBadge = widget.isNew &&
         revealedAt.isAfter(
             DateTime.now().subtract(const Duration(minutes: 1)));

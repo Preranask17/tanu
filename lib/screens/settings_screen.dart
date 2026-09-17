@@ -169,7 +169,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SizedBox(height: 28),
         const Center(
           child: Text(
-            'Tanu · MVP build\nAll data stays on this phone.',
+            'Tanu · MVP build\nAll data stays on this device.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: kTanuMuted),
           ),

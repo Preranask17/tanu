@@ -170,7 +170,8 @@ class _LiveCaptureCard extends ConsumerWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: kTanuSurface,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: TanuTheme.softShadow,
             border: Border.all(color: kTanuLine),
           ),
           child: Column(
@@ -179,7 +180,7 @@ class _LiveCaptureCard extends ConsumerWidget {
               Row(
                 children: [
                   _Equalizer(
-                    color: kTanuGreen,
+                    color: kTanuInk,
                     level: conversation.micLevel,
                   ),
                   const SizedBox(width: 10),
@@ -327,7 +328,8 @@ class _ConnectionCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: kTanuSurface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: TanuTheme.softShadow,
           border: Border.all(color: kTanuLine),
         ),
         child: Row(
@@ -400,7 +402,7 @@ class _SectionHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: kTanuChip,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
               ),
               child: Text(
                 pillLabel,

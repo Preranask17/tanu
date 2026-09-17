@@ -1,42 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-/// Tanu's own warm palette — cream, white cards, warm-beige chips, ink text
-/// and a tan accent. The layout/shell borrows Omi's structure; the colors are
-/// all Tanu.
+/// Tanu's Minimalist Monolith palette — ultra-clean, high-contrast, professional.
 class TanuTheme {
-  /// Warm cream page background.
-  static const Color bg = Color(0xFFFAF7F2);
+  /// Clean, stark off-white background.
+  static const Color bg = Color(0xFFFAFAFA);
 
-  /// White card surface (conversation tiles, live card, settings rows).
+  /// Pure white surfaces.
   static const Color surface = Color(0xFFFFFFFF);
 
-  /// Warm-beige tertiary chips (account tiles, icon squares, stat rows).
-  static const Color chip = Color(0xFFEDE3D4);
+  /// Subtle light-grey chips and inactive elements.
+  static const Color chip = Color(0xFFF2F2F2);
 
-  /// Warm near-black ink for all primary text.
-  static const Color ink = Color(0xFF221A11);
+  /// Deep, rich black ink for primary text and accents.
+  static const Color ink = Color(0xFF111111);
 
-  /// Tan accent — record button, active states, secondary icons.
-  static const Color warm = Color(0xFFB07A3E);
+  /// Monochromatic accent (same as ink) for a sophisticated look.
+  static const Color warm = Color(0xFF111111);
 
-  /// Muted sage for "ready / connected / success".
-  static const Color green = Color(0xFF5E7D5A);
+  /// Muted tone for secondary text.
+  static const Color muted = Color(0xFF888888);
 
-  /// Terracotta for errors, delete, stop.
-  static const Color red = Color(0xFFA3432E);
+  /// Ultra-subtle hairline borders (Black @ 5%).
+  static const Color line = Color(0x0D000000);
 
-  /// Secondary/iso text.
-  static const Color muted = Color(0xFF8A7F70);
+  /// Deep red for destructive actions.
+  static const Color red = Color(0xFFC93A3A);
 
-  /// Bottom edge of the nav fade.
-  static const Color navEdge = Color(0xFFF0E9DE);
+  /// Professional green for success.
+  static const Color green = Color(0xFF2C7A2C);
 
-  /// Hairline borders/separators (ink @ 8%).
-  static const Color line = Color(0x14221A11);
+  /// Nav edge fade
+  static const Color navEdge = Color(0xFFF5F5F5);
+
+  /// Standard soft shadow for floating elements.
+  static final List<BoxShadow> softShadow = [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    ),
+  ];
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
-      seedColor: warm,
+      seedColor: ink,
       brightness: Brightness.light,
       surface: surface,
     );
@@ -45,19 +53,21 @@ class TanuTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
+      textTheme: GoogleFonts.interTextTheme(),
     );
 
     return base.copyWith(
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: bg,
         foregroundColor: ink,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.inter(
           color: ink,
-          fontSize: 22,
+          fontSize: 24,
           fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
         ),
       ),
       cardTheme: CardThemeData(
@@ -69,44 +79,44 @@ class TanuTheme {
       dividerTheme: const DividerThemeData(color: line),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: chip,
+        fillColor: surface,
         hintStyle: const TextStyle(color: muted),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: line),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: warm),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: ink, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: ink,
           foregroundColor: bg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.2),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: warm),
+        style: TextButton.styleFrom(foregroundColor: ink),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: ink,
-        contentTextStyle: const TextStyle(color: bg),
+        contentTextStyle: GoogleFonts.inter(color: bg, fontWeight: FontWeight.w500),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       listTileTheme: const ListTileThemeData(
-        iconColor: warm,
+        iconColor: ink,
         textColor: ink,
-        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: EdgeInsets.symmetric(horizontal: 20),
       ),
     );
   }

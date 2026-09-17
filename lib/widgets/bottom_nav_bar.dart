@@ -6,12 +6,12 @@ import '../providers/navigation_provider.dart';
 import '../theme.dart';
 
 /// Height of the bottom nav row above whatever bottom inset it reserves.
-const double kBottomNavBarHeight = 92;
+const double kBottomNavBarHeight = 96;
 
 /// Gap between the top of the nav row and the home chat bar that floats above
 /// it. The chat bar derives its offset from this pair rather than repeating a
 /// literal, so changing the row height can't silently close the gap.
-const double kBottomNavChatBarGap = 14;
+const double kBottomNavChatBarGap = 16;
 
 /// Bottom inset the nav row reserves for system chrome. Anything positioned
 /// against the row must add this to stay in step with it.
@@ -53,24 +53,25 @@ class _NavRow extends ConsumerWidget {
     final bottomInset = bottomNavBarReservedInset(context);
     return Align(
       alignment: Alignment.bottomCenter,
-      child: Container(
-        width: double.infinity,
-        height: kBottomNavBarHeight + bottomInset,
-        padding: EdgeInsets.fromLTRB(12, 10, 12, bottomInset),
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: [0.0, 0.35, 1.0],
-            colors: [Colors.transparent, kTanuNavEdge, kTanuNavEdge],
+      child: Padding(
+        padding: EdgeInsets.only(left: 24, right: 24, bottom: bottomInset + 16),
+        child: Container(
+          width: double.infinity,
+          height: 64,
+          decoration: BoxDecoration(
+            color: kTanuSurface,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: TanuTheme.softShadow,
+            border: Border.all(color: kTanuLine),
           ),
-        ),
-        child: Row(
-          children: [
-            _buildTab(context, index, 0, Icons.home_outlined, Icons.home, 'Home'),
-            _buildTab(context, index, 1, Icons.forum_outlined, Icons.forum, 'Conversations'),
-            _buildTab(context, index, 2, Icons.settings_outlined, Icons.settings, 'Settings'),
-          ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildTab(context, index, 0, Icons.home_outlined, Icons.home, 'Home'),
+              _buildTab(context, index, 1, Icons.forum_outlined, Icons.forum, 'Memories'),
+              _buildTab(context, index, 2, Icons.settings_outlined, Icons.settings, 'Settings'),
+            ],
+          ),
         ),
       ),
     );
@@ -105,6 +106,7 @@ class _NavRow extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    letterSpacing: -0.2,
                     color: selected ? kTanuInk : kTanuMuted,
                   ),
                 ),
