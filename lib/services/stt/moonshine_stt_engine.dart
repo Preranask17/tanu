@@ -12,11 +12,11 @@ import 'package:sherpa_onnx/sherpa_onnx.dart';
 import '../../abstractions/stt_engine.dart';
 import '../../constants.dart';
 
-/// On-device speech-to-text using the Whisper tiny-en model, decoded by
+/// On-device speech-to-text using the Moonshine base model, decoded by
 /// sherpa_onnx.
 ///
 /// The model bundle (~43 MB) is downloaded elsewhere into app-support storage
-/// (see [kWhisperBundleFileName]); this engine only ever reads the three
+/// (see [kOfflineBundleFileName]); this engine only ever reads the three
 /// extracted files (`encoder_model.ort`, `decoder_model_merged.ort`,
 /// `tokens.txt`) from a model directory it is handed (or resolves from
 /// `path_provider` by default). It swaps the retired engine's native decode
@@ -24,8 +24,8 @@ import '../../constants.dart';
 /// recognizer are loaded once in that isolate and reused across every
 /// utterance, since spawning per utterance would re-pay the
 /// 40+ MB model load each time.
-class WhisperSttEngine implements ContinuousSttEngine {
-  WhisperSttEngine({String? modelDir}) : _modelDirOverride = modelDir;
+class MoonshineSttEngine implements ContinuousSttEngine {
+  MoonshineSttEngine({String? modelDir}) : _modelDirOverride = modelDir;
 
   /// Overrides the default `appSupport/<bundle-stem>` model directory.
   final String? _modelDirOverride;
@@ -81,7 +81,7 @@ class WhisperSttEngine implements ContinuousSttEngine {
   AudioRecorder? _recorder;
   StreamSubscription<Uint8List>? _recorderSub;
 
-  /// True while the Whisper bindings/model are loading in the worker isolate
+  /// True while the Moonshine bindings/model are loading in the worker isolate
   /// (the slow part the app warms up at startup). Listened to by the Home UI.
   @override
   final ValueNotifier<bool> warmingUp = ValueNotifier(false);
@@ -118,13 +118,7 @@ class WhisperSttEngine implements ContinuousSttEngine {
 
   /// Sentinel that tells the worker isolate to shut down. A String is safe
   /// because every real request is a `List` message.
-  static const String _shutdownKey = 'Whisper::shutdown';
-
-  static const List<String> _bundleFiles = [
-    'base-encoder.int8.onnx',
-    'base-decoder.int8.onnx',
-    'base-tokens.txt',
-  ];
+  static const String _shutdownKey = 'Moonshine::shutdown';
 
   @override
   Future<bool> isAvailable() async {
@@ -150,7 +144,7 @@ class WhisperSttEngine implements ContinuousSttEngine {
   }
 
   bool _filesExist(String dir) =>
-      _bundleFiles.every((f) => File('$dir/$f').existsSync());
+      kOfflineBundleFiles.every((f) => File('$dir/${f.name}').existsSync());
 
   /// Loads (spawning the worker isolate and its recognizer if needed) and
   /// caches the live worker. Safe to call concurrently: concurrent callers
@@ -187,7 +181,7 @@ class WhisperSttEngine implements ContinuousSttEngine {
           _workerSend = null;
           final ready = _readyCompleter;
           if (ready != null && !ready.isCompleted) ready.complete(false);
-          debugPrint('[tanu] Whisper worker error: $e\n$st');
+          debugPrint('[tanu] Moonshine worker error: $e\n$st');
         },
         onDone: () {
           _closePending();
@@ -197,10 +191,10 @@ class WhisperSttEngine implements ContinuousSttEngine {
         },
       );
 
-      await Isolate.spawn(_whisperWorker, [
-        '$dir/${_bundleFiles[0]}',
-        '$dir/${_bundleFiles[1]}',
-        '$dir/${_bundleFiles[2]}',
+      await Isolate.spawn(_moonshineWorker, [
+        '$dir/${kOfflineBundleFiles[0].name}',
+        '$dir/${kOfflineBundleFiles[1].name}',
+        '$dir/${kOfflineBundleFiles[2].name}',
         replies.sendPort,
       ]);
 
@@ -222,7 +216,7 @@ class WhisperSttEngine implements ContinuousSttEngine {
     } catch (e, st) {
       _lastError = '$e';
       onEvent?.call('model error: $e');
-      debugPrint('[tanu] Whisper worker start failed: $e\n$st');
+      debugPrint('[tanu] Moonshine worker start failed: $e\n$st');
       return false;
     } finally {
       warmingUp.value = false;
@@ -450,7 +444,7 @@ class WhisperSttEngine implements ContinuousSttEngine {
         _chunkSub = null;
       },
     );
-    debugPrint('[tanu] Whisper chunk mode subscribed');
+    debugPrint('[tanu] Moonshine chunk mode subscribed');
     return true;
   }
 
@@ -724,11 +718,11 @@ class WhisperSttEngine implements ContinuousSttEngine {
 }
 
 /// Long-lived sherpa-onnx worker isolate: binds FFI once (bindings are
-/// isolate-local), builds the Whisper recognizer once, then loops serving
+/// isolate-local), builds the Moonshine recognizer once, then loops serving
 /// decode requests until the shutdown key arrives. Spawning it once and keeping
 /// it alive across utterances is the whole latency win over per-utterance
 /// loads.
-Future<void> _whisperWorker(List<Object?> args) async {
+Future<void> _moonshineWorker(List<Object?> args) async {
   final encoder = args[0] as String;
   final decoder = args[1] as String;
   final tokens = args[2] as String;
@@ -742,7 +736,7 @@ Future<void> _whisperWorker(List<Object?> args) async {
   final recognizer = OfflineRecognizer(
     OfflineRecognizerConfig(
       model: OfflineModelConfig(
-        whisper: OfflineWhisperModelConfig(encoder: encoder, decoder: decoder),
+        moonshine: OfflineMoonshineModelConfig(encoder: encoder, mergedDecoder: decoder),
         tokens: tokens,
         numThreads: 2,
         provider: 'cpu',
@@ -752,7 +746,7 @@ Future<void> _whisperWorker(List<Object?> args) async {
   );
 
   await for (final Object? message in commands) {
-    if (message is String && message == WhisperSttEngine._shutdownKey) break;
+    if (message is String && message == MoonshineSttEngine._shutdownKey) break;
     if (message is List && message.length == 2 && message[0] is int) {
       final id = message[0] as int;
       final samples = message[1];
@@ -761,7 +755,7 @@ Future<void> _whisperWorker(List<Object?> args) async {
         try {
           text = _recognizeOnce(recognizer, samples);
         } catch (e) {
-          debugPrint('[tanu] Whisper decode failed: $e');
+          debugPrint('[tanu] Moonshine decode failed: $e');
         }
       }
       replyPort.send([id, text]);

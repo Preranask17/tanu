@@ -15,15 +15,15 @@ const String kPendantName = 'Omi';
 
 
 /// ---- Moonshine v2 on-device bundle (fallback recognizer) ----------------
-/// Quantized "tiny-en" bundle, ~43 MB, tar.bz2. The single download replaces
+/// Quantized "base-en" bundle, ~85 MB, tar.bz2. The single download replaces
 /// the retired on-device ggml-base.en.bin (~148 MB) one-for-one: same storage
-/// slot in app support, downloaded the same way, but ~3.4× lighter and built
-/// for streaming feedback latency. `sherpa_onnx` ships the ofn runtime; this
+/// slot in app support, downloaded the same way, but ~1.7× lighter and built
+/// for streaming feedback latency. `sherpa_onnx` ships the onnx runtime; this
 /// is just the weights + tokens.
 const String kOfflineBundleUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/'
-    'sherpa-onnx-whisper-base.tar.bz2';
-const String kOfflineBundleFileName = 'sherpa-onnx-whisper-base.tar.bz2';
+    'sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2';
+const String kOfflineBundleFileName = 'sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2';
 
 const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
@@ -35,13 +35,13 @@ const String kSileroVadFileName = 'silero_vad.onnx';
 /// variant (no separate cached/uncached decoder pairs), matching
 /// `OfflineMoonshineModelConfig.mergedDecoder`.
 const List<({String name, int bytes})> kOfflineBundleFiles = [
-  (name: 'base-encoder.int8.onnx', bytes: 0),
-  (name: 'base-decoder.int8.onnx', bytes: 0),
-  (name: 'base-tokens.txt', bytes: 0),
+  (name: 'encoder_model.ort', bytes: 0),
+  (name: 'decoder_model_merged.ort', bytes: 0),
+  (name: 'tokens.txt', bytes: 0),
 ];
 
 /// Human label shown in Settings and the Home warm-up chip.
-const String kOfflineModelLabel = 'Whisper Base · 145 MB';
+const String kOfflineModelLabel = 'Moonshine Base · 85 MB';
 
 /// Names of on-disk bundles that are no longer the on-device fallback model.
 /// Any of these found in app support are deleted on startup. The retired

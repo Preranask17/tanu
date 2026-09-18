@@ -16,12 +16,11 @@ import 'ble_provider.dart';
 import 'commitment_provider.dart';
 import 'settings_provider.dart';
 
-import '../services/stt/whisper_stt_engine.dart';
+import '../services/stt/moonshine_stt_engine.dart';
 
-/// The on-device Whisper model is the only STT engine.
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = WhisperSttEngine();
-  ref.onDispose(() => unawaited(engine.dispose()));
+  final engine = MoonshineSttEngine();
+  ref.onDispose(() => engine.dispose());
   return engine;
 });
 

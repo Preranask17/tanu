@@ -10,7 +10,7 @@ import '../services/stt/model_download_coordinator.dart';
 
 enum SttModelPhase { checking, missing, downloading, ready }
 
-/// Live state of the on-device Whisper bundle stored in app-support storage.
+/// Live state of the on-device Moonshine bundle stored in app-support storage.
 class SttModelState {
   const SttModelState({
     this.phase = SttModelPhase.checking,
