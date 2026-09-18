@@ -231,6 +231,27 @@ class BluetoothPendantSource implements AudioSource {
       await stopScanForDevices();
     }
 
+    // Ensure the Bluetooth adapter is on and permissions are granted.
+    // On Android 9 (Oppo A9, etc.) this is required before scanning.
+    try {
+      if (await FlutterBluePlus.isSupported == false) {
+        throw Exception('Bluetooth is not supported on this device');
+      }
+
+      // Wait for adapter to be on (up to 5 seconds)
+      final adapterState = await FlutterBluePlus.adapterState
+          .where((s) => s == BluetoothAdapterState.on)
+          .first
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        throw Exception(
+            'Bluetooth is off. Please turn on Bluetooth in Settings.');
+      });
+      _log('[tanu] adapter state: $adapterState');
+    } catch (e) {
+      _log('[tanu] adapter/permission check failed: $e');
+      rethrow;
+    }
+
     _scanAutoStop?.cancel();
     _scanAutoStop = Timer(const Duration(seconds: 20), stopScanForDevices);
 
