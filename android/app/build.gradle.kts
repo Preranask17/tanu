@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.tanu.tanu_app"
     compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "25.2.9519653"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
