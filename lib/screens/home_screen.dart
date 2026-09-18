@@ -97,9 +97,10 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Calculate padding for the persistent bottom chat bar
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
-    // On desktop, there is no bottom tab bar (height ~50).
+    // On mobile, bottom dock is safeAreaBottom + 16 (bottom offset) + 64 (height) = safeAreaBottom + 80.
+    // We want 16px padding above the dock, so we need 96.
     final bottomPadding =
-        MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 50 + 16);
+        MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
     final bottomInset = bottomPadding + 62 + 16; // space for chat bar
 
     final recent = conversation.conversations.length > 3
@@ -123,7 +124,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               slivers: [
                 SliverAppBar(
-                  expandedHeight: 120,
+                  expandedHeight: 160,
                   floating: true,
                   pinned: true,
                   backgroundColor: Theme.of(context).scaffoldBackgroundColor,
