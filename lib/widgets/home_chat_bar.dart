@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,12 +26,16 @@ class HomeChatBar extends ConsumerWidget {
 class _ChatPill extends StatelessWidget {
   void _openLive(BuildContext context) {
     Navigator.of(context).push(
-      CupertinoPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const ChatPage(),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
@@ -41,14 +45,17 @@ class _ChatPill extends StatelessWidget {
       child: Container(
         height: 62,
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: CupertinoColors.systemGrey5.resolveFrom(context)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -59,7 +66,7 @@ class _ChatPill extends StatelessWidget {
               child: Text(
                 'Live memory…',
                 style: TextStyle(
-                  color: CupertinoColors.systemGrey,
+                  color: Color(0xFF888888),
                   fontSize: 16,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -76,10 +83,14 @@ class _ChatPill extends StatelessWidget {
                 margin: const EdgeInsets.only(right: 8),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey5.resolveFrom(context),
+                  color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(CupertinoIcons.mic_solid, size: 17, color: CupertinoColors.activeBlue),
+                child: Icon(
+                  Icons.mic,
+                  size: 20,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
             ),
           ],
@@ -101,7 +112,10 @@ class _RecordButton extends StatelessWidget {
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.of(context).push(
-          CupertinoPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => const ChatPage(),
+          ),
         );
       },
       onLongPress: () => _showOptions(context),
@@ -110,36 +124,63 @@ class _RecordButton extends StatelessWidget {
         width: 62,
         height: 62,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: CupertinoColors.activeBlue,
+        decoration: BoxDecoration(
+          color: Theme.of(context).primaryColor,
           shape: BoxShape.circle,
         ),
-        child: const Icon(CupertinoIcons.add, size: 28, color: CupertinoColors.white),
+        child: const Icon(
+          Icons.add,
+          size: 28,
+          color: Colors.white,
+        ),
       ),
     );
   }
 
   void _showOptions(BuildContext context) {
     HapticFeedback.mediumImpact();
-    // Use the native iOS action sheet for the microphone test option
-    showCupertinoModalPopup<void>(
+    
+    showModalBottomSheet(
       context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('Developer Options'),
-        message: const Text('These options are useful for debugging your pendant audio.'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(sheetContext);
-              ref.read(conversationProvider.notifier).microphoneTest();
-            },
-            child: const Text('Microphone test'),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Developer Options',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'These options are useful for debugging your pendant audio.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF888888),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  ref.read(conversationProvider.notifier).microphoneTest();
+                },
+                child: const Text('Microphone test'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('Cancel'),
         ),
       ),
     );

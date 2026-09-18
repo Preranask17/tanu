@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,7 +9,6 @@ import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
-import '../theme.dart';
 import '../widgets/connection_status_bar.dart';
 import '../widgets/state_indicator.dart';
 
@@ -22,38 +21,42 @@ class ChatPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conversation = ref.watch(conversationProvider);
-    final status = ref.watch(pendantStatusProvider).value ?? const PendantStatus();
+    final status =
+        ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final model = ref.watch(sttModelProvider);
     final engine = ref.watch(sttEngineProvider);
 
-    return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
           conversation.active?.title.isNotEmpty == true
               ? conversation.active!.title
               : 'Tanu',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleLarge,
         ),
-        trailing: ValueListenableBuilder<bool>(
-          valueListenable: engine.warmingUp,
-          builder: (context, warming, _) {
-            final show = model.busy || warming;
-            if (!show) return const SizedBox.shrink();
-            final title = model.phase == SttModelPhase.downloading
-                ? model.label
-                : 'Loading model…';
-            return _ModelLoadingChip(title: title);
-          },
-        ),
+        actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: engine.warmingUp,
+            builder: (context, warming, _) {
+              final show = model.busy || warming;
+              if (!show) return const SizedBox.shrink();
+              final title = model.phase == SttModelPhase.downloading
+                  ? model.label
+                  : 'Loading model…';
+              return _ModelLoadingChip(title: title);
+            },
+          ),
+          const SizedBox(width: 16),
+        ],
       ),
-      child: SafeArea(
+      body: SafeArea(
         top: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 50), // navigation bar height padding
             const ConnectionStatusBar(),
             const SizedBox(height: 2),
             Padding(
@@ -116,14 +119,15 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
     });
     _scrollToBottom();
 
-    final engine = ref.read(mistralEngineProvider);
+    final engine = ref.read(localEngineProvider);
     try {
       final reply = await engine.prompt(
         widget.session.transcriptText,
         history: [
           const ChatMessage(
             role: 'system',
-            content: 'You are an AI assistant helping a user recall details from their memory. Use the provided transcript context to answer.',
+            content:
+                'You are an AI assistant helping a user recall details from their memory. Use the provided transcript context to answer.',
           ),
           ..._messages,
         ],
@@ -138,7 +142,12 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _messages.add(ChatMessage(role: 'assistant', content: 'Failed to query memory: $e'));
+          _messages.add(
+            ChatMessage(
+              role: 'assistant',
+              content: 'Failed to query memory: $e',
+            ),
+          );
           _isGenerating = false;
         });
         _scrollToBottom();
@@ -161,16 +170,19 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
           session.title.isEmpty ? 'Memory' : session.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleLarge,
         ),
       ),
-      child: SafeArea(
+      body: SafeArea(
         child: Column(
           children: [
             Expanded(
@@ -178,32 +190,44 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                 controller: _scrollCtrl,
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
-                  if (session.summary != null && session.summary!.isNotEmpty) ...[
+                  if (session.summary != null &&
+                      session.summary!.isNotEmpty) ...[
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemBackground.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.15),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ],
+                        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                          width: 1,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(CupertinoIcons.sparkles, size: 16, color: CupertinoColors.activeBlue),
-                              SizedBox(width: 8),
-                              Text('AI Summary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: CupertinoColors.activeBlue)),
+                              Icon(
+                                Icons.auto_awesome,
+                                size: 16,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'AI Summary',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(session.summary!, style: const TextStyle(height: 1.4, fontSize: 15)),
+                          Text(
+                            session.summary!,
+                            style: const TextStyle(height: 1.4, fontSize: 15),
+                          ),
                         ],
                       ),
                     ),
@@ -215,27 +239,41 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                         padding: EdgeInsets.all(32.0),
                         child: Text(
                           'Nothing was captured in this session.',
-                          style: TextStyle(color: CupertinoColors.systemGrey),
+                          style: TextStyle(color: Color(0xFF888888)),
                         ),
                       ),
                     )
                   else
-                    ...session.segments.map((s) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _SegmentRow(segment: s),
-                        )),
+                    ...session.segments.map(
+                      (s) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SegmentRow(segment: s),
+                      ),
+                    ),
                   if (_messages.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    Container(height: 1, color: CupertinoColors.systemGrey4.resolveFrom(context)),
+                    Container(
+                      height: 1,
+                      color: Theme.of(context).dividerTheme.color,
+                    ),
                     const SizedBox(height: 16),
-                    const Text('Memory Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: CupertinoColors.systemGrey)),
+                    const Text(
+                      'Memory Chat',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Color(0xFF888888),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     ..._messages.map((m) => _ChatBubble(message: m)),
                   ],
                   if (_isGenerating)
                     const Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Center(child: CupertinoActivityIndicator(radius: 12)),
+                      child: Center(
+                        child: CircularProgressIndicator(),
+                      ),
                     ),
                 ],
               ),
@@ -243,35 +281,56 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGroupedBackground,
-                border: Border(top: BorderSide(color: CupertinoColors.separator.resolveFrom(context))),
+                color: Theme.of(context).scaffoldBackgroundColor,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                  ),
+                ),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: CupertinoTextField(
+                    child: TextField(
                       controller: _chatCtrl,
-                      placeholder: 'Ask about this memory...',
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemBackground.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: CupertinoColors.systemGrey4.resolveFrom(context)),
+                      decoration: InputDecoration(
+                        hintText: 'Ask about this memory...',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                          ),
+                        ),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  IconButton(
                     onPressed: _isGenerating ? null : _send,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _isGenerating ? CupertinoColors.systemGrey.resolveFrom(context) : CupertinoColors.activeBlue.resolveFrom(context),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(CupertinoIcons.arrow_up, color: CupertinoColors.white, size: 20),
+                    style: IconButton.styleFrom(
+                      backgroundColor: _isGenerating
+                          ? const Color(0xFF888888)
+                          : Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                    icon: const Icon(
+                      Icons.arrow_upward,
+                      size: 20,
                     ),
                   ),
                 ],
@@ -291,25 +350,31 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isUser ? CupertinoColors.activeBlue.resolveFrom(context) : CupertinoColors.systemBackground.resolveFrom(context),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isUser ? null : [
-            BoxShadow(
-              color: CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            )
-          ],
+          color: isUser
+              ? (isDark ? const Color(0xFF333333) : const Color(0xFFE5E5E5))
+              : (isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF)),
+          borderRadius: BorderRadius.circular(12),
+          border: isUser ? null : Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
         ),
         child: Text(
           message.content,
-          style: TextStyle(color: isUser ? CupertinoColors.white : CupertinoColors.label.resolveFrom(context), fontSize: 15, height: 1.4),
+          style: TextStyle(
+            color: isUser
+                ? (isDark ? Colors.white : Colors.black)
+                : (isDark ? Colors.white : Colors.black),
+            fontSize: 15,
+            height: 1.4,
+          ),
         ),
       ),
     );
@@ -330,9 +395,9 @@ class _ChatWelcome extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              status.isConnected ? CupertinoIcons.mic_fill : CupertinoIcons.mic,
+              status.isConnected ? Icons.mic : Icons.mic_none,
               size: 48,
-              color: CupertinoColors.systemBlue,
+              color: Theme.of(context).primaryColor,
             ),
             const SizedBox(height: 16),
             const Text(
@@ -363,8 +428,7 @@ class _SessionTranscript extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        for (final segment in session.segments)
-          _SegmentRow(segment: segment),
+        for (final segment in session.segments) _SegmentRow(segment: segment),
         if (livePartial.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -372,10 +436,13 @@ class _SessionTranscript extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _offsetLabel(session.segments.isNotEmpty
-                      ? livePartialMs(session)
-                      : 0),
-                  style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+                  _offsetLabel(
+                    session.segments.isNotEmpty ? livePartialMs(session) : 0,
+                  ),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF888888),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -392,14 +459,21 @@ class _SessionTranscript extends StatelessWidget {
             ),
           ),
         if (isListening && livePartial.trim().isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(CupertinoIcons.mic_fill, size: 14, color: CupertinoColors.activeBlue),
-                SizedBox(width: 6),
-                Text('Listening…', style: TextStyle(color: CupertinoColors.activeBlue)),
+                Icon(
+                  Icons.mic,
+                  size: 14,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Listening…',
+                  style: TextStyle(color: Theme.of(context).primaryColor),
+                ),
               ],
             ),
           ),
@@ -432,6 +506,7 @@ class _SegmentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = segment.text.trim();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -439,7 +514,10 @@ class _SegmentRow extends StatelessWidget {
           width: 44,
           child: Text(
             _offsetLabel(segment.startMs),
-            style: const TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF888888),
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -447,9 +525,12 @@ class _SegmentRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: CupertinoColors.systemGrey5.resolveFrom(context)),
+              color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                width: 1,
+              ),
             ),
             child: Text(
               text.isEmpty ? '…' : text,
@@ -469,10 +550,11 @@ class _ModelLoadingChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey5.resolveFrom(context),
+        color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -481,14 +563,14 @@ class _ModelLoadingChip extends StatelessWidget {
           const SizedBox(
             width: 10,
             height: 10,
-            child: CupertinoActivityIndicator(radius: 5),
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
           const SizedBox(width: 6),
           Text(
             title,
             style: const TextStyle(
               fontSize: 11,
-              color: CupertinoColors.systemGrey,
+              color: Color(0xFF888888),
             ),
           ),
         ],

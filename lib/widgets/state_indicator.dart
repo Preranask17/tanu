@@ -1,8 +1,6 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show CircularProgressIndicator;
+import 'package:flutter/material.dart';
 
 import '../abstractions/audio_source.dart';
-import '../theme.dart';
 
 /// Mirrors the pendant state in the UI: idle / listening / thinking / error.
 class StateIndicator extends StatelessWidget {
@@ -23,59 +21,59 @@ class StateIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     if (error != null) {
       return _Pill(
-        color: CupertinoColors.destructiveRed.resolveFrom(context),
-        icon: CupertinoIcons.exclamationmark_triangle_fill,
+        color: Colors.redAccent,
+        icon: Icons.warning_amber_rounded,
         label: error!,
       );
     }
     if (isThinking) {
       return _Pill(
-        color: CupertinoColors.activeBlue.resolveFrom(context),
-        icon: CupertinoIcons.sparkles,
+        color: Theme.of(context).primaryColor,
+        icon: Icons.auto_awesome,
         label: 'Tanu is thinking...',
         progress: true,
       );
     }
     if (isListening) {
       return _Pill(
-        color: CupertinoColors.activeBlue.resolveFrom(context),
-        icon: CupertinoIcons.waveform,
+        color: Theme.of(context).primaryColor,
+        icon: Icons.graphic_eq,
         label: 'Listening...',
         pulse: true,
       );
     }
     switch (state) {
       case PendantState.connected:
-        return _Pill(
-          color: CupertinoColors.systemGreen.resolveFrom(context),
-          icon: CupertinoIcons.check_mark_circled,
+        return const _Pill(
+          color: Colors.green,
+          icon: Icons.check_circle_outline,
           label: 'Ready',
         );
       case PendantState.scanning:
         return _Pill(
-          color: CupertinoColors.activeBlue.resolveFrom(context),
-          icon: CupertinoIcons.antenna_radiowaves_left_right,
+          color: Theme.of(context).primaryColor,
+          icon: Icons.settings_bluetooth,
           label: 'Scanning for your pendant...',
           progress: true,
         );
       case PendantState.connecting:
         return _Pill(
-          color: CupertinoColors.activeBlue.resolveFrom(context),
-          icon: CupertinoIcons.arrow_2_circlepath,
+          color: Theme.of(context).primaryColor,
+          icon: Icons.sync,
           label: 'Connecting...',
           progress: true,
         );
       case PendantState.reconnecting:
-        return _Pill(
-          color: CupertinoColors.systemOrange.resolveFrom(context),
-          icon: CupertinoIcons.arrow_2_circlepath,
+        return const _Pill(
+          color: Colors.orange,
+          icon: Icons.sync,
           label: 'Reconnecting...',
           progress: true,
         );
       case PendantState.disconnected:
-        return _Pill(
-          color: CupertinoColors.systemGrey.resolveFrom(context),
-          icon: CupertinoIcons.bluetooth,
+        return const _Pill(
+          color: Color(0xFF888888),
+          icon: Icons.bluetooth_disabled,
           label: 'Pendant not connected',
         );
     }

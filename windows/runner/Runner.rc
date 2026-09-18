@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.tanu" "\0"
-            VALUE "FileDescription", "tanu_app" "\0"
+            VALUE "FileDescription", "Tanu" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "tanu_app" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.tanu. All rights reserved." "\0"
             VALUE "OriginalFilename", "tanu_app.exe" "\0"
-            VALUE "ProductName", "tanu_app" "\0"
+            VALUE "ProductName", "Tanu" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

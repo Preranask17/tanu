@@ -213,6 +213,14 @@ Win32Window::MessageHandler(HWND hwnd,
       }
       return 0;
 
+    case WM_GETMINMAXINFO: {
+      // Enforce a minimum window size so the Flutter layout never breaks.
+      LPMINMAXINFO info = reinterpret_cast<LPMINMAXINFO>(lparam);
+      info->ptMinTrackSize.x = 480;   // min width in pixels
+      info->ptMinTrackSize.y = 600;   // min height in pixels
+      return 0;
+    }
+
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);
       return 0;

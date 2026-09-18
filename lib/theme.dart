@@ -1,102 +1,137 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Tanu's Minimalist Monolith palette — ultra-clean, high-contrast, professional.
+/// Tanu's "Storytelling AI" Aesthetic
 class TanuTheme {
-  /// Clean, stark off-white background.
-  static const Color bg = Color(0xFFFAFAFA);
-
-  /// Pure white surfaces.
-  static const Color surface = Color(0xFFFFFFFF);
-
-  /// Subtle light-grey chips and inactive elements.
-  static const Color chip = Color(0xFFF2F2F2);
-
-  /// Deep, rich black ink for primary text and accents.
-  static const Color ink = Color(0xFF111111);
-
-  /// Monochromatic accent (same as ink) for a sophisticated look.
-  static const Color warm = Color(0xFF111111);
-
-  /// Muted tone for secondary text.
-  static const Color muted = Color(0xFF888888);
-
-  /// Ultra-subtle hairline borders (Black @ 5%).
-  static const Color line = Color(0x0D000000);
-
-  /// Deep red for destructive actions.
-  static const Color red = Color(0xFFC93A3A);
-
-  /// Professional green for success.
-  static const Color green = Color(0xFF2C7A2C);
-
-  /// Nav edge fade
-  static const Color navEdge = Color(0xFFF5F5F5);
-
-  /// Standard soft shadow for floating elements.
-  static final List<BoxShadow> softShadow = [
-    BoxShadow(
-      color: CupertinoColors.black.withValues(alpha: 0.04),
-      blurRadius: 24,
-      offset: const Offset(0, 8),
-    ),
-  ];
-
-  static const Color primary = ink;
-
-  static CupertinoThemeData getTheme(Brightness brightness) {
+  static ThemeData getTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-    final primaryInk = isDark ? CupertinoColors.white : CupertinoColors.black;
-    final primaryBg = isDark ? CupertinoColors.black : bg;
+    
+    // Deep contrast colors
+    final primaryInk = isDark ? Colors.white : Colors.black;
+    final primaryBg = isDark ? const Color(0xFF000000) : const Color(0xFFFAFAFA);
+    final surfaceColor = isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF);
+    final borderColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5);
+    final accentBlue = isDark ? const Color(0xFF4A90E2) : Colors.blueAccent;
+    final mutedText = isDark ? const Color(0xFF888888) : const Color(0xFF666666);
 
-    return CupertinoThemeData(
+    final textTheme = TextTheme(
+      displayLarge: GoogleFonts.dmSerifDisplay(
+        color: primaryInk,
+        fontSize: 32,
+        height: 1.2,
+      ),
+      displayMedium: GoogleFonts.dmSerifDisplay(
+        color: primaryInk,
+        fontSize: 28,
+        height: 1.2,
+      ),
+      titleLarge: GoogleFonts.inter(
+        color: primaryInk,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.5,
+      ),
+      bodyLarge: GoogleFonts.inter(
+        color: primaryInk,
+        fontSize: 16,
+        letterSpacing: -0.2,
+        height: 1.4,
+      ),
+      bodyMedium: GoogleFonts.inter(
+        color: primaryInk,
+        fontSize: 15,
+        letterSpacing: -0.2,
+        height: 1.4,
+      ),
+      labelLarge: GoogleFonts.inter(
+        color: mutedText,
+        fontSize: 13,
+        letterSpacing: 0,
+      ),
+    );
+
+    return ThemeData(
       brightness: brightness,
-      primaryColor: CupertinoColors.activeBlue,
-      primaryContrastingColor: primaryBg,
-      barBackgroundColor: primaryBg.withValues(alpha: 0.8), // Translucent for frosted glass
+      primaryColor: accentBlue,
       scaffoldBackgroundColor: primaryBg,
-      textTheme: CupertinoTextThemeData(
-        primaryColor: primaryInk,
-        textStyle: GoogleFonts.inter(
-          color: primaryInk,
-          fontSize: 17,
-          letterSpacing: -0.41,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: accentBlue,
+        brightness: brightness,
+        surface: surfaceColor,
+        onSurface: primaryInk,
+        primary: accentBlue,
+        onPrimary: Colors.white,
+      ),
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: primaryBg,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: primaryInk),
+        titleTextStyle: textTheme.titleLarge,
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: primaryBg,
+        selectedItemColor: accentBlue,
+        unselectedItemColor: mutedText,
+        elevation: 0,
+      ),
+      dividerTheme: DividerThemeData(
+        color: borderColor,
+        thickness: 1,
+        space: 1,
+      ),
+      iconTheme: IconThemeData(
+        color: primaryInk,
+        size: 24,
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: accentBlue,
+        selectionColor: accentBlue.withValues(alpha: 0.3),
+        selectionHandleColor: accentBlue,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: borderColor),
         ),
-        actionTextStyle: GoogleFonts.inter(
-          color: CupertinoColors.activeBlue,
-          fontSize: 17,
-          fontWeight: FontWeight.w500,
-          letterSpacing: -0.41,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: borderColor),
         ),
-        tabLabelTextStyle: GoogleFonts.inter(
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          letterSpacing: -0.24,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: accentBlue),
         ),
-        navTitleTextStyle: GoogleFonts.inter(
-          color: primaryInk,
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.41,
+        hintStyle: TextStyle(color: mutedText),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryInk,
+          foregroundColor: primaryBg,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        navLargeTitleTextStyle: GoogleFonts.inter(
-          color: primaryInk,
-          fontSize: 34,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: accentBlue,
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
   }
 }
-
-const Color kTanuBg = TanuTheme.bg;
-const Color kTanuSurface = TanuTheme.surface;
-const Color kTanuChip = TanuTheme.chip;
-const Color kTanuInk = TanuTheme.ink;
-const Color kTanuWarm = TanuTheme.warm;
-const Color kTanuGreen = TanuTheme.green;
-const Color kTanuRed = TanuTheme.red;
-const Color kTanuMuted = TanuTheme.muted;
-const Color kTanuLine = TanuTheme.line;
-const Color kTanuNavEdge = TanuTheme.navEdge;

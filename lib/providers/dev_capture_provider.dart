@@ -26,7 +26,9 @@ class DevCaptureState {
 }
 
 final devCaptureProvider =
-    NotifierProvider<DevCaptureNotifier, DevCaptureState>(DevCaptureNotifier.new);
+    NotifierProvider<DevCaptureNotifier, DevCaptureState>(
+      DevCaptureNotifier.new,
+    );
 
 class DevCaptureNotifier extends Notifier<DevCaptureState> {
   StreamSubscription<Uint8List>? _sub;
@@ -62,21 +64,23 @@ class DevCaptureNotifier extends Notifier<DevCaptureState> {
         .replaceAll(':', '-')
         .split('.')
         .first;
-    final capture = await WavCapture.create(File('${dir.path}/capture_$stamp.wav'));
+    final capture = await WavCapture.create(
+      File('${dir.path}/capture_$stamp.wav'),
+    );
 
     _capture = capture;
     _bytes = 0;
     _lastUi = 0;
     state = const DevCaptureState(recording: true);
 
-    _sub = source.pcmAudio.listen(_onPcm, onError: (Object e) {
-      _lastUi = 0;
-      state = state.copyWith(
-        recording: false,
-        path: 'capture error: $e',
-      );
-      unawaited(_cleanup());
-    });
+    _sub = source.pcmAudio.listen(
+      _onPcm,
+      onError: (Object e) {
+        _lastUi = 0;
+        state = state.copyWith(recording: false, path: 'capture error: $e');
+        unawaited(_cleanup());
+      },
+    );
   }
 
   void _onPcm(Uint8List pcm) {

@@ -10,8 +10,8 @@ class Commitment {
     this.done = false,
     this.autoExtracted = false,
     DateTime? createdAt,
-  })  : id = id ?? const Uuid().v4(),
-        createdAt = createdAt ?? DateTime.now();
+  }) : id = id ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now();
 
   final String id;
   final String action;
@@ -32,7 +32,12 @@ class Commitment {
     return DateTime(now.year, now.month, now.day);
   }
 
-  Commitment copyWith({String? action, String? person, DateTime? due, bool? done}) {
+  Commitment copyWith({
+    String? action,
+    String? person,
+    DateTime? due,
+    bool? done,
+  }) {
     return Commitment(
       id: id,
       action: action ?? this.action,
@@ -45,14 +50,14 @@ class Commitment {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'action': action,
-        'person': person,
-        'due': due?.toIso8601String(),
-        'done': done,
-        'autoExtracted': autoExtracted,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'action': action,
+    'person': person,
+    'due': due?.toIso8601String(),
+    'done': done,
+    'autoExtracted': autoExtracted,
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   factory Commitment.fromJson(Map<String, dynamic> json) {
     return Commitment(

@@ -12,7 +12,9 @@ const bool kUseSimulator = false;
 
 /// Singleton pendant source. Its status is watched via [pendantStatusProvider].
 final pendantProvider = Provider<AudioSource>((ref) {
-  final source = kUseSimulator ? SimulatorPendantSource() : BluetoothPendantSource();
+  final source = kUseSimulator
+      ? SimulatorPendantSource()
+      : BluetoothPendantSource();
   ref.onDispose(source.dispose);
   return source;
 });
@@ -37,8 +39,8 @@ final pendantReconnectProvider = Provider<void Function()>((ref) {
   final source = ref.watch(pendantProvider);
   return () {
     source.connect().catchError(
-          (e) => debugPrint('[tanu] auto-reconnect failed: $e'),
-        );
+      (e) => debugPrint('[tanu] auto-reconnect failed: $e'),
+    );
   };
 });
 
@@ -65,7 +67,7 @@ final pendantForgetProvider = Provider<void Function()>((ref) {
   final source = ref.watch(pendantProvider);
   return () {
     source.forgetDevice().catchError(
-          (e) => debugPrint('[tanu] forget failed: $e'),
-        );
+      (e) => debugPrint('[tanu] forget failed: $e'),
+    );
   };
 });

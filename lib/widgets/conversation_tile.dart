@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/transcript.dart';
@@ -47,6 +47,7 @@ class _ConversationTileState extends State<ConversationTile> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -54,11 +55,15 @@ class _ConversationTileState extends State<ConversationTile> {
         duration: const Duration(milliseconds: 200),
         width: double.maxFinite,
         decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           child: widget.onDelete == null
               ? _body(context)
               : Dismissible(
@@ -67,8 +72,11 @@ class _ConversationTileState extends State<ConversationTile> {
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
-                    color: CupertinoColors.destructiveRed.resolveFrom(context),
-                    child: const Icon(CupertinoIcons.delete, color: CupertinoColors.white),
+                    color: Colors.redAccent,
+                    child: const Icon(
+                      Icons.delete,
+                      color: Colors.white,
+                    ),
                   ),
                   onDismissed: (_) => widget.onDelete!(),
                   child: _body(context),
@@ -80,24 +88,27 @@ class _ConversationTileState extends State<ConversationTile> {
 
   Widget _body(BuildContext context) {
     final session = widget.session;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final title = session.title.trim();
     final revealedAt = session.finishedAt ?? session.startedAt;
-    final time = '${revealedAt.hour % 12 == 0 ? 12 : revealedAt.hour % 12}:'
+    final time =
+        '${revealedAt.hour % 12 == 0 ? 12 : revealedAt.hour % 12}:'
         '${revealedAt.minute.toString().padLeft(2, '0')} '
         '${revealedAt.hour < 12 ? 'AM' : 'PM'}';
     final tail = session.summary?.isNotEmpty == true
         ? session.summary!
-        : (session.segments.isEmpty ? 'Empty memory' : session.segments.last.text.trim());
-    final newBadge = widget.isNew &&
-        revealedAt.isAfter(
-            DateTime.now().subtract(const Duration(minutes: 1)));
+        : (session.segments.isEmpty
+              ? 'Empty memory'
+              : session.segments.last.text.trim());
+    final newBadge =
+        widget.isNew &&
+        revealedAt.isAfter(DateTime.now().subtract(const Duration(minutes: 1)));
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return InkWell(
       onTap: () {
         HapticFeedback.selectionClick();
         Navigator.of(context).push(
-          CupertinoPageRoute(
+          MaterialPageRoute(
             fullscreenDialog: true,
             builder: (_) => SessionDetailPage(session: session),
           ),
@@ -113,15 +124,13 @@ class _ConversationTileState extends State<ConversationTile> {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey5.resolveFrom(context),
+                color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                title.isEmpty
-                    ? 'T'
-                    : title.characters.first.toUpperCase(),
+                title.isEmpty ? 'T' : title.characters.first.toUpperCase(),
                 style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
+                  color: isDark ? Colors.white : Colors.black,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -137,7 +146,7 @@ class _ConversationTileState extends State<ConversationTile> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: CupertinoColors.label.resolveFrom(context),
+                      color: isDark ? Colors.white : Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -147,21 +156,27 @@ class _ConversationTileState extends State<ConversationTile> {
                     tail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: CupertinoColors.secondaryLabel.resolveFrom(context), fontSize: 13),
+                    style: const TextStyle(
+                      color: Color(0xFF888888),
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(
                         time,
-                        style: TextStyle(color: CupertinoColors.secondaryLabel.resolveFrom(context), fontSize: 14),
+                        style: const TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 14,
+                        ),
                       ),
                       if (session.segmentCount > 0) ...[
                         const SizedBox(width: 8),
                         Text(
                           '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
-                          style: TextStyle(
-                            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                          style: const TextStyle(
+                            color: Color(0xFF888888),
                             fontSize: 14,
                           ),
                         ),
@@ -170,15 +185,19 @@ class _ConversationTileState extends State<ConversationTile> {
                       if (newBadge)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: CupertinoColors.activeBlue.withValues(alpha: 0.14),
+                            color: Theme.of(context).primaryColor.withValues(
+                              alpha: 0.14,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Text(
+                          child: Text(
                             'New',
                             style: TextStyle(
-                              color: CupertinoColors.activeBlue,
+                              color: Theme.of(context).primaryColor,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -189,7 +208,11 @@ class _ConversationTileState extends State<ConversationTile> {
                 ],
               ),
             ),
-            Icon(CupertinoIcons.chevron_right, size: 20, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+            const Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Color(0xFF888888),
+            ),
           ],
         ),
       ),

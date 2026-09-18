@@ -47,20 +47,21 @@ class TranscriptSegment {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'text': text,
-        'timestamp': timestamp.toIso8601String(),
-        'startMs': startMs,
-        'endMs': endMs,
-        'isUser': isUser,
-      };
+    'id': id,
+    'text': text,
+    'timestamp': timestamp.toIso8601String(),
+    'startMs': startMs,
+    'endMs': endMs,
+    'isUser': isUser,
+  };
 
   factory TranscriptSegment.fromJson(Map<String, dynamic> json) {
     return TranscriptSegment(
       id: json['id'] as String,
       text: json['text'] as String? ?? '',
       timestamp:
-          DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+          DateTime.now(),
       startMs: json['startMs'] as int? ?? 0,
       endMs: json['endMs'] as int?,
       isUser: json['isUser'] as bool? ?? true,
@@ -114,17 +115,18 @@ class ConversationSession {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'finishedAt': finishedAt?.toIso8601String(),
-        'status': status.name,
-        'segments': segments.map((s) => s.toJson()).toList(),
-        'summary': summary,
-      };
+    'id': id,
+    'title': title,
+    'finishedAt': finishedAt?.toIso8601String(),
+    'status': status.name,
+    'segments': segments.map((s) => s.toJson()).toList(),
+    'summary': summary,
+  };
 
   factory ConversationSession.fromJson(Map<String, dynamic> json) {
     final started = DateTime.tryParse(json['startedAt'] as String? ?? '');
-    final status = ConversationStatus.values.asNameMap()[json['status'] as String];
+    final status = ConversationStatus.values
+        .asNameMap()[json['status'] as String];
     final segments = (json['segments'] as List? ?? [])
         .whereType<Map>()
         .map((s) => TranscriptSegment.fromJson(Map<String, dynamic>.from(s)))

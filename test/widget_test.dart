@@ -63,16 +63,16 @@ class FakeSttEngine implements ContinuousSttEngine {
     void Function(String partial)? onPartial,
     void Function(double level)? onMicLevel,
     void Function(String event)? onEvent,
-  }) async =>
-      true;
+  }) async => true;
 
   @override
   Future<void> stopContinuous() async {}
 
   @override
-  Future<String> transcribe(Uint8List pcmUtterance,
-          {SttCallbacks? callbacks}) async =>
-      '';
+  Future<String> transcribe(
+    Uint8List pcmUtterance, {
+    SttCallbacks? callbacks,
+  }) async => '';
 
   @override
   Future<String> transcribeMic({SttCallbacks? callbacks}) async => '';
@@ -86,7 +86,11 @@ class FakeSttEngine implements ContinuousSttEngine {
 
 class FakeAudioSource implements AudioSource {
   final _status = ValueNotifier(
-    const PendantStatus(state: PendantState.connected, batteryPercent: 90, deviceName: 'Omi'),
+    const PendantStatus(
+      state: PendantState.connected,
+      batteryPercent: 90,
+      deviceName: 'Omi',
+    ),
   );
   final _button = StreamController<int>.broadcast();
   final _utterances = StreamController<Uint8List>.broadcast();
@@ -94,7 +98,9 @@ class FakeAudioSource implements AudioSource {
   final _pcm = StreamController<Uint8List>.broadcast();
   final _statusStream = StreamController<PendantStatus>.broadcast();
   final _devices = StreamController<List<DiscoveredDevice>>.broadcast();
-  final _stats = ValueNotifier(const PendantStats(codecId: 20, notifySubscribed: true));
+  final _stats = ValueNotifier(
+    const PendantStats(codecId: 20, notifySubscribed: true),
+  );
 
   @override
   Stream<Uint8List> get audioFrames => _frames.stream;

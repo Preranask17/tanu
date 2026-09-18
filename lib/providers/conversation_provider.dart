@@ -11,27 +11,16 @@ import '../abstractions/stt_engine.dart';
 import '../models/conversation.dart';
 import '../models/transcript.dart';
 import '../services/storage_service.dart';
-import '../services/stt/routing_stt_engine.dart';
 import 'agent_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
 import 'settings_provider.dart';
 
-/// The typed routing engine backing [sttEngineProvider]. Settings toggles read
-/// this to flip the cloud/on-device preference live via [RoutingSttEngine.switchBackend].
-final routingSttEngineProvider = Provider<RoutingSttEngine>((ref) {
-  final settings = ref.read(settingsProvider);
-  final engine = RoutingSttEngine(backend: settings.sttBackend);
-  ref.onDispose(() => unawaited(engine.dispose()));
-  return engine;
-});
+import '../services/stt/whisper_stt_engine.dart';
 
-/// [RoutingSttEngine] dispatches continuous speech to Deepgram streaming when
-/// the user's STT preference is cloud and to the on-device Moonshine model
-/// otherwise, so the conversation loop talks to one engine regardless of the
-/// active recognizer.
+/// The on-device Whisper model is the only STT engine.
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = ref.watch(routingSttEngineProvider);
+  final engine = WhisperSttEngine();
   ref.onDispose(() => unawaited(engine.dispose()));
   return engine;
 });
@@ -43,8 +32,8 @@ final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
 /// list as completed memories.
 final conversationProvider =
     NotifierProvider<ConversationNotifier, ConversationState>(
-  ConversationNotifier.new,
-);
+      ConversationNotifier.new,
+    );
 
 /// How long a completed memory can stay quiet in a session before it is
 /// closed automatically (Omi's server-side `conversation_timeout` equivalent).
@@ -134,10 +123,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       },
     );
     if (!ok) {
-      state = state.copyWith(
-        isListening: false,
-        sttEvent: 'stt unavailable',
-      );
+      state = state.copyWith(isListening: false, sttEvent: 'stt unavailable');
       _continuousStarted = false;
     } else {
       // The "phone just received bytes from the pendant" cue: any PCM chunk
@@ -270,13 +256,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
       segments[segments.length - 1] = last.copyWith(text: trimmed);
     } else {
       final ms = _clock.elapsedMilliseconds;
-      segments.add(TranscriptSegment(
-        id: '${session.id}-${segments.length}',
-        text: trimmed,
-        timestamp: DateTime.now(),
-        startMs: ms,
-        endMs: ms,
-      ));
+      segments.add(
+        TranscriptSegment(
+          id: '${session.id}-${segments.length}',
+          text: trimmed,
+          timestamp: DateTime.now(),
+          startMs: ms,
+          endMs: ms,
+        ),
+      );
     }
     state = state.copyWith(
       active: _withTitle(session, segments),
@@ -306,13 +294,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
     } else {
       final start = segments.isEmpty ? 0 : (ms - 800).clamp(0, ms);
-      segments.add(TranscriptSegment(
-        id: '${session.id}-${segments.length}',
-        text: trimmed,
-        timestamp: DateTime.now(),
-        startMs: start,
-        endMs: ms,
-      ));
+      segments.add(
+        TranscriptSegment(
+          id: '${session.id}-${segments.length}',
+          text: trimmed,
+          timestamp: DateTime.now(),
+          startMs: start,
+          endMs: ms,
+        ),
+      );
     }
 
     state = state.copyWith(
@@ -333,7 +323,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
       for (final s in segments) {
         final t = s.text.trim();
         if (t.isNotEmpty) {
-          title = t.length <= _titleCutoff ? t : '${t.substring(0, _titleCutoff)}…';
+          title = t.length <= _titleCutoff
+              ? t
+              : '${t.substring(0, _titleCutoff)}…';
           break;
         }
       }
@@ -399,7 +391,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
         clearError: true,
       );
       var peak = 0.0;
-      final transcript = await ref.read(sttEngineProvider).transcribeMic(
+      final transcript = await ref
+          .read(sttEngineProvider)
+          .transcribeMic(
             callbacks: SttCallbacks(
               onPartial: (partial) {
                 if (!_micTestActive) return;
@@ -517,14 +511,16 @@ class ConversationNotifier extends Notifier<ConversationState> {
   }
 
   ({List<ConversationSession> completed, ConversationSession? active})
-      _loadState() {
+  _loadState() {
     final box = Hive.box(Boxes.conversation);
     var completed = <ConversationSession>[];
     final stored = box.get('sessions');
     if (stored is List) {
       completed = stored
           .whereType<Map>()
-          .map((e) => ConversationSession.fromJson(Map<String, dynamic>.from(e)))
+          .map(
+            (e) => ConversationSession.fromJson(Map<String, dynamic>.from(e)),
+          )
           .toList();
     }
 
@@ -537,10 +533,12 @@ class ConversationNotifier extends Notifier<ConversationState> {
     var finalized = false;
     for (final c in completed) {
       if (c.status == ConversationStatus.inProgress) {
-        rebuilt.add(c.copyWith(
-          status: ConversationStatus.completed,
-          finishedAt: c.finishedAt ?? now,
-        ));
+        rebuilt.add(
+          c.copyWith(
+            status: ConversationStatus.completed,
+            finishedAt: c.finishedAt ?? now,
+          ),
+        );
         finalized = true;
       } else {
         rebuilt.add(c);
@@ -550,8 +548,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
     final activeJson = box.get('activeSession');
     if (activeJson is Map) {
-      final storedActive =
-          ConversationSession.fromJson(Map<String, dynamic>.from(activeJson));
+      final storedActive = ConversationSession.fromJson(
+        Map<String, dynamic>.from(activeJson),
+      );
       if (storedActive.segments.isNotEmpty) {
         completed = [
           ...completed,
@@ -580,15 +579,17 @@ class ConversationNotifier extends Notifier<ConversationState> {
         final map = Map<String, dynamic>.from(e);
         final text = (map['transcript'] as String? ?? '').trim();
         if (text.isEmpty) continue;
-        segments.add(TranscriptSegment(
-          id: 'legacy-$i',
-          text: text,
-          timestamp:
-              DateTime.tryParse(map['timestamp'] as String? ?? '') ??
-                  DateTime.now().subtract(Duration(minutes: 5 * (i + 1))),
-          startMs: i * 30000,
-          endMs: i * 30000 + 15000,
-        ));
+        segments.add(
+          TranscriptSegment(
+            id: 'legacy-$i',
+            text: text,
+            timestamp:
+                DateTime.tryParse(map['timestamp'] as String? ?? '') ??
+                DateTime.now().subtract(Duration(minutes: 5 * (i + 1))),
+            startMs: i * 30000,
+            endMs: i * 30000 + 15000,
+          ),
+        );
         i++;
       }
       if (segments.isNotEmpty) {

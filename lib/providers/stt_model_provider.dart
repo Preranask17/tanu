@@ -10,7 +10,7 @@ import '../services/stt/model_download_coordinator.dart';
 
 enum SttModelPhase { checking, missing, downloading, ready }
 
-/// Live state of the on-device Moonshine bundle stored in app-support storage.
+/// Live state of the on-device Whisper bundle stored in app-support storage.
 class SttModelState {
   const SttModelState({
     this.phase = SttModelPhase.checking,
@@ -34,8 +34,9 @@ class SttModelState {
 
   /// Short status line for the Home chip: "Loading model…" / "Downloading 47%".
   String get label {
-    final base =
-        phase == SttModelPhase.downloading ? 'Downloading model' : 'Loading model';
+    final base = phase == SttModelPhase.downloading
+        ? 'Downloading model'
+        : 'Loading model';
     final p = percent;
     return p == null ? '$base…' : '$base $p%';
   }
@@ -57,11 +58,11 @@ class SttModelState {
   }
 }
 
-final sttModelProvider =
-    NotifierProvider<SttModelNotifier, SttModelState>(SttModelNotifier.new);
+final sttModelProvider = NotifierProvider<SttModelNotifier, SttModelState>(
+  SttModelNotifier.new,
+);
 
-int get _bundleBytes =>
-    kMoonshineBundleFiles.fold(0, (sum, f) => sum + f.bytes);
+int get _bundleBytes => kOfflineBundleFiles.fold(0, (sum, f) => sum + f.bytes);
 
 class SttModelNotifier extends Notifier<SttModelState> {
   StreamSubscription<Object?>? _progressSub;
@@ -69,29 +70,31 @@ class SttModelNotifier extends Notifier<SttModelState> {
   @override
   SttModelState build() {
     unawaited(refresh());
-    return SttModelState(modelName: kMoonshineBundleFileName);
+    return SttModelState(modelName: kOfflineBundleFileName);
   }
 
   Future<void> refresh() async {
-    state = const SttModelState(phase: SttModelPhase.checking)
-        .copyWith(modelName: kMoonshineBundleFileName);
+    state = const SttModelState(
+      phase: SttModelPhase.checking,
+    ).copyWith(modelName: kOfflineBundleFileName);
     try {
       final dir = await _modelDirectory();
       if (dir != null && _bundleExists(dir)) {
         state = SttModelState(
           phase: SttModelPhase.ready,
-          modelName: kMoonshineBundleFileName,
+          modelName: kOfflineBundleFileName,
           downloadedBytes: await _bundleSize(dir),
           totalBytes: _bundleBytes,
         );
       } else {
-        state = const SttModelState(phase: SttModelPhase.missing)
-            .copyWith(modelName: kMoonshineBundleFileName);
+        state = const SttModelState(
+          phase: SttModelPhase.missing,
+        ).copyWith(modelName: kOfflineBundleFileName);
       }
     } catch (e) {
       state = SttModelState(
         phase: SttModelPhase.missing,
-        modelName: kMoonshineBundleFileName,
+        modelName: kOfflineBundleFileName,
         error: '$e',
       );
     }
@@ -102,7 +105,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
     state = const SttModelState(
       phase: SttModelPhase.downloading,
       modelName: '',
-    ).copyWith(modelName: kMoonshineBundleFileName);
+    ).copyWith(modelName: kOfflineBundleFileName);
 
     // The coordinator is single-flight: if the engine's warm-up is already
     // downloading, [ensure] awaits that same transfer and the progress stream
@@ -112,7 +115,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
     _progressSub = ModelDownloadCoordinator.progress.listen((p) {
       state = SttModelState(
         phase: SttModelPhase.downloading,
-        modelName: kMoonshineBundleFileName,
+        modelName: kOfflineBundleFileName,
         downloadedBytes: p.received,
         totalBytes: p.total > 0 ? p.total : _bundleBytes,
       );
@@ -126,7 +129,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
       } else {
         state = SttModelState(
           phase: SttModelPhase.missing,
-          modelName: kMoonshineBundleFileName,
+          modelName: kOfflineBundleFileName,
           error: 'Model download failed.',
         );
       }
@@ -135,7 +138,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
       _progressSub = null;
       state = SttModelState(
         phase: SttModelPhase.missing,
-        modelName: kMoonshineBundleFileName,
+        modelName: kOfflineBundleFileName,
         error: 'Download failed: $e',
       );
       debugPrint('[tanu] moonshine download failed: $e');
@@ -146,10 +149,10 @@ class SttModelNotifier extends Notifier<SttModelState> {
     if (state.busy) return;
     try {
       final root = (await getApplicationSupportDirectory()).path;
-      final stem = kMoonshineBundleFileName.replaceFirst('.tar.bz2', '');
+      final stem = kOfflineBundleFileName.replaceFirst('.tar.bz2', '');
       final modelDir = Directory('$root/$stem');
       if (await modelDir.exists()) await modelDir.delete(recursive: true);
-      final bundle = File('$root/$kMoonshineBundleFileName');
+      final bundle = File('$root/$kOfflineBundleFileName');
       if (await bundle.exists()) await bundle.delete();
       for (final name in kRetiredModelBundles) {
         final path = '$root/$name';
@@ -163,10 +166,25 @@ class SttModelNotifier extends Notifier<SttModelState> {
     await refresh();
   }
 
+  Future<bool> hasRetiredModels() async {
+    try {
+      final root = (await getApplicationSupportDirectory()).path;
+      for (final name in kRetiredModelBundles) {
+        final path = '$root/$name';
+        if (await File(path).exists() || await Directory(path).exists()) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('[tanu] retired model check failed: $e');
+    }
+    return false;
+  }
+
   /// Mirrors the Moonshine engine's default model directory:
   /// `appSupport/<bundle-stem>`.
   Future<String?> _modelDirectory() async {
-    final stem = kMoonshineBundleFileName.replaceFirst('.tar.bz2', '');
+    final stem = kOfflineBundleFileName.replaceFirst('.tar.bz2', '');
     try {
       final support = await getApplicationSupportDirectory();
       return '${support.path}/$stem';
@@ -177,11 +195,11 @@ class SttModelNotifier extends Notifier<SttModelState> {
   }
 
   bool _bundleExists(String dir) =>
-      kMoonshineBundleFiles.every((f) => File('$dir/${f.name}').existsSync());
+      kOfflineBundleFiles.every((f) => File('$dir/${f.name}').existsSync());
 
   Future<int> _bundleSize(String dir) async {
     var total = 0;
-    for (final f in kMoonshineBundleFiles) {
+    for (final f in kOfflineBundleFiles) {
       total += await File('$dir/${f.name}').length();
     }
     return total;

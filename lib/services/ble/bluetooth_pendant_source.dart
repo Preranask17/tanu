@@ -17,16 +17,19 @@ import 'opus_decoder.dart';
 /// lifecycle in Dart (no native split like Omi's — acceptable for the MVP).
 class BluetoothPendantSource implements AudioSource {
   BluetoothPendantSource({void Function(String)? log})
-      : _log = log ?? debugPrint {
+    : _log = log ?? debugPrint {
     _storedDeviceId = _readStoredDeviceId();
   }
 
   final void Function(String) _log;
 
   // ---- state ----
-  final ValueNotifier<PendantStatus> _status =
-      ValueNotifier(const PendantStatus());
-  final ValueNotifier<PendantStats> _stats = ValueNotifier(const PendantStats());
+  final ValueNotifier<PendantStatus> _status = ValueNotifier(
+    const PendantStatus(),
+  );
+  final ValueNotifier<PendantStats> _stats = ValueNotifier(
+    const PendantStats(),
+  );
   final StreamController<PendantStatus> _statusController =
       StreamController<PendantStatus>.broadcast();
   final StreamController<List<DiscoveredDevice>> _devicesController =
@@ -57,8 +60,7 @@ class BluetoothPendantSource implements AudioSource {
       StreamController<Uint8List>.broadcast();
   final StreamController<Uint8List> _pcmAudio =
       StreamController<Uint8List>.broadcast(sync: true);
-  final StreamController<int> _buttonEvents =
-      StreamController<int>.broadcast();
+  final StreamController<int> _buttonEvents = StreamController<int>.broadcast();
 
   OpusDecoder? _decoder;
 
@@ -67,7 +69,9 @@ class BluetoothPendantSource implements AudioSource {
   // `[packet_index:2 LE][chunk_index:1][payload]`. chunk_index only splits one
   // packet across notifications when it exceeds `mtu - 3`; at large MTU it is
   // always 0, so grouping by it never flushes. Group by packet_index instead.
-  late final OmiReassembler _reassembler = OmiReassembler(onPacket: _onReassembled);
+  late final OmiReassembler _reassembler = OmiReassembler(
+    onPacket: _onReassembled,
+  );
   int _framesDecoded = 0;
   int? _codecId;
 
@@ -234,8 +238,27 @@ class BluetoothPendantSource implements AudioSource {
     _scanResultsSub = FlutterBluePlus.onScanResults.listen(_onScanResults);
 
     _devices.clear();
+
+    // Include already-connected system devices (e.g. if paired in Windows settings)
+    try {
+      final systemDevices = await FlutterBluePlus.systemDevices([]);
+      for (final d in systemDevices) {
+        _devices[d.remoteId.str] = DiscoveredDevice(
+          id: d.remoteId.str,
+          name: d.platformName,
+          rssi: 0,
+          isConnectable: true,
+        );
+      }
+    } catch (e) {
+      _log('[tanu] systemDevices error: $e');
+    }
+    
     _emitDevices();
-    await FlutterBluePlus.startScan();
+    await FlutterBluePlus.startScan(
+      continuousUpdates: true,
+      continuousDivisor: 2, // emit every 2nd update to balance speed/perf
+    );
     _log('[tanu] device scan started');
   }
 
@@ -262,7 +285,8 @@ class BluetoothPendantSource implements AudioSource {
         rssi: r.rssi,
         isConnectable: r.advertisementData.connectable,
       );
-      final shouldReplace = existing == null ||
+      final shouldReplace =
+          existing == null ||
           candidate.rssi > existing.rssi ||
           (name.isNotEmpty && existing.name.isEmpty) ||
           candidate.isConnectable != existing.isConnectable;
@@ -282,9 +306,7 @@ class BluetoothPendantSource implements AudioSource {
       if (byRssi != 0) return byRssi;
       return a.displayName.compareTo(b.displayName);
     });
-    _devicesController.add(
-      sorted.take(_maxDiscoveredDevices).toList(),
-    );
+    _devicesController.add(sorted.take(_maxDiscoveredDevices).toList());
   }
 
   // ---- stored device (remember the pendant across launches) ----
@@ -441,10 +463,15 @@ class BluetoothPendantSource implements AudioSource {
     // notifies were rebuilding widgets on the main isolate ~40x/sec.
     if (_lastStatsEmit.elapsedMilliseconds >= 250) {
       _lastStatsEmit.reset();
-      _setStats((s) => s.copyWith(packets: _packetCount, bytes: _receivedBytes));
+      _setStats(
+        (s) => s.copyWith(packets: _packetCount, bytes: _receivedBytes),
+      );
     }
     if (_packetCount <= 3) {
-      final head = packet.take(16).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+      final head = packet
+          .take(16)
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join(' ');
       _log('[tanu] pkt#$_packetCount len=${packet.length} head=[$head]');
     }
     if (_packetCount % 2000 == 0) {
@@ -558,7 +585,9 @@ class BluetoothPendantSource implements AudioSource {
     final utterance = Uint8List.fromList(_utteranceBuffer);
     _utteranceBuffer.clear();
     _silentFrames = 0;
-    _log('[tanu] utterance emitted: ${(utterance.length / 2 / 16000).toStringAsFixed(2)}s');
+    _log(
+      '[tanu] utterance emitted: ${(utterance.length / 2 / 16000).toStringAsFixed(2)}s',
+    );
     if (!_utterances.isClosed) {
       _utterances.add(utterance);
     }
@@ -622,11 +651,7 @@ class BluetoothPendantSource implements AudioSource {
 
   // ---- helpers ----
 
-  void _setState(
-    PendantState state, {
-    int? battery,
-    String? name,
-  }) {
+  void _setState(PendantState state, {int? battery, String? name}) {
     _status.value = _status.value.copyWith(
       state: state,
       batteryPercent: battery,

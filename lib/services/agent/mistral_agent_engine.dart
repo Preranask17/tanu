@@ -27,16 +27,15 @@ class MistralAgentEngine implements AgentEngine {
   final String endpoint;
   final String? systemPrompt;
 
-  static const String _defaultEndpoint = 'https://api.mistral.ai/v1/chat/completions';
+  static const String _defaultEndpoint =
+      'https://api.mistral.ai/v1/chat/completions';
 
   @override
-  Future<String> prompt(
-    String transcript, {
-    List<ChatMessage>? history,
-  }) async {
+  Future<String> prompt(String transcript, {List<ChatMessage>? history}) async {
     if (apiKey.isEmpty) {
       await Future.delayed(const Duration(seconds: 1));
-      if (history != null && history.any((m) => m.content.contains('"title"'))) {
+      if (history != null &&
+          history.any((m) => m.content.contains('"title"'))) {
         return '{"title": "Mock Chat Memory", "summary": "This is a mock summary generated because no Mistral API key was provided.", "commitments": []}';
       }
       return 'This is a mock AI response since no API key is provided. You said: "$transcript"';
@@ -82,8 +81,9 @@ class MistralAgentEngine implements AgentEngine {
       if (choices == null || choices.isEmpty) {
         throw AgentException('Mistral returned no choices');
       }
-      final content = (choices.first as Map<String, dynamic>)['message']
-          as Map<String, dynamic>;
+      final content =
+          (choices.first as Map<String, dynamic>)['message']
+              as Map<String, dynamic>;
       return (content['content'] as String?)?.trim() ?? '';
     } on AgentException {
       rethrow;
@@ -162,22 +162,28 @@ No commentary, no markdown.
     final start = raw.indexOf('{');
     final end = raw.lastIndexOf('}');
     if (start == -1 || end == -1) {
-      return const MemoryResult(title: 'Memory', summary: 'Could not parse response', commitments: []);
+      return const MemoryResult(
+        title: 'Memory',
+        summary: 'Could not parse response',
+        commitments: [],
+      );
     }
     final jsonStr = raw.substring(start, end + 1);
 
     try {
       final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
       final items = decoded['commitments'] as List<dynamic>?;
-      final commitments = items?.map((item) {
-        final m = item as Map<String, dynamic>;
-        return AgentCommitment(
-          isCommitment: m['is_commitment'] as bool? ?? true,
-          action: m['action'] as String?,
-          person: m['person'] as String?,
-          due: m['due'] as String?,
-        );
-      }).toList() ?? [];
+      final commitments =
+          items?.map((item) {
+            final m = item as Map<String, dynamic>;
+            return AgentCommitment(
+              isCommitment: m['is_commitment'] as bool? ?? true,
+              action: m['action'] as String?,
+              person: m['person'] as String?,
+              due: m['due'] as String?,
+            );
+          }).toList() ??
+          [];
 
       return MemoryResult(
         title: decoded['title'] as String? ?? 'Memory',
@@ -185,7 +191,11 @@ No commentary, no markdown.
         commitments: commitments,
       );
     } catch (_) {
-      return const MemoryResult(title: 'Memory', summary: 'Could not parse response', commitments: []);
+      return const MemoryResult(
+        title: 'Memory',
+        summary: 'Could not parse response',
+        commitments: [],
+      );
     }
   }
 }
@@ -214,10 +224,10 @@ String pcmToWavPcm16(Uint8List pcm, {int sampleRate = 16000}) {
 }
 
 List<int> _uint32(int value) => [
-      value & 0xff,
-      (value >> 8) & 0xff,
-      (value >> 16) & 0xff,
-      (value >> 24) & 0xff,
-    ];
+  value & 0xff,
+  (value >> 8) & 0xff,
+  (value >> 16) & 0xff,
+  (value >> 24) & 0xff,
+];
 
 List<int> _uint16(int value) => [value & 0xff, (value >> 8) & 0xff];

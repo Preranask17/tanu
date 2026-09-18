@@ -11,9 +11,5 @@ Future<void> main() async {
   FlutterForegroundTask.initCommunicationPort();
   await StorageService.initialize();
 
-  runApp(
-    const ProviderScope(
-      child: TanuApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: TanuApp()));
 }

@@ -1,18 +1,17 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../theme.dart';
 import '../widgets/conversation_tile.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
 
   @override
-  ConsumerState<ConversationsScreen> createState() => ConversationsScreenState();
+  ConsumerState<ConversationsScreen> createState() =>
+      ConversationsScreenState();
 }
 
 class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
@@ -50,8 +49,18 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Yesterday';
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final label = '${months[time.month - 1]} ${time.day}';
     if (time.year != now.year) return '$label ${time.year}';
@@ -67,9 +76,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final visible = sessions.where((s) {
       if (query.isEmpty) return true;
       if (s.title.toLowerCase().contains(query)) return true;
-      return s.segments.any(
-        (seg) => seg.text.toLowerCase().contains(query),
-      );
+      if (s.summary != null && s.summary!.toLowerCase().contains(query))
+        return true;
+      return s.segments.any((seg) => seg.text.toLowerCase().contains(query));
     }).toList();
 
     // Group by calendar day, newest first.
@@ -84,80 +93,120 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       groups[label]!.add(session);
     }
 
-    return CupertinoPageScaffold(
-      child: sessions.isEmpty
-          ? const _EmptyConversations()
-          : CustomScrollView(
-              controller: _scroll,
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              slivers: [
-                CupertinoSliverNavigationBar(
-                  largeTitle: const Text('Memories'),
-                  trailing: CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: toggleSearch,
-                    child: Icon(
-                      _searching ? CupertinoIcons.clear_circled_solid : CupertinoIcons.search,
-                    ),
-                  ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: RefreshIndicator(
+        onRefresh: () async =>
+            ref.read(conversationProvider.notifier).reloadFromStorage(),
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 120,
+              floating: true,
+              pinned: true,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(
+                  'Memories',
+                  style: Theme.of(context).textTheme.displayMedium,
                 ),
-                CupertinoSliverRefreshControl(
-                  onRefresh: () async =>
-                      ref.read(conversationProvider.notifier).reloadFromStorage(),
-                ),
-                if (_searching)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: CupertinoSearchTextField(
-                        controller: _query,
-                        autofocus: true,
-                        onChanged: (_) => setState(() {}),
-                        onSuffixTap: () {
-                          _query.clear();
-                          setState(() {});
-                        },
-                      ),
-                    ),
+                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+              ),
+              actions: [
+                IconButton(
+                  onPressed: toggleSearch,
+                  icon: Icon(
+                    _searching ? Icons.close : Icons.search,
+                    color: isDark ? Colors.white : Colors.black,
                   ),
-                SliverPadding(
-                  padding: EdgeInsets.only(
-                    top: _searching ? 4 : 12,
-                    left: 16,
-                    right: 16,
-                    bottom: bottomInset,
-                  ),
-                  sliver: visible.isEmpty && query.isNotEmpty
-                      ? const SliverToBoxAdapter(child: _NoMatches())
-                      : SliverList(
-                          delegate: SliverChildListDelegate([
-                            for (final label in order) ...[
-                              Padding(
-                                padding: const EdgeInsets.only(top: 16, bottom: 4),
-                                child: _DayHeader(label: label),
-                              ),
-                              for (final session in groups[label]!)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: ConversationTile(
-                                    session: session,
-                                    isNew:
-                                        session.status ==
-                                            ConversationStatus.completed &&
-                                        (session.finishedAt ?? session.startedAt)
-                                            .isAfter(DateTime.now().subtract(
-                                                const Duration(minutes: 1))),
-                                    onDelete: () => ref
-                                        .read(conversationProvider.notifier)
-                                        .removeSession(session.id),
-                                  ),
-                                ),
-                            ],
-                          ]),
-                        ),
                 ),
               ],
             ),
+            if (_searching)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: TextField(
+                    controller: _query,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search memories...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: query.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _query.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ),
+            if (sessions.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyConversations(),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  top: _searching ? 4 : 12,
+                  left: 16,
+                  right: 16,
+                  bottom: bottomInset,
+                ),
+                sliver: visible.isEmpty && query.isNotEmpty
+                    ? const SliverToBoxAdapter(child: _NoMatches())
+                    : SliverList(
+                        delegate: SliverChildListDelegate([
+                          for (final label in order) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16, bottom: 4),
+                              child: _DayHeader(label: label),
+                            ),
+                            for (final session in groups[label]!)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: ConversationTile(
+                                  session: session,
+                                  isNew:
+                                      session.status ==
+                                          ConversationStatus.completed &&
+                                      (session.finishedAt ?? session.startedAt)
+                                          .isAfter(
+                                            DateTime.now().subtract(
+                                              const Duration(minutes: 1),
+                                            ),
+                                          ),
+                                  onDelete: () => ref
+                                      .read(conversationProvider.notifier)
+                                      .removeSession(session.id),
+                                ),
+                              ),
+                          ],
+                        ]),
+                      ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -177,7 +226,7 @@ class _DayHeader extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: CupertinoColors.systemGrey,
+          color: Color(0xFF888888),
         ),
       ),
     );
@@ -194,7 +243,7 @@ class _NoMatches extends StatelessWidget {
       child: Center(
         child: Text(
           'No matches for that search.',
-          style: TextStyle(color: CupertinoColors.systemGrey),
+          style: TextStyle(color: Color(0xFF888888)),
         ),
       ),
     );
@@ -212,18 +261,35 @@ class _EmptyConversations extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(CupertinoIcons.archivebox, color: CupertinoColors.systemGrey, size: 48),
+            const Icon(
+              Icons.inventory_2_outlined,
+              color: Color(0xFF888888),
+              size: 48,
+            ),
             const SizedBox(height: 16),
             const Text(
               'No memories yet.\nConnect your pendant and start talking.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: CupertinoColors.systemGrey, height: 1.5, fontSize: 16),
+              style: TextStyle(
+                color: Color(0xFF888888),
+                height: 1.5,
+                fontSize: 16,
+              ),
             ),
             const SizedBox(height: 24),
-            CupertinoButton.filled(
+            ElevatedButton(
               onPressed: () =>
                   ref.read(navigationTabProvider.notifier).goToHome(),
-              child: const Text('Go to Home', style: TextStyle(fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text(
+                'Go to Home',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),

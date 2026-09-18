@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,10 +13,12 @@ import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/settings_screen.dart';
 import 'theme.dart';
-import 'widgets/bottom_nav_bar.dart';
+
 import 'widgets/home_chat_bar.dart';
+import 'widgets/responsive_scaffold.dart';
 
 class TanuApp extends ConsumerStatefulWidget {
   const TanuApp({super.key});
@@ -39,7 +40,9 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     // widget tests where the native plugin is unavailable.
     if (Platform.environment['FLUTTER_TEST'] != 'true') {
       Future.microtask(() => ref.read(sttEngineProvider).isAvailable());
-      WidgetsBinding.instance.addPostFrameCallback((_) => _initForegroundTask());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _initForegroundTask(),
+      );
     }
   }
 
@@ -96,7 +99,8 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       if (notice != _fgNotice) {
         _fgNotice = notice;
         unawaited(
-            FlutterForegroundTask.updateService(notificationText: notice));
+          FlutterForegroundTask.updateService(notificationText: notice),
+        );
       }
     }
   }
@@ -111,9 +115,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       } else {
         await FlutterForegroundTask.startService(
           serviceId: 1010,
-          serviceTypes: const [
-            ForegroundServiceTypes.connectedDevice,
-          ],
+          serviceTypes: const [ForegroundServiceTypes.connectedDevice],
           notificationTitle: 'Tanu',
           notificationText: 'Listening…',
           callback: _fgTaskCallback,
@@ -160,54 +162,47 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     final brightness = settings.themeMode == ThemeMode.dark
         ? Brightness.dark
         : (settings.themeMode == ThemeMode.light
-            ? Brightness.light
-            : platformBrightness);
+              ? Brightness.light
+              : platformBrightness);
 
-    return CupertinoApp(
+    return MaterialApp(
       title: 'Tanu',
       debugShowCheckedModeBanner: false,
       theme: TanuTheme.getTheme(brightness),
-      home: CupertinoTabScaffold(
-        controller: CupertinoTabController(initialIndex: index),
-        tabBar: CupertinoTabBar(
-          onTap: (i) {
-            if (i == index) {
-              _onTabTap(i, true);
-            } else {
-              ref.read(navigationTabProvider.notifier).goTo(i);
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(CupertinoIcons.mic),
-              activeIcon: Icon(CupertinoIcons.mic_solid),
-              label: 'Capture',
+      home: !settings.hasCompletedOnboarding
+          ? const OnboardingScreen()
+          : ResponsiveScaffold(
+              currentIndex: index,
+              onTabTapped: (i) {
+                if (i == index) {
+                  _onTabTap(i, true);
+                } else {
+                  ref.read(navigationTabProvider.notifier).goTo(i);
+                }
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.mic_none),
+                  activeIcon: Icon(Icons.mic),
+                  label: 'Capture',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.inventory_2_outlined),
+                  activeIcon: Icon(Icons.inventory_2),
+                  label: 'Memories',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings_outlined),
+                  activeIcon: Icon(Icons.settings),
+                  label: 'Settings',
+                ),
+              ],
+              pages: [
+                HomeScreen(key: _homeKey),
+                ConversationsScreen(key: _conversationsKey),
+                const SettingsScreen(),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(CupertinoIcons.archivebox),
-              activeIcon: Icon(CupertinoIcons.archivebox_fill),
-              label: 'Memories',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(CupertinoIcons.settings),
-              activeIcon: Icon(CupertinoIcons.settings_solid),
-              label: 'Settings',
-            ),
-          ],
-        ),
-        tabBuilder: (context, i) {
-          switch (i) {
-            case 0:
-              return HomeScreen(key: _homeKey);
-            case 1:
-              return ConversationsScreen(key: _conversationsKey);
-            case 2:
-              return const SettingsScreen();
-            default:
-              return const SizedBox.shrink();
-          }
-        },
-      ),
     );
   }
 }

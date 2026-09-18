@@ -1,18 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../services/agent/mistral_agent_engine.dart';
-import 'settings_provider.dart';
+import '../services/agent/local_agent_engine.dart';
 
-/// Provides a configured MistralAgentEngine using the user's settings.
-final mistralEngineProvider = Provider<MistralAgentEngine>((ref) {
-  final settings = ref.watch(settingsProvider);
-  return MistralAgentEngine(
-    apiKey: settings.apiKey,
-    model: settings.model,
-  );
+/// Provides a configured LocalHeuristicAgentEngine.
+final localEngineProvider = Provider<LocalHeuristicAgentEngine>((ref) {
+  return LocalHeuristicAgentEngine();
 });
 
 /// Provides the processor for turning raw transcripts into structured memories.
 final memoryProcessorProvider = Provider<MemoryProcessor>((ref) {
-  return MemoryProcessor(ref.watch(mistralEngineProvider));
+  return MemoryProcessor(ref.watch(localEngineProvider));
 });

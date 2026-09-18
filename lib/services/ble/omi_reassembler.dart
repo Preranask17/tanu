@@ -25,7 +25,9 @@ class OmiReassembler {
   void add(Uint8List notification) {
     if (notification.length < 4) return;
 
-    final packetId = ByteData.sublistView(notification).getUint16(0, Endian.little);
+    final packetId = ByteData.sublistView(
+      notification,
+    ).getUint16(0, Endian.little);
     final payload = Uint8List.sublistView(notification, 3);
 
     if (!_gotFirst) {

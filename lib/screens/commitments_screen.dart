@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/commitment.dart';
@@ -25,35 +25,29 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
     super.dispose();
   }
 
-  void _pickDue() {
-    showCupertinoModalPopup<void>(
+  Future<void> _pickDue() async {
+    final picked = await showDatePicker(
       context: context,
-      builder: (BuildContext context) => Container(
-        height: 250,
-        color: CupertinoColors.systemBackground.resolveFrom(context),
-        child: SafeArea(
-          top: false,
-          child: CupertinoDatePicker(
-            initialDateTime: _due ?? DateTime.now(),
-            minimumDate: DateTime.now().subtract(const Duration(days: 1)),
-            maximumDate: DateTime.now().add(const Duration(days: 365 * 3)),
-            mode: CupertinoDatePickerMode.date,
-            onDateTimeChanged: (DateTime newDate) {
-              setState(() => _due = newDate);
-            },
-          ),
-        ),
-      ),
+      initialDate: _due ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
     );
+    if (picked != null) {
+      setState(() => _due = picked);
+    }
   }
 
   void _submit() {
     final action = _actionCtrl.text.trim();
     if (action.isEmpty) return;
     setState(() => _submitting = true);
-    ref.read(commitmentsProvider.notifier).addManual(
+    ref
+        .read(commitmentsProvider.notifier)
+        .addManual(
           action: action,
-          person: _personCtrl.text.trim().isEmpty ? null : _personCtrl.text.trim(),
+          person: _personCtrl.text.trim().isEmpty
+              ? null
+              : _personCtrl.text.trim(),
           due: _due,
         );
     _actionCtrl.clear();
@@ -64,26 +58,84 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
     });
   }
 
+  // ── Section Card style ────────────────────────────────────────────────────
+  Widget _sectionCard({required String header, required List<Widget> children}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: 8, top: 16),
+          child: Text(
+            header.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+              color: Color(0xFF888888),
+            ),
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          child: Material(
+            color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              children: children,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final commitments = ref.watch(commitmentsProvider);
 
-    final overdue = commitments.where((c) => c.needsAttention && !c.done).toList();
-    final active = commitments.where((c) => !c.done && !c.needsAttention).toList();
+    final overdue = commitments
+        .where((c) => c.needsAttention && !c.done)
+        .toList();
+    final active = commitments
+        .where((c) => !c.done && !c.needsAttention)
+        .toList();
     final done = commitments.where((c) => c.done).toList();
 
     final currentDate = Commitment.today();
 
-    final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 100; // Keyboard avoiding + Nav bar + bottom bar padding
+    final bottomInset =
+        MediaQuery.paddingOf(context).bottom +
+        50 +
+        100; // Keyboard avoiding + Nav bar + bottom bar padding
+        
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return CupertinoPageScaffold(
-      backgroundColor: CupertinoColors.systemGroupedBackground,
-      child: Stack(
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
         children: [
           CustomScrollView(
             slivers: [
-              const CupertinoSliverNavigationBar(
-                largeTitle: Text('Commitments'),
+              SliverAppBar(
+                expandedHeight: 120,
+                floating: true,
+                pinned: true,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                flexibleSpace: FlexibleSpaceBar(
+                  title: Text(
+                    'Commitments',
+                    style: Theme.of(context).textTheme.displayMedium,
+                  ),
+                  titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -93,40 +145,59 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                     children: [
                       const ConnectionStatusBar(),
                       if (overdue.isNotEmpty)
-                        CupertinoListSection.insetGrouped(
-                          header: const Text('Needs attention'),
-                          children: overdue.map((c) => _CommitmentTile(
-                            commitment: c,
-                            dueText: _dueLabel(c, currentDate),
-                            highlight: true,
-                          )).toList(),
+                        _sectionCard(
+                          header: 'Needs attention',
+                          children: overdue
+                              .map(
+                                (c) => _CommitmentTile(
+                                  commitment: c,
+                                  dueText: _dueLabel(c, currentDate),
+                                  highlight: true,
+                                ),
+                              )
+                              .toList(),
                         ),
                       if (active.isNotEmpty)
-                        CupertinoListSection.insetGrouped(
-                          header: const Text('Upcoming'),
-                          children: active.map((c) => _CommitmentTile(
-                            commitment: c,
-                            dueText: _dueLabel(c, currentDate),
-                          )).toList(),
+                        _sectionCard(
+                          header: 'Upcoming',
+                          children: active
+                              .map(
+                                (c) => _CommitmentTile(
+                                  commitment: c,
+                                  dueText: _dueLabel(c, currentDate),
+                                ),
+                              )
+                              .toList(),
                         ),
                       if (done.isNotEmpty)
-                        CupertinoListSection.insetGrouped(
-                          header: const Text('Done'),
-                          children: done.map((c) => _CommitmentTile(
-                            commitment: c,
-                            dueText: _dueLabel(c, currentDate),
-                            done: true,
-                          )).toList(),
+                        _sectionCard(
+                          header: 'Done',
+                          children: done
+                              .map(
+                                (c) => _CommitmentTile(
+                                  commitment: c,
+                                  dueText: _dueLabel(c, currentDate),
+                                  done: true,
+                                ),
+                              )
+                              .toList(),
                         ),
                       if (commitments.isEmpty)
                         const _EmptyState()
                       else
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 32,
+                          ),
                           child: Text(
                             'These surface automatically when Tanu hears you commit to something — or add your own below.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, color: CupertinoColors.systemGrey.resolveFrom(context), height: 1.4),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: const Color(0xFF888888),
+                              height: 1.4,
+                            ),
                           ),
                         ),
                     ],
@@ -157,7 +228,11 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
     if (c.done) return 'Done';
     if (c.due == null) return c.person ?? '';
     final due = c.due!;
-    final diff = DateTime(due.year, due.month, due.day).difference(today).inDays;
+    final diff = DateTime(
+      due.year,
+      due.month,
+      due.day,
+    ).difference(today).inDays;
     if (diff < 0) return 'Overdue · ${_friendly(due)}';
     if (diff == 0) return 'Due today';
     if (diff == 1) return 'Due tomorrow';
@@ -165,7 +240,20 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
   }
 
   String _friendly(DateTime d) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${months[d.month - 1]} ${d.day}';
   }
 }
@@ -187,18 +275,24 @@ class _CommitmentTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(commitmentsProvider.notifier);
     final isDone = done || commitment.done;
-    return CupertinoListTile(
-      backgroundColor: highlight ? CupertinoColors.destructiveRed.resolveFrom(context).withValues(alpha: 0.1) : null,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return ListTile(
+      tileColor: highlight
+          ? Colors.red.withOpacity(0.1)
+          : null,
       onTap: () => notifier.toggleDone(commitment.id),
       leading: Icon(
-        isDone ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
-        color: isDone ? CupertinoColors.systemGrey : CupertinoColors.activeBlue,
+        isDone ? Icons.check_circle : Icons.circle_outlined,
+        color: isDone ? Colors.grey : Theme.of(context).primaryColor,
         size: 24,
       ),
       title: Text(
         commitment.action,
         style: TextStyle(
-          color: isDone ? CupertinoColors.secondaryLabel.resolveFrom(context) : CupertinoColors.label.resolveFrom(context),
+          color: isDone
+              ? const Color(0xFF888888)
+              : (isDark ? Colors.white : Colors.black),
           decoration: isDone ? TextDecoration.lineThrough : null,
           fontWeight: isDone ? FontWeight.w400 : FontWeight.w600,
         ),
@@ -208,15 +302,21 @@ class _CommitmentTile extends ConsumerWidget {
           : Text(
               dueText,
               style: TextStyle(
-                color: highlight ? CupertinoColors.destructiveRed.resolveFrom(context) : CupertinoColors.secondaryLabel.resolveFrom(context),
+                color: highlight
+                    ? Colors.red
+                    : const Color(0xFF888888),
                 fontSize: 12,
               ),
             ),
-      trailing: CupertinoButton(
+      trailing: IconButton(
         padding: EdgeInsets.zero,
-        minSize: 0,
+        constraints: const BoxConstraints(),
         onPressed: () => notifier.remove(commitment.id),
-        child: const Icon(CupertinoIcons.clear_thick, size: 18, color: CupertinoColors.systemGrey),
+        icon: const Icon(
+          Icons.close,
+          size: 18,
+          color: Colors.grey,
+        ),
       ),
     );
   }
@@ -227,21 +327,33 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
       child: Column(
         children: [
-          const Icon(CupertinoIcons.sparkles, size: 40, color: CupertinoColors.activeBlue),
+          Icon(
+            Icons.auto_awesome,
+            size: 40,
+            color: Theme.of(context).primaryColor,
+          ),
           const SizedBox(height: 12),
           Text(
             'No commitments yet',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: CupertinoColors.label.resolveFrom(context)),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : Colors.black,
+            ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Say “I’ll send the file tomorrow” and Tanu will note it here.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: CupertinoColors.secondaryLabel.resolveFrom(context)),
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF888888),
+            ),
           ),
         ],
       ),
@@ -268,11 +380,17 @@ class _ManualAddBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-        border: Border(top: BorderSide(color: CupertinoColors.separator.resolveFrom(context))),
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+          ),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -280,30 +398,47 @@ class _ManualAddBar extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: CupertinoTextField(
+                child: TextField(
                   controller: actionCtrl,
-                  placeholder: 'New commitment...',
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground.resolveFrom(context),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: CupertinoColors.systemGrey4.resolveFrom(context)),
-                  ),
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => onSubmit(),
+                  decoration: InputDecoration(
+                    hintText: 'New commitment...',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
+              IconButton(
                 onPressed: submitting ? null : onSubmit,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: submitting ? CupertinoColors.systemGrey.resolveFrom(context) : CupertinoColors.activeBlue.resolveFrom(context),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(CupertinoIcons.arrow_up, color: CupertinoColors.white, size: 20),
+                style: IconButton.styleFrom(
+                  backgroundColor: submitting
+                      ? const Color(0xFF888888)
+                      : Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.all(12),
+                ),
+                icon: const Icon(
+                  Icons.arrow_upward,
+                  size: 20,
                 ),
               ),
             ],
@@ -312,26 +447,51 @@ class _ManualAddBar extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: CupertinoTextField(
+                child: TextField(
                   controller: personCtrl,
-                  placeholder: 'For who? (optional)',
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground.resolveFrom(context),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: CupertinoColors.systemGrey4.resolveFrom(context)),
+                  decoration: InputDecoration(
+                    hintText: 'For who? (optional)',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                      ),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: CupertinoColors.systemBackground.resolveFrom(context),
-                borderRadius: BorderRadius.circular(16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                  foregroundColor: isDark ? Colors.white : Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
                 onPressed: onPickDue,
                 child: Text(
                   due == null ? 'Pick date' : _shortDate(due!),
-                  style: TextStyle(color: CupertinoColors.label.resolveFrom(context), fontSize: 14),
+                  style: const TextStyle(
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],
@@ -342,7 +502,20 @@ class _ManualAddBar extends StatelessWidget {
   }
 
   String _shortDate(DateTime d) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${months[d.month - 1]} ${d.day}';
   }
 }
