@@ -16,16 +16,16 @@ import 'ble_provider.dart';
 import 'commitment_provider.dart';
 import 'settings_provider.dart';
 
-import '../services/stt/moonshine_stt_engine.dart';
+import '../services/stt/zipformer_stt_engine.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = MoonshineSttEngine();
+  final engine = ZipformerSttEngine();
   ref.onDispose(() => engine.dispose());
   return engine;
 });
 
 /// Drives the core loop: pendant audio -> continuous STT -> timestamped
-/// transcript segments inside one in-progress "memory" session — the same
+/// transcript segments inside one in-progress "memory" session â€” the same
 /// session model Omi uses. Sessions close on pendant disconnect, a double-tap
 /// of the pendant button, or an idle timeout, and land in the conversations
 /// list as completed memories.
@@ -101,7 +101,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         status: ConversationStatus.inProgress,
       ),
       isListening: true,
-      sttEvent: 'listening…',
+      sttEvent: 'listeningâ€¦',
     );
     _clock = Stopwatch()..start();
 
@@ -324,7 +324,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         if (t.isNotEmpty) {
           title = t.length <= _titleCutoff
               ? t
-              : '${t.substring(0, _titleCutoff)}…';
+              : '${t.substring(0, _titleCutoff)}â€¦';
           break;
         }
       }
@@ -386,7 +386,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         isListening: true,
         liveTranscript: '',
         micLevel: 0,
-        sttEvent: 'listening…',
+        sttEvent: 'listeningâ€¦',
         clearError: true,
       );
       var peak = 0.0;
@@ -440,7 +440,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         state = state.copyWith(
           liveTranscript: '',
           isListening: false,
-          sttEvent: 'no words recognized · mic peak ${(peak * 100).round()}%',
+          sttEvent: 'no words recognized Â· mic peak ${(peak * 100).round()}%',
           micLevel: 0,
         );
       }
@@ -636,6 +636,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   String _clip(String text) {
     final t = text.trim();
-    return t.length <= _titleCutoff ? t : '${t.substring(0, _titleCutoff)}…';
+    return t.length <= _titleCutoff ? t : '${t.substring(0, _titleCutoff)}â€¦';
   }
 }
