@@ -30,14 +30,17 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(pendantReconnectProvider)();
-      _checkRetiredModels();
+      _ensureSttModel();
     });
   }
 
-  Future<void> _checkRetiredModels() async {
-    final hasRetired = await ref
-        .read(sttModelProvider.notifier)
-        .hasRetiredModels();
+  /// Auto-downloads the Moonshine STT model on first launch, or upgrades
+  /// from a retired model if one exists.
+  Future<void> _ensureSttModel() async {
+    final notifier = ref.read(sttModelProvider.notifier);
+
+    // If there is a retired (old) model, prompt the user to upgrade.
+    final hasRetired = await notifier.hasRetiredModels();
     if (hasRetired && mounted) {
       showDialog(
         context: context,
@@ -52,15 +55,22 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                ref.read(sttModelProvider.notifier).deleteModel().then((_) {
-                  ref.read(sttModelProvider.notifier).download();
-                });
+                notifier.deleteModel().then((_) => notifier.download());
               },
               child: const Text('Delete & Upgrade'),
             ),
           ],
         ),
       );
+      return;
+    }
+
+    // If the model is simply missing (fresh install), auto-download it.
+    await notifier.refresh();
+    final state = ref.read(sttModelProvider);
+    if (state.phase == SttModelPhase.missing) {
+      debugPrint('[tanu] STT model missing -- auto-downloading...');
+      notifier.download();
     }
   }
 
@@ -272,7 +282,7 @@ class _LiveCaptureCard extends ConsumerWidget {
     final active = conversation.active;
     final label = switch (conversation.sttEvent) {
       'stt unavailable' => 'Transcription unavailable',
-      _ => conversation.isListening ? 'Listening…' : 'Capturing…',
+      _ => conversation.isListening ? 'Listeningâ€¦' : 'Capturingâ€¦',
     };
 
     final preview = words.isNotEmpty
@@ -580,7 +590,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               connected
-                  ? 'Listening… speak to capture a memory.'
+                  ? 'Listeningâ€¦ speak to capture a memory.'
                   : 'Nothing here yet.\nConnect your pendant and say something.',
               textAlign: TextAlign.center,
               style: const TextStyle(

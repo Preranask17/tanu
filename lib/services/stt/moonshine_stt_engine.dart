@@ -104,7 +104,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
 
   /// Hard cap for a single utterance; longer clips are cut and processed even
   /// while still talking, so the feed never falls behind.
-  static const int _maxUtteranceMs = 12000;
+  static const int _maxUtteranceMs = 8000;
 
   /// Cadence for the live partial preview re-decode of the trailing tail.
   static const Duration _partialCadence = Duration(milliseconds: 650);
@@ -494,7 +494,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
       // --- ROBUST LEVEL-BASED VAD PATH (FALLBACK) ---
       if (!_vadSpeech) {
         _noiseFloor = _noiseFloor == 0 ? level : _noiseFloor * 0.94 + level * 0.06;
-        final isSpeaking = level > math.max(0.015, _noiseFloor * 1.8);
+        final isSpeaking = level > math.max(0.035, _noiseFloor * 2.0);
         if (!isSpeaking) return;
 
         debugPrint('[tanu] level vad speech onset (level=$level, floor=$_noiseFloor)');
@@ -504,7 +504,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
         _vadSilenceMs = 0;
         _startPartialTimer();
       } else {
-        final isSpeaking = level > math.max(0.010, _noiseFloor * 1.5);
+        final isSpeaking = level > math.max(0.020, _noiseFloor * 1.5);
         _vadSilenceMs = isSpeaking ? 0 : _vadSilenceMs + ms;
       }
 
@@ -539,6 +539,14 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     );
     if (clip.length < _sampleRate * 3 ~/ 10) return; // <300 ms: ignore.
 
+    // Energy gate: skip chunks that are mostly silence to prevent
+    // hallucinations. Moonshine will "make up" words from quiet audio.
+    final energy = _level(clip);
+    if (energy < 0.02) {
+      debugPrint('[tanu] chunk dropped: energy=$energy too low (hallucination guard)');
+      return;
+    }
+
     if (_transcribing || _partialBusy) {
       _transcribeQueue.add((clip, fallback));
       return;
@@ -549,7 +557,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
   Future<void> _transcribeChunk(Float32List clip, String fallback) async {
     _transcribing = true;
     try {
-      _onEventCb?.call('hearing…');
+      _onEventCb?.call('hearingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦');
       final text = await _decodeOne(clip);
       if (_continuousActive) {
         final finalText = text.trim().isNotEmpty ? text.trim() : fallback;
@@ -581,14 +589,14 @@ class MoonshineSttEngine implements ContinuousSttEngine {
   }
 
   /// Best-effort live preview: re-decodes the trailing tail of the growing
-  /// buffer with the worker and streams words to [onPartial] — and only when
+  /// buffer with the worker and streams words to [onPartial] ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â and only when
   /// the hypothesis actually changed, so the UI isn't rebuilt with identical
   /// text. Skips while a final pass or another partial is running; the next
   /// tick retries. Partials are previews only; never surface or queue them.
   Future<void> _transcribePartial() async {
     if (!_continuousActive || !_vadSpeech) return;
     if (_transcribing || _partialBusy) return;
-    if (_pendingSamples.length < _sampleRate) return; // need ≥1s of audio.
+    if (_pendingSamples.length < _sampleRate) return; // need ÃƒÂ¢Ã¢â‚¬Â°Ã‚Â¥1s of audio.
 
     _partialBusy = true;
     try {
@@ -601,9 +609,9 @@ class MoonshineSttEngine implements ContinuousSttEngine {
       );
       final text = (await _decodeOne(copy)).trim();
       if (_continuousActive && _vadSpeech) {
-        // `…` marks a mid-sentence preview that only covers the tail window;
+        // `ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦` marks a mid-sentence preview that only covers the tail window;
         // the final pass will replace it with the full, accurate turn.
-        final shown = start > 0 && text.isNotEmpty ? '…$text' : text;
+        final shown = start > 0 && text.isNotEmpty ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦$text' : text;
         if (shown.isNotEmpty && shown != _lastPartialText) {
           _lastPartialText = shown;
           _onPartialCb?.call(shown);
