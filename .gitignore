@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 .apk
+.env
 
 # IntelliJ related
 *.iml
@@ -83,3 +84,4 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 *.tar.bz2
+ref.txt

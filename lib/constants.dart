@@ -20,8 +20,8 @@ const String kPendantName = 'Omi';
 /// slot in app support, downloaded the same way, but ~1.7ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â lighter and built
 /// for streaming feedback latency. `sherpa_onnx` ships the onnx runtime; this
 /// is just the weights + tokens.
-const String kOfflineBundleUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2';
-const String kOfflineBundleFileName = 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2';
+const String kOfflineBundleUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-02-21.tar.bz2';
+const String kOfflineBundleFileName = 'sherpa-onnx-streaming-zipformer-en-2023-02-21.tar.bz2';
 
 const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
@@ -32,7 +32,9 @@ const String kSileroVadFileName = 'silero_vad.onnx';
 /// archive should contain. `decoder_model_merged.ort` is the merged-decoder
 /// variant (no separate cached/uncached decoder pairs), matching
 /// `OfflineMoonshineModelConfig.mergedDecoder`.
-const List<({String name, int bytes})> kOfflineBundleFiles = [ (name: 'model.int8.onnx', bytes: 0), (name: 'tokens.txt', bytes: 0) ];
+const List<({String name, int bytes})> kOfflineBundleFiles = [ (name: 'encoder-epoch-99-avg-1.int8.onnx', bytes: 0),
+  (name: 'decoder-epoch-99-avg-1.int8.onnx', bytes: 0),
+  (name: 'joiner-epoch-99-avg-1.int8.onnx', bytes: 0), (name: 'tokens.txt', bytes: 0) ];
 
 /// Human label shown in Settings and the Home warm-up chip.
 const String kOfflineModelLabel = 'SenseVoice Â· 163 MB';

@@ -16,10 +16,10 @@ import 'ble_provider.dart';
 import 'commitment_provider.dart';
 import 'settings_provider.dart';
 
-import '../services/stt/sense_voice_stt_engine.dart';
+import '../services/stt/zipformer_stt_engine.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = SenseVoiceSttEngine();
+  final engine = ZipformerSttEngine();
   ref.onDispose(() => engine.dispose());
   return engine;
 });
@@ -108,6 +108,12 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _buttonSub?.cancel();
     _buttonSub = source.buttonEvents.listen(_onButtonEvent);
 
+    final available = await engine.isAvailable();
+    if (!available) {
+      state = state.copyWith(isListening: false, sttEvent: "Model missing. Download in Settings.");
+      _continuousStarted = false;
+      return;
+    }
     final ok = await engine.startContinuous(
       source.pcmAudio,
       onUtterance: _onUtterance,
