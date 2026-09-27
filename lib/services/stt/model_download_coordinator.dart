@@ -59,7 +59,7 @@ final class ModelDownloadCoordinator {
   static Future<File?> ensure({void Function(String)? onEvent}) {
     final task = _singleton._tasks[kOfflineBundleFileName];
     if (task != null) {
-      onEvent?.call('downloading models… (already running)');
+      onEvent?.call('downloading modelsâ€¦ (already running)');
       return task.done;
     }
     final started = _ActiveTask(onEvent);
@@ -112,7 +112,7 @@ final class _ActiveTask {
           return null;
         }
       }
-      onEvent?.call('downloading models… retry $attempt/$_maxDownloadAttempts');
+      onEvent?.call('downloading modelsâ€¦ retry $attempt/$_maxDownloadAttempts');
       await Future<void>.delayed(Duration(seconds: 2 * attempt));
     }
     return null;
@@ -123,7 +123,7 @@ final class _ActiveTask {
     final file = File('${support.path}/$kSileroVadFileName');
     if (file.existsSync() && file.lengthSync() > 0) return;
 
-    onEvent?.call('downloading VAD model…');
+    onEvent?.call('downloading VAD modelâ€¦');
     final client = http.Client();
     try {
       final response = await client.get(Uri.parse(kSileroVadUrl));
@@ -169,7 +169,7 @@ final class _ActiveTask {
   /// True when every expected bundle member is present on disk and non-empty.
   /// The authoritative integrity guard is BZip2's own `verify: true` stream CRC
   /// (any truncated/corrupt archive fails in the decoder before a single file
-  /// lands); per-file byte counts are deliberately NOT compared here — the
+  /// lands); per-file byte counts are deliberately NOT compared here â€” the
   /// release asset is republished by upstream without notice, so a baked-in
   /// byte table silently rots and turns every legitimate re-download into a
   /// false "failed size verification". Existence + non-empty is the stable
@@ -183,6 +183,15 @@ final class _ActiveTask {
   }
 
   Future<File?> _downloadAndExtract() async {
+    Future<void> _ensureVad(void Function(String)? onEvent) async {
+      final dir = await _modelDir();
+      final vad = File('$dir/silero_vad.onnx');
+      if (!vad.existsSync()) {
+        onEvent?.call('downloading VAD model...');
+        final res = await http.get(Uri.parse('https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx'));
+        await vad.writeAsBytes(res.bodyBytes);
+      }
+    }
     final dir = await _modelDir();
     if (dir == null) return null;
     final support = Directory(dir).parent;
@@ -213,7 +222,8 @@ final class _ActiveTask {
       await _cleanupDownload(archiveFile, part, dir);
       rethrow;
     }
-    if (!_verified(dir)) {
+    await _ensureVad(null);
+      if (!_verified(dir)) {
       await _cleanupDownload(archiveFile, part, dir);
       throw const FormatException('downloaded bundle failed size verification');
     }
@@ -281,7 +291,7 @@ final class _ActiveTask {
   /// BZip2/TAR decode + per-file writes are megabytes of CPU-bound byte work
   /// that would stall the calling isolate (the Settings download button, or
   /// the conversation provider's warm-up) for several seconds otherwise.
-  /// Expands the archive in the background and returns the exact name → bytes
+  /// Expands the archive in the background and returns the exact name â†’ bytes
   /// map of what was written, taken from the archive's own members. This is the
   /// truth the caller re-checks on disk, so the pending smoke path needs no
   /// hardcoded per-file byte table that rots every time upstream republishes
