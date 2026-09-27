@@ -57,15 +57,15 @@ final class ModelDownloadCoordinator {
   /// Returns the verified `tokens.txt` inside the extracted model directory,
   /// or `null` if the bundle could not be obtained.
   static Future<File?> ensure({void Function(String)? onEvent}) {
-    final task = _singleton._tasks[kMoonshineBundleFileName];
+    final task = _singleton._tasks[kOfflineBundleFileName];
     if (task != null) {
-      onEvent?.call('downloading $kMoonshineModelLabel… (already running)');
+      onEvent?.call('downloading modelsâ€¦ (already running)');
       return task.done;
     }
     final started = _ActiveTask(onEvent);
-    _singleton._tasks[kMoonshineBundleFileName] = started;
+    _singleton._tasks[kOfflineBundleFileName] = started;
     started.done.whenComplete(() {
-      _singleton._tasks.remove(kMoonshineBundleFileName);
+      _singleton._tasks.remove(kOfflineBundleFileName);
       _completions.add(started.ok);
     });
     started.done.ignore();
@@ -98,6 +98,7 @@ final class _ActiveTask {
 
     for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt++) {
       try {
+        await _ensureVad(onEvent);
         final file = await _downloadAndExtract();
         if (file != null) {
           ok = true;
@@ -111,11 +112,29 @@ final class _ActiveTask {
           return null;
         }
       }
-      onEvent?.call(
-          'downloading $kMoonshineModelLabel… retry $attempt/$_maxDownloadAttempts');
+      onEvent?.call('downloading modelsâ€¦ retry $attempt/$_maxDownloadAttempts');
       await Future<void>.delayed(Duration(seconds: 2 * attempt));
     }
     return null;
+  }
+
+  Future<void> _ensureVad(void Function(String)? onEvent) async {
+    final support = await getApplicationSupportDirectory();
+    final file = File('${support.path}/$kSileroVadFileName');
+    if (file.existsSync() && file.lengthSync() > 0) return;
+
+    onEvent?.call('downloading VAD modelâ€¦');
+    final client = http.Client();
+    try {
+      final response = await client.get(Uri.parse(kSileroVadUrl));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+      } else {
+        throw HttpException('vad download failed: ${response.statusCode}');
+      }
+    } finally {
+      client.close();
+    }
   }
 
   /// The model directory sherpa_onnx reads from: `appSupport/<bundle-stem>`,
@@ -124,7 +143,7 @@ final class _ActiveTask {
   Future<String?> _modelDir() async {
     try {
       final support = await getApplicationSupportDirectory();
-      final stem = kMoonshineBundleFileName.replaceFirst('.tar.bz2', '');
+      final stem = kOfflineBundleFileName.replaceFirst('.tar.bz2', '');
       return '${support.path}/$stem';
     } catch (e) {
       debugPrint('[tanu] model dir unavailable: $e');
@@ -150,13 +169,13 @@ final class _ActiveTask {
   /// True when every expected bundle member is present on disk and non-empty.
   /// The authoritative integrity guard is BZip2's own `verify: true` stream CRC
   /// (any truncated/corrupt archive fails in the decoder before a single file
-  /// lands); per-file byte counts are deliberately NOT compared here — the
+  /// lands); per-file byte counts are deliberately NOT compared here â€” the
   /// release asset is republished by upstream without notice, so a baked-in
   /// byte table silently rots and turns every legitimate re-download into a
   /// false "failed size verification". Existence + non-empty is the stable
   /// contract the recognizer needs (all three files must be loadable).
   bool _verified(String dir) {
-    for (final f in kMoonshineBundleFiles) {
+    for (final f in kOfflineBundleFiles) {
       final file = File('$dir/${f.name}');
       if (!file.existsSync() || file.lengthSync() == 0) return false;
     }
@@ -164,20 +183,38 @@ final class _ActiveTask {
   }
 
   Future<File?> _downloadAndExtract() async {
+    Future<void> _ensureVad(void Function(String)? onEvent) async {
+      final dir = await _modelDir();
+      final vad = File('$dir/silero_vad.onnx');
+      if (!vad.existsSync()) {
+        onEvent?.call('downloading VAD model...');
+        final res = await http.get(Uri.parse('https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx'));
+        await vad.writeAsBytes(res.bodyBytes);
+      }
+    }
     final dir = await _modelDir();
     if (dir == null) return null;
     final support = Directory(dir).parent;
-    final archiveFile = File('${support.path}/$kMoonshineBundleFileName');
-    final part = File('${support.path}/$kMoonshineBundleFileName.part');
+    final archiveFile = File('${support.path}/$kOfflineBundleFileName');
+    final part = File('${support.path}/$kOfflineBundleFileName.part');
     await support.create(recursive: true);
 
-    await _transfer(part);
-    // The download is complete and verified: commit it, then extract.
-    try {
-      await part.rename(archiveFile.path);
-    } catch (e) {
-      await _cleanupDownload(archiveFile, part, dir);
-      rethrow;
+    if (!archiveFile.existsSync()) {
+      await _transfer(part);
+      // The download is complete and verified: commit it, then extract.
+      try {
+        await part.rename(archiveFile.path);
+      } catch (e) {
+        await _cleanupDownload(archiveFile, part, dir);
+        rethrow;
+      }
+    } else {
+      // Archive already exists (likely from a hot restart during extraction).
+      // Emit a 100% progress event so the UI jumps straight to "Extracting..."
+      final len = archiveFile.lengthSync();
+      ModelDownloadCoordinator._events.add(
+        ModelDownloadProgress(received: len, total: len),
+      );
     }
     try {
       await _extract(archiveFile, dir);
@@ -185,7 +222,8 @@ final class _ActiveTask {
       await _cleanupDownload(archiveFile, part, dir);
       rethrow;
     }
-    if (!_verified(dir)) {
+    await _ensureVad(null);
+      if (!_verified(dir)) {
       await _cleanupDownload(archiveFile, part, dir);
       throw const FormatException('downloaded bundle failed size verification');
     }
@@ -200,7 +238,7 @@ final class _ActiveTask {
     final client = http.Client();
     try {
       final start = part.existsSync() ? part.lengthSync() : 0;
-      final request = http.Request('GET', Uri.parse(kMoonshineBundleUrl));
+      final request = http.Request('GET', Uri.parse(kOfflineBundleUrl));
       if (start > 0) {
         request.headers[HttpHeaders.rangeHeader] = 'bytes=$start-';
       }
@@ -227,7 +265,8 @@ final class _ActiveTask {
           sink.add(chunk);
           received += chunk.length;
           ModelDownloadCoordinator._events.add(
-              ModelDownloadProgress(received: received, total: total));
+            ModelDownloadProgress(received: received, total: total),
+          );
         }
         await sink.flush();
       } finally {
@@ -246,13 +285,13 @@ final class _ActiveTask {
   /// Expands the commit archive into [dir]. `BZip2Decoder(verify: true)`
   /// checks the stream CRC, so a truncated set of bytes can never be silently
   /// unpacked into broken model files; per-file byte counts are re-checked by
-  /// [_verified] against [kMoonshineBundleFiles] afterwards.
+  /// [_verified] against [kOfflineBundleFiles] afterwards.
   ///
   /// Extraction runs inside an `Isolate.run` worker: the archive package's
   /// BZip2/TAR decode + per-file writes are megabytes of CPU-bound byte work
   /// that would stall the calling isolate (the Settings download button, or
   /// the conversation provider's warm-up) for several seconds otherwise.
-  /// Expands the archive in the background and returns the exact name → bytes
+  /// Expands the archive in the background and returns the exact name â†’ bytes
   /// map of what was written, taken from the archive's own members. This is the
   /// truth the caller re-checks on disk, so the pending smoke path needs no
   /// hardcoded per-file byte table that rots every time upstream republishes
@@ -267,33 +306,33 @@ final class _ActiveTask {
   /// archives; per-member sizes are simply reported so [_verified] can compare
   /// on-disk bytes against the decode, never against a stale constant.
   static Future<Map<String, int>> _extractSync(
-      String archivePath, String dir) async {
+    String archivePath,
+    String dir,
+  ) async {
     final bytes = await File(archivePath).readAsBytes();
     final tarBytes = Uint8List.fromList(
-        BZip2Decoder().decodeBytes(bytes, verify: true));
+      BZip2Decoder().decodeBytes(bytes, verify: true),
+    );
     final archive = TarDecoder().decodeBytes(tarBytes);
     final out = Directory(dir);
     if (out.existsSync()) await out.delete(recursive: true);
     await out.create(recursive: true);
-    final expected = kMoonshineBundleFiles.map((f) => f.name).toSet();
+    final expected = kOfflineBundleFiles.map((f) => f.name).toSet();
     final written = <String, int>{};
     for (final f in archive.files) {
       final name = f.name.split('/').last;
       if (name.isEmpty || !expected.contains(name)) continue;
-      final content = f.content as Uint8List;
+      final content = f.content as List<int>;
       await File('${out.path}/$name').writeAsBytes(content);
       written[name] = content.length;
     }
     return written;
   }
 
-  Future<void> _cleanupDownload(
-      File archiveFile, File part, String dir) async {
-    for (final f in [archiveFile, part]) {
-      try {
-        if (f.existsSync()) await f.delete();
-      } catch (_) {}
-    }
+  Future<void> _cleanupDownload(File archiveFile, File part, String dir) async {
+    try {
+      if (part.existsSync()) await part.delete();
+    } catch (_) {}
     try {
       final d = Directory(dir);
       if (d.existsSync()) await d.delete(recursive: true);

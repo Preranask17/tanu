@@ -47,29 +47,35 @@ void main() {
       expect(packets.length, 1);
       expect(packets[0].length, 150);
       for (var i = 0; i < 3; i++) {
-        expect(packets[0].sublist(i * 50, i * 50 + 50), List.filled(50, 10 + i));
+        expect(
+          packets[0].sublist(i * 50, i * 50 + 50),
+          List.filled(50, 10 + i),
+        );
       }
       r.flush();
       expect(packets.length, 2);
       expect(packets[1], [9, 9]);
     });
 
-    test('a partial packet after a gap still gets delivered to the decoder', () {
-      final packets = <Uint8List>[];
-      final r = OmiReassembler(onPacket: packets.add);
+    test(
+      'a partial packet after a gap still gets delivered to the decoder',
+      () {
+        final packets = <Uint8List>[];
+        final r = OmiReassembler(onPacket: packets.add);
 
-      r.add(_notify(20, 0, [1, 2]));
-      // Notification for chunk 1 is lost; next packet arrives instead.
-      r.add(_notify(21, 0, [3, 4]));
+        r.add(_notify(20, 0, [1, 2]));
+        // Notification for chunk 1 is lost; next packet arrives instead.
+        r.add(_notify(21, 0, [3, 4]));
 
-      // The partial frame 20 is flushed to the decoder (Opus rejects it);
-      // then frame 21 completes on its own boundary.
-      expect(packets.length, 1);
-      expect(packets[0], [1, 2]);
-      r.flush();
-      expect(packets.length, 2);
-      expect(packets[1], [3, 4]);
-    });
+        // The partial frame 20 is flushed to the decoder (Opus rejects it);
+        // then frame 21 completes on its own boundary.
+        expect(packets.length, 1);
+        expect(packets[0], [1, 2]);
+        r.flush();
+        expect(packets.length, 2);
+        expect(packets[1], [3, 4]);
+      },
+    );
 
     test('reassembler id generation is little-endian', () {
       final packets = <Uint8List>[];

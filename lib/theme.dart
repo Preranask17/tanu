@@ -1,124 +1,137 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-/// Tanu's own warm palette — cream, white cards, warm-beige chips, ink text
-/// and a tan accent. The layout/shell borrows Omi's structure; the colors are
-/// all Tanu.
+/// Tanu's "Storytelling AI" Aesthetic
 class TanuTheme {
-  /// Warm cream page background.
-  static const Color bg = Color(0xFFFAF7F2);
+  static ThemeData getTheme(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    
+    // Deep contrast colors
+    final primaryInk = isDark ? Colors.white : Colors.black;
+    final primaryBg = isDark ? const Color(0xFF000000) : const Color(0xFFFAFAFA);
+    final surfaceColor = isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF);
+    final borderColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5);
+    final accentBlue = isDark ? const Color(0xFF4A90E2) : Colors.blueAccent;
+    final mutedText = isDark ? const Color(0xFF888888) : const Color(0xFF666666);
 
-  /// White card surface (conversation tiles, live card, settings rows).
-  static const Color surface = Color(0xFFFFFFFF);
-
-  /// Warm-beige tertiary chips (account tiles, icon squares, stat rows).
-  static const Color chip = Color(0xFFEDE3D4);
-
-  /// Warm near-black ink for all primary text.
-  static const Color ink = Color(0xFF221A11);
-
-  /// Tan accent — record button, active states, secondary icons.
-  static const Color warm = Color(0xFFB07A3E);
-
-  /// Muted sage for "ready / connected / success".
-  static const Color green = Color(0xFF5E7D5A);
-
-  /// Terracotta for errors, delete, stop.
-  static const Color red = Color(0xFFA3432E);
-
-  /// Secondary/iso text.
-  static const Color muted = Color(0xFF8A7F70);
-
-  /// Bottom edge of the nav fade.
-  static const Color navEdge = Color(0xFFF0E9DE);
-
-  /// Hairline borders/separators (ink @ 8%).
-  static const Color line = Color(0x14221A11);
-
-  static ThemeData light() {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: warm,
-      brightness: Brightness.light,
-      surface: surface,
+    final textTheme = TextTheme(
+      displayLarge: GoogleFonts.dmSerifDisplay(
+        color: primaryInk,
+        fontSize: 32,
+        height: 1.2,
+      ),
+      displayMedium: GoogleFonts.dmSerifDisplay(
+        color: primaryInk,
+        fontSize: 28,
+        height: 1.2,
+      ),
+      titleLarge: GoogleFonts.inter(
+        color: primaryInk,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.5,
+      ),
+      bodyLarge: GoogleFonts.inter(
+        color: primaryInk,
+        fontSize: 16,
+        letterSpacing: -0.2,
+        height: 1.4,
+      ),
+      bodyMedium: GoogleFonts.inter(
+        color: primaryInk,
+        fontSize: 15,
+        letterSpacing: -0.2,
+        height: 1.4,
+      ),
+      labelLarge: GoogleFonts.inter(
+        color: mutedText,
+        fontSize: 13,
+        letterSpacing: 0,
+      ),
     );
 
-    final base = ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      scaffoldBackgroundColor: bg,
-    );
-
-    return base.copyWith(
-      appBarTheme: const AppBarTheme(
-        backgroundColor: bg,
-        foregroundColor: ink,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: ink,
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-        ),
+    return ThemeData(
+      brightness: brightness,
+      primaryColor: accentBlue,
+      scaffoldBackgroundColor: primaryBg,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: accentBlue,
+        brightness: brightness,
+        surface: surfaceColor,
+        onSurface: primaryInk,
+        primary: accentBlue,
+        onPrimary: Colors.white,
       ),
-      cardTheme: CardThemeData(
-        color: surface,
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: primaryBg,
         elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        centerTitle: true,
+        iconTheme: IconThemeData(color: primaryInk),
+        titleTextStyle: textTheme.titleLarge,
       ),
-      dividerTheme: const DividerThemeData(color: line),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: primaryBg,
+        selectedItemColor: accentBlue,
+        unselectedItemColor: mutedText,
+        elevation: 0,
+      ),
+      dividerTheme: DividerThemeData(
+        color: borderColor,
+        thickness: 1,
+        space: 1,
+      ),
+      iconTheme: IconThemeData(
+        color: primaryInk,
+        size: 24,
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: accentBlue,
+        selectionColor: accentBlue.withValues(alpha: 0.3),
+        selectionHandleColor: accentBlue,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: chip,
-        hintStyle: const TextStyle(color: muted),
+        fillColor: surfaceColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: line),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: line),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: warm),
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: accentBlue),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        hintStyle: TextStyle(color: mutedText),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: ink,
-          foregroundColor: bg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryInk,
+          foregroundColor: primaryBg,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: warm),
-      ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: ink,
-        contentTextStyle: const TextStyle(color: bg),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      listTileTheme: const ListTileThemeData(
-        iconColor: warm,
-        textColor: ink,
-        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+        style: TextButton.styleFrom(
+          foregroundColor: accentBlue,
+          textStyle: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
 }
-
-const Color kTanuBg = TanuTheme.bg;
-const Color kTanuSurface = TanuTheme.surface;
-const Color kTanuChip = TanuTheme.chip;
-const Color kTanuInk = TanuTheme.ink;
-const Color kTanuWarm = TanuTheme.warm;
-const Color kTanuGreen = TanuTheme.green;
-const Color kTanuRed = TanuTheme.red;
-const Color kTanuMuted = TanuTheme.muted;
-const Color kTanuLine = TanuTheme.line;
-const Color kTanuNavEdge = TanuTheme.navEdge;

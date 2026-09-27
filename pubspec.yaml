@@ -43,10 +43,10 @@ dependencies:
   uuid: ^4.6.0
   path_provider: ^2.1.5
   sherpa_onnx: ^1.13.8
-  web_socket_channel: ^3.0.3
   archive: ^3.6.1
   record: ^6.1.2
   flutter_foreground_task: ^11.0.3
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:

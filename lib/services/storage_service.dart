@@ -23,7 +23,11 @@ class StorageService {
   }
 
   static Future<void> clearAll() async {
-    for (final name in [Boxes.settings, Boxes.commitments, Boxes.conversation]) {
+    for (final name in [
+      Boxes.settings,
+      Boxes.commitments,
+      Boxes.conversation,
+    ]) {
       final box = Hive.box(name);
       await box.clear();
     }

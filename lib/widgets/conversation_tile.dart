@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../models/transcript.dart';
 import '../screens/chat_screen.dart';
-import '../theme.dart';
 
 /// One completed memory card: a warm-beige initial tile, the session title,
 /// the tail of its transcript and the close time. Swipe-to-delete when
@@ -48,6 +47,7 @@ class _ConversationTileState extends State<ConversationTile> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -55,9 +55,12 @@ class _ConversationTileState extends State<ConversationTile> {
         duration: const Duration(milliseconds: 200),
         width: double.maxFinite,
         decoration: BoxDecoration(
-          color: kTanuSurface,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kTanuLine),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
@@ -69,8 +72,11 @@ class _ConversationTileState extends State<ConversationTile> {
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
-                    color: kTanuRed,
-                    child: const Icon(Icons.delete, color: Colors.white),
+                    color: Colors.redAccent,
+                    child: const Icon(
+                      Icons.delete,
+                      color: Colors.white,
+                    ),
                   ),
                   onDismissed: (_) => widget.onDelete!(),
                   child: _body(context),
@@ -82,17 +88,21 @@ class _ConversationTileState extends State<ConversationTile> {
 
   Widget _body(BuildContext context) {
     final session = widget.session;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final title = session.title.trim();
     final revealedAt = session.finishedAt ?? session.startedAt;
-    final time = '${revealedAt.hour % 12 == 0 ? 12 : revealedAt.hour % 12}:'
+    final time =
+        '${revealedAt.hour % 12 == 0 ? 12 : revealedAt.hour % 12}:'
         '${revealedAt.minute.toString().padLeft(2, '0')} '
         '${revealedAt.hour < 12 ? 'AM' : 'PM'}';
-    final tail = session.segments.isEmpty
-        ? 'Empty memory'
-        : session.segments.last.text.trim();
-    final newBadge = widget.isNew &&
-        revealedAt.isAfter(
-            DateTime.now().subtract(const Duration(minutes: 1)));
+    final tail = session.summary?.isNotEmpty == true
+        ? session.summary!
+        : (session.segments.isEmpty
+              ? 'Empty memory'
+              : session.segments.last.text.trim());
+    final newBadge =
+        widget.isNew &&
+        revealedAt.isAfter(DateTime.now().subtract(const Duration(minutes: 1)));
 
     return InkWell(
       onTap: () {
@@ -114,15 +124,13 @@ class _ConversationTileState extends State<ConversationTile> {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: kTanuChip,
+                color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                title.isEmpty
-                    ? 'T'
-                    : title.characters.first.toUpperCase(),
-                style: const TextStyle(
-                  color: kTanuInk,
+                title.isEmpty ? 'T' : title.characters.first.toUpperCase(),
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -137,8 +145,8 @@ class _ConversationTileState extends State<ConversationTile> {
                     title.isEmpty ? 'Untitled memory' : title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: kTanuInk,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -148,21 +156,27 @@ class _ConversationTileState extends State<ConversationTile> {
                     tail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kTanuMuted, fontSize: 13),
+                    style: const TextStyle(
+                      color: Color(0xFF888888),
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(
                         time,
-                        style: const TextStyle(color: kTanuMuted, fontSize: 14),
+                        style: const TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 14,
+                        ),
                       ),
                       if (session.segmentCount > 0) ...[
                         const SizedBox(width: 8),
                         Text(
                           '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
                           style: const TextStyle(
-                            color: kTanuMuted,
+                            color: Color(0xFF888888),
                             fontSize: 14,
                           ),
                         ),
@@ -171,15 +185,19 @@ class _ConversationTileState extends State<ConversationTile> {
                       if (newBadge)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: kTanuWarm.withValues(alpha: 0.14),
+                            color: Theme.of(context).primaryColor.withValues(
+                              alpha: 0.14,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Text(
+                          child: Text(
                             'New',
                             style: TextStyle(
-                              color: kTanuWarm,
+                              color: Theme.of(context).primaryColor,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -190,7 +208,11 @@ class _ConversationTileState extends State<ConversationTile> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20, color: kTanuMuted),
+            const Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Color(0xFF888888),
+            ),
           ],
         ),
       ),

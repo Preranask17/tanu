@@ -10,10 +10,10 @@ import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../screens/chat_screen.dart';
-import '../theme.dart';
-import '../widgets/bottom_nav_bar.dart';
+import '../providers/stt_model_provider.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/device_picker_sheet.dart';
+import '../widgets/home_chat_bar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -30,7 +30,48 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(pendantReconnectProvider)();
+      _ensureSttModel();
     });
+  }
+
+  /// Auto-downloads the Moonshine STT model on first launch, or upgrades
+  /// from a retired model if one exists.
+  Future<void> _ensureSttModel() async {
+    final notifier = ref.read(sttModelProvider.notifier);
+
+    // If there is a retired (old) model, prompt the user to upgrade.
+    final hasRetired = await notifier.hasRetiredModels();
+    if (hasRetired && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('STT Model Upgrade'),
+          content: const Text(
+            'We\'ve upgraded the offline speech engine to a highly accurate Moonshine model. '
+            'Please delete the old model to make room and install the latest one.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                notifier.deleteModel().then((_) => notifier.download());
+              },
+              child: const Text('Delete & Upgrade'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // If the model is simply missing (fresh install), auto-download it.
+    await notifier.refresh();
+    final state = ref.read(sttModelProvider);
+    if (state.phase == SttModelPhase.missing) {
+      debugPrint('[tanu] STT model missing -- auto-downloading...');
+      notifier.download();
+    }
   }
 
   @override
@@ -60,70 +101,112 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(pendantStatusProvider).value ?? const PendantStatus();
+    final status =
+        ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    // Calculate padding for the persistent bottom chat bar
+    final isDesktop = MediaQuery.sizeOf(context).width >= 600;
+    // On mobile, bottom dock is safeAreaBottom + 16 (bottom offset) + 64 (height) = safeAreaBottom + 80.
+    // We want 16px padding above the dock, so we need 96.
+    final bottomPadding =
+        MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
+    final bottomInset = bottomPadding + 62 + 16; // space for chat bar
 
     final recent = conversation.conversations.length > 3
         ? conversation.conversations
-            .sublist(conversation.conversations.length - 3)
-            .reversed
-            .toList()
+              .sublist(conversation.conversations.length - 3)
+              .reversed
+              .toList()
         : conversation.conversations.reversed.toList();
 
-    return RefreshIndicator(
-      onRefresh: () async =>
-          ref.read(conversationProvider.notifier).reloadFromStorage(),
-      color: kTanuWarm,
-      child: CustomScrollView(
-        controller: _scroll,
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: 8,
-                bottom: 92 +
-                    kBottomNavChatBarGap +
-                    bottomInset +
-                    62 +
-                    16,
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async =>
+                ref.read(conversationProvider.notifier).reloadFromStorage(),
+            child: CustomScrollView(
+              controller: _scroll,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (conversation.active != null ||
-                      conversation.isListening ||
-                      conversation.liveTranscript.isNotEmpty)
-                    _LiveCaptureCard(
+              slivers: [
+                SliverAppBar(
+                  expandedHeight: 160,
+                  floating: true,
+                  pinned: true,
+                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: Text(
+                      'Capture',
+                      style: Theme.of(context).textTheme.displayMedium,
+                    ),
+                    titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                  ),
+                  actions: [
+                    _PendantStatusIndicator(
                       status: status,
-                      conversation: conversation,
+                      onConnect: _openDevicePicker,
                     ),
-                  if (!status.isConnected && conversation.active == null)
-                    _ConnectionCard(onConnect: _openDevicePicker),
-                  if (conversation.active == null &&
-                      conversation.conversations.isEmpty)
-                    _EmptyState(connected: status.isConnected)
-                  else ...[
-                    const SizedBox(height: 20),
-                    _SectionHeader(
-                      title: 'Conversations',
-                      pillLabel: 'View All',
-                      interactive: true,
-                      onPillTap: () => ref
-                          .read(navigationTabProvider.notifier)
-                          .goToConversations(),
-                    ),
-                    const SizedBox(height: 4),
-                    for (final (i, session) in recent.indexed)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: ConversationTile(session: session, isNew: i == 0),
-                      ),
+                    const SizedBox(width: 8),
                   ],
-                ],
-              ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 16, bottom: bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (conversation.active != null ||
+                            conversation.isListening ||
+                            conversation.liveTranscript.isNotEmpty)
+                          _LiveCaptureCard(
+                            status: status,
+                            conversation: conversation,
+                          ),
+                        if (!status.isConnected && conversation.active == null)
+                          _ConnectionCard(onConnect: _openDevicePicker),
+                        if (conversation.active == null &&
+                            conversation.conversations.isEmpty &&
+                            status.isConnected)
+                          _EmptyState(connected: status.isConnected)
+                        else ...[
+                          const SizedBox(height: 32),
+                          _SectionHeader(
+                            title: 'Recent Memories',
+                            pillLabel: 'View All',
+                            interactive: true,
+                            onPillTap: () => ref
+                                .read(navigationTabProvider.notifier)
+                                .goToConversations(),
+                          ),
+                          const SizedBox(height: 8),
+                          for (final (i, session) in recent.indexed)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 4,
+                              ),
+                              child: ConversationTile(
+                                session: session,
+                                isNew: i == 0,
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: bottomPadding,
+            child: const Center(child: HomeChatBar()),
           ),
         ],
       ),
@@ -131,11 +214,64 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _LiveCaptureCard extends ConsumerWidget {
-  const _LiveCaptureCard({
+class _PendantStatusIndicator extends StatelessWidget {
+  const _PendantStatusIndicator({
     required this.status,
-    required this.conversation,
+    required this.onConnect,
   });
+  final PendantStatus status;
+  final VoidCallback onConnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = status.isConnected;
+
+    final Widget leading;
+    if (!connected) {
+      leading = const Icon(
+        Icons.bluetooth,
+        size: 20,
+        color: Color(0xFF888888),
+      );
+    } else if (status.state == PendantState.reconnecting) {
+      leading = const Icon(
+        Icons.sync,
+        size: 20,
+        color: Colors.orange,
+      );
+    } else {
+      leading = const Icon(
+        Icons.bluetooth_connected,
+        size: 20,
+        color: Colors.green,
+      );
+    }
+
+    return TextButton(
+      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+      onPressed: onConnect,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          leading,
+          if (connected && status.batteryPercent != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              '${status.batteryPercent}%',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF888888),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveCaptureCard extends ConsumerWidget {
+  const _LiveCaptureCard({required this.status, required this.conversation});
 
   final PendantStatus status;
   final ConversationState conversation;
@@ -146,32 +282,40 @@ class _LiveCaptureCard extends ConsumerWidget {
     final active = conversation.active;
     final label = switch (conversation.sttEvent) {
       'stt unavailable' => 'Transcription unavailable',
-      _ => conversation.isListening ? 'Listening…' : 'Capturing…',
+      _ => conversation.isListening ? 'Listeningâ€¦' : 'Capturingâ€¦',
     };
 
     final preview = words.isNotEmpty
         ? words
         : (active != null && active.segments.isNotEmpty
-            ? active.segments.last.text.trim()
-            : '');
+              ? active.segments.last.text.trim()
+              : '');
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
           HapticFeedback.selectionClick();
           Navigator.of(context).push(
-            MaterialPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => const ChatPage(),
+            ),
           );
         },
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: kTanuSurface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: kTanuLine),
+            color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+              width: 1,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,62 +323,66 @@ class _LiveCaptureCard extends ConsumerWidget {
               Row(
                 children: [
                   _Equalizer(
-                    color: kTanuGreen,
+                    color: Theme.of(context).primaryColor,
                     level: conversation.micLevel,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       label,
                       style: const TextStyle(
-                        color: kTanuInk,
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   Text(
                     status.deviceName ?? 'Pendant',
-                    style: const TextStyle(fontSize: 12, color: kTanuMuted),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF888888),
+                    ),
                   ),
                 ],
               ),
               if (active != null && active.segments.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(conversationProvider.notifier).forceEndSession();
                     },
-                    style: TextButton.styleFrom(
-                      foregroundColor: kTanuWarm,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(0, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: const Icon(Icons.post_add, size: 18),
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
                     label: const Text(
                       'New memory',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ],
               if (preview.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
                   preview,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontStyle: words.isNotEmpty
                         ? FontStyle.italic
                         : FontStyle.normal,
-                    color: kTanuInk.withValues(alpha: 0.85),
-                    fontSize: 16,
-                    height: 1.35,
+                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.8),
+                    fontSize: 17,
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -246,7 +394,7 @@ class _LiveCaptureCard extends ConsumerWidget {
   }
 }
 
-/// Animated 4-bar voice meter, Tanu-colored.
+/// Animated 4-bar voice meter.
 class _Equalizer extends StatefulWidget {
   const _Equalizer({required this.color, required this.level});
 
@@ -294,15 +442,17 @@ class _EqualizerState extends State<_Equalizer>
             for (var i = 0; i < barCount; i++)
               Container(
                 width: 3.5,
-                height: 12 +
+                height:
+                    12 +
                     (16 * amp) *
                         (0.5 +
                             0.5 *
                                 math.sin(
-                                    i * 0.9 + t * frequencies[i] + phases[i])),
+                                  i * 0.9 + t * frequencies[i] + phases[i],
+                                )),
                 margin: const EdgeInsets.symmetric(horizontal: 1.5),
                 decoration: BoxDecoration(
-                  color: widget.color.withValues(alpha: 0.9),
+                  color: widget.color,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -320,42 +470,55 @@ class _ConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: kTanuSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kTanuLine),
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
-            Icon(Icons.bluetooth_disabled, color: kTanuMuted, size: 24),
-            const SizedBox(width: 14),
+            const Icon(
+              Icons.bluetooth,
+              color: Color(0xFF888888),
+              size: 28,
+            ),
+            const SizedBox(width: 16),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'No pendant yet',
-                    style: TextStyle(
-                      color: kTanuInk,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
-                  SizedBox(height: 2),
+                  SizedBox(height: 4),
                   Text(
                     'Connect your pendant to start talking.',
-                    style: TextStyle(color: kTanuMuted, fontSize: 13),
+                    style: TextStyle(
+                      color: Color(0xFF888888),
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
             ),
-            FilledButton(
+            ElevatedButton(
               onPressed: onConnect,
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              ),
               child: const Text('Scan'),
             ),
           ],
@@ -381,35 +544,24 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: kTanuInk,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          InkWell(
-            onTap: interactive ? onPillTap : null,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: kTanuChip,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                pillLabel,
-                style: TextStyle(
-                  color: interactive ? kTanuInk : kTanuMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: interactive ? onPillTap : null,
+            child: Text(
+              pillLabel,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -426,18 +578,26 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.record_voice_over_outlined, color: kTanuMuted, size: 36),
-            const SizedBox(height: 12),
+            const Icon(
+              Icons.mic_off,
+              color: Color(0xFF888888),
+              size: 48,
+            ),
+            const SizedBox(height: 16),
             Text(
               connected
-                  ? 'Listening… speak or tap + to view a memory'
+                  ? 'Listeningâ€¦ speak to capture a memory.'
                   : 'Nothing here yet.\nConnect your pendant and say something.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: kTanuMuted, height: 1.5),
+              style: const TextStyle(
+                color: Color(0xFF888888),
+                height: 1.5,
+                fontSize: 16,
+              ),
             ),
           ],
         ),

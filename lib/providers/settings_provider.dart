@@ -1,57 +1,46 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../constants.dart';
 import '../services/storage_service.dart';
 
-/// Where continuous speech recognition runs: Deepgram in the cloud or the
-/// on-device Moonshine model. The pendant is never blocked on this choice —
-/// it only decides which recognizer gets fed the audio stream.
-enum SttBackend { cloud, onDevice }
-
 class AppSettings {
   const AppSettings({
-    this.apiKey = '',
-    this.model = kMistralModel,
     this.deviceName = kPendantName,
-    this.sttBackend = SttBackend.cloud,
+    this.themeMode = ThemeMode.system,
+    this.hasCompletedOnboarding = true,
   });
 
-  final String apiKey;
-  final String model;
   final String deviceName;
-  final SttBackend sttBackend;
-
-  bool get hasApiKey => apiKey.isNotEmpty;
+  final ThemeMode themeMode;
+  final bool hasCompletedOnboarding;
 
   AppSettings copyWith({
-    String? apiKey,
-    String? model,
     String? deviceName,
-    SttBackend? sttBackend,
+    ThemeMode? themeMode,
+    bool? hasCompletedOnboarding,
   }) {
     return AppSettings(
-      apiKey: apiKey ?? this.apiKey,
-      model: model ?? this.model,
       deviceName: deviceName ?? this.deviceName,
-      sttBackend: sttBackend ?? this.sttBackend,
+      themeMode: themeMode ?? this.themeMode,
+      hasCompletedOnboarding:
+          hasCompletedOnboarding ?? this.hasCompletedOnboarding,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'apiKey': apiKey,
-        'model': model,
-        'deviceName': deviceName,
-        'sttBackend': sttBackend.name,
-      };
+    'deviceName': deviceName,
+    'themeMode': themeMode.name,
+    'hasCompletedOnboarding': hasCompletedOnboarding,
+  };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
-        apiKey: json['apiKey'] as String? ?? '',
-        model: json['model'] as String? ?? kMistralModel,
-        deviceName: json['deviceName'] as String? ?? kPendantName,
-        sttBackend: SttBackend.values.asNameMap()[json['sttBackend']] ??
-            SttBackend.cloud,
-      );
+    deviceName: json['deviceName'] as String? ?? kPendantName,
+    themeMode:
+        ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
+    hasCompletedOnboarding: false, // Hardcoded for testing the new UI
+  );
 }
 
 class SettingsNotifier extends Notifier<AppSettings> {
@@ -62,26 +51,25 @@ class SettingsNotifier extends Notifier<AppSettings> {
     if (stored is Map) {
       return AppSettings.fromJson(Map<String, dynamic>.from(stored));
     }
-    return AppSettings(apiKey: kMistralApiKeyDefine);
-  }
-
-  void setApiKey(String key) {
-    state = state.copyWith(apiKey: key.trim());
-    _save();
-  }
-
-  void setModel(String model) {
-    state = state.copyWith(model: model);
-    _save();
+    return const AppSettings(
+      hasCompletedOnboarding: false, // Force onboarding on fresh install
+    );
   }
 
   void setDeviceName(String name) {
-    state = state.copyWith(deviceName: name.trim().isEmpty ? kPendantName : name.trim());
+    state = state.copyWith(
+      deviceName: name.trim().isEmpty ? kPendantName : name.trim(),
+    );
     _save();
   }
 
-  void setSttBackend(SttBackend backend) {
-    state = state.copyWith(sttBackend: backend);
+  void setThemeMode(ThemeMode mode) {
+    state = state.copyWith(themeMode: mode);
+    _save();
+  }
+
+  void completeOnboarding() {
+    state = state.copyWith(hasCompletedOnboarding: true);
     _save();
   }
 
@@ -90,5 +78,6 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 }
 
-final settingsProvider =
-    NotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);
+final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
+  SettingsNotifier.new,
+);

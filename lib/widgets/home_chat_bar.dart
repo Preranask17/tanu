@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/conversation_provider.dart';
 import '../screens/chat_screen.dart';
-import '../theme.dart';
 
 /// The floating home row Omi keeps above its bottom nav: a rounded memory bar
 /// and a round record button. Tapping either opens the live memory page;
@@ -27,12 +26,16 @@ class HomeChatBar extends ConsumerWidget {
 class _ChatPill extends StatelessWidget {
   void _openLive(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const ChatPage(),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
@@ -42,18 +45,29 @@ class _ChatPill extends StatelessWidget {
       child: Container(
         height: 62,
         decoration: BoxDecoration(
-          color: kTanuInk,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(32),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
         child: Row(
           children: [
             const SizedBox(width: 18),
-            Expanded(
+            const Expanded(
               child: Text(
                 'Live memory…',
                 style: TextStyle(
-                  color: kTanuBg.withValues(alpha: 0.75),
-                  fontSize: 15,
+                  color: Color(0xFF888888),
+                  fontSize: 16,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -68,11 +82,15 @@ class _ChatPill extends StatelessWidget {
                 height: 44,
                 margin: const EdgeInsets.only(right: 8),
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: kTanuBg,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.mic, size: 17, color: kTanuInk),
+                child: Icon(
+                  Icons.mic,
+                  size: 20,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
             ),
           ],
@@ -94,7 +112,10 @@ class _RecordButton extends StatelessWidget {
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.of(context).push(
-          MaterialPageRoute(fullscreenDialog: true, builder: (_) => const ChatPage()),
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => const ChatPage(),
+          ),
         );
       },
       onLongPress: () => _showOptions(context),
@@ -103,53 +124,60 @@ class _RecordButton extends StatelessWidget {
         width: 62,
         height: 62,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: kTanuWarm,
+        decoration: BoxDecoration(
+          color: Theme.of(context).primaryColor,
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.add, size: 28, color: Colors.white),
+        child: const Icon(
+          Icons.add,
+          size: 28,
+          color: Colors.white,
+        ),
       ),
     );
   }
 
   void _showOptions(BuildContext context) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet<void>(
+    
+    showModalBottomSheet(
       context: context,
-      backgroundColor: kTanuSurface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: kTanuLine,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+              Text(
+                'Developer Options',
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.mic, color: kTanuWarm),
-                title: const Text('Microphone test'),
-                subtitle: Text(
-                  'Listen from the phone mic and see the words land',
-                  style: TextStyle(color: kTanuMuted, fontSize: 13),
+              const SizedBox(height: 8),
+              Text(
+                'These options are useful for debugging your pendant audio.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF888888),
                 ),
-                onTap: () {
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
                   Navigator.pop(sheetContext);
                   ref.read(conversationProvider.notifier).microphoneTest();
                 },
+                child: const Text('Microphone test'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
               ),
             ],
           ),

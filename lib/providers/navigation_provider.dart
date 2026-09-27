@@ -14,5 +14,6 @@ class NavigationTab extends Notifier<int> {
   void goToSettings() => state = 2;
 }
 
-final navigationTabProvider =
-    NotifierProvider<NavigationTab, int>(NavigationTab.new);
+final navigationTabProvider = NotifierProvider<NavigationTab, int>(
+  NavigationTab.new,
+);

@@ -18,38 +18,23 @@ class CommitmentsNotifier extends Notifier<List<Commitment>> {
   }
 
   void _persist() {
-    Hive.box(Boxes.commitments)
-        .put('items', state.map((c) => c.toJson()).toList());
+    Hive.box(
+      Boxes.commitments,
+    ).put('items', state.map((c) => c.toJson()).toList());
   }
 
   /// Add a commitment extracted by the agent.
-  void addFromAgent(
-    String action, {
-    String? person,
-    DateTime? due,
-  }) {
+  void addFromAgent(String action, {String? person, DateTime? due}) {
     state = [
-      Commitment(
-        action: action,
-        person: person,
-        due: due,
-        autoExtracted: true,
-      ),
+      Commitment(action: action, person: person, due: due, autoExtracted: true),
       ...state,
     ];
     _persist();
   }
 
   /// Add a commitment manually from the UI.
-  void addManual({
-    required String action,
-    String? person,
-    DateTime? due,
-  }) {
-    state = [
-      Commitment(action: action, person: person, due: due),
-      ...state,
-    ];
+  void addManual({required String action, String? person, DateTime? due}) {
+    state = [Commitment(action: action, person: person, due: due), ...state];
     _persist();
   }
 
@@ -76,5 +61,5 @@ class CommitmentsNotifier extends Notifier<List<Commitment>> {
 
 final commitmentsProvider =
     NotifierProvider<CommitmentsNotifier, List<Commitment>>(
-  CommitmentsNotifier.new,
-);
+      CommitmentsNotifier.new,
+    );

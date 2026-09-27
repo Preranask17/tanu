@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
-import '../theme.dart';
 
 /// Compact strip showing pendant connection + battery across screens.
 class ConnectionStatusBar extends ConsumerWidget {
@@ -12,17 +11,34 @@ class ConnectionStatusBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(pendantStatusProvider).value ?? PendantStatus();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final (color, icon, text) = switch (status.state) {
       PendantState.connected => (
-          kTanuGreen,
-          Icons.bluetooth_connected,
-          status.deviceName ?? 'Connected',
-        ),
-      PendantState.reconnecting => (kTanuWarm, Icons.sync, 'Reconnecting...'),
-      PendantState.scanning => (kTanuWarm, Icons.radar, 'Looking for pendant...'),
-      PendantState.connecting => (kTanuWarm, Icons.sync, 'Connecting...'),
-      PendantState.disconnected => (kTanuRed, Icons.bluetooth_disabled, 'Not connected'),
+        Colors.green,
+        Icons.bluetooth_connected,
+        status.deviceName ?? 'Connected',
+      ),
+      PendantState.reconnecting => (
+        Colors.orange,
+        Icons.sync,
+        'Reconnecting...',
+      ),
+      PendantState.scanning => (
+        Theme.of(context).primaryColor,
+        Icons.settings_bluetooth,
+        'Looking for pendant...',
+      ),
+      PendantState.connecting => (
+        Theme.of(context).primaryColor,
+        Icons.sync,
+        'Connecting...',
+      ),
+      PendantState.disconnected => (
+        const Color(0xFF888888),
+        Icons.bluetooth_disabled,
+        'Not connected',
+      ),
     };
 
     return Padding(
@@ -34,13 +50,27 @@ class ConnectionStatusBar extends ConsumerWidget {
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (status.batteryPercent != null) ...[
-            Icon(Icons.battery_full, size: 15, color: kTanuWarm),
+            const Icon(
+              Icons.battery_full,
+              size: 15,
+              color: Color(0xFF888888),
+            ),
             const SizedBox(width: 4),
-            Text('${status.batteryPercent}%', style: const TextStyle(fontSize: 13)),
+            Text(
+              '${status.batteryPercent}%',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
           ],
         ],
       ),
