@@ -3,6 +3,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../models/commitment.dart';
 import '../services/storage_service.dart';
+import 'analytics_provider.dart';
 
 class CommitmentsNotifier extends Notifier<List<Commitment>> {
   @override
@@ -30,12 +31,29 @@ class CommitmentsNotifier extends Notifier<List<Commitment>> {
       ...state,
     ];
     _persist();
+    _track('agent');
   }
 
   /// Add a commitment manually from the UI.
   void addManual({required String action, String? person, DateTime? due}) {
     state = [Commitment(action: action, person: person, due: due), ...state];
     _persist();
+    _track('manual');
+  }
+
+  /// Records that a commitment was added. Shape only — the `action` text is
+  /// the user's own words and is never sent.
+  void _track(String source) {
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'commitment added',
+          properties: {
+            'source': source,
+            'has_due': state.first.due != null,
+            'has_person': (state.first.person ?? '').isNotEmpty,
+          },
+        );
   }
 
   void toggleDone(String id) {

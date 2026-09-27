@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../constants.dart';
 import '../services/stt/model_download_coordinator.dart';
+import 'analytics_provider.dart';
 
 enum SttModelPhase { checking, missing, downloading, ready }
 
@@ -120,11 +121,27 @@ class SttModelNotifier extends Notifier<SttModelState> {
         totalBytes: p.total > 0 ? p.total : _bundleBytes,
       );
     });
+    final startedAt = DateTime.now();
     try {
       final file = await ModelDownloadCoordinator.ensure(onEvent: (_) {});
       await _progressSub?.cancel();
       _progressSub = null;
       if (file != null) {
+        var bytes = 0;
+        try {
+          bytes = await file.length();
+        } catch (e) {
+          debugPrint('[tanu] could not stat downloaded bundle: $e');
+        }
+        ref
+            .read(analyticsProvider)
+            .capture(
+              'stt model downloaded',
+              properties: {
+                'bytes': bytes,
+                'duration_s': DateTime.now().difference(startedAt).inSeconds,
+              },
+            );
         await refresh();
       } else {
         state = SttModelState(
@@ -132,6 +149,15 @@ class SttModelNotifier extends Notifier<SttModelState> {
           modelName: kOfflineBundleFileName,
           error: 'Model download failed.',
         );
+        ref
+            .read(analyticsProvider)
+            .capture(
+              'stt model failed',
+              properties: {
+                'reason': 'exhausted_retries',
+                'duration_s': DateTime.now().difference(startedAt).inSeconds,
+              },
+            );
       }
     } catch (e) {
       await _progressSub?.cancel();
@@ -141,19 +167,36 @@ class SttModelNotifier extends Notifier<SttModelState> {
         modelName: kOfflineBundleFileName,
         error: 'Download failed: $e',
       );
+      ref
+          .read(analyticsProvider)
+          .capture(
+            'stt model failed',
+            properties: {
+              // The error class only — the message can embed a filesystem path.
+              'reason': e.runtimeType.toString(),
+              'duration_s': DateTime.now().difference(startedAt).inSeconds,
+            },
+          );
       debugPrint('[tanu] moonshine download failed: $e');
     }
   }
 
   Future<void> deleteModel() async {
     if (state.busy) return;
+    var deleted = false;
     try {
       final root = (await getApplicationSupportDirectory()).path;
       final stem = kOfflineBundleFileName.replaceFirst('.tar.bz2', '');
       final modelDir = Directory('$root/$stem');
-      if (await modelDir.exists()) await modelDir.delete(recursive: true);
+      if (await modelDir.exists()) {
+        await modelDir.delete(recursive: true);
+        deleted = true;
+      }
       final bundle = File('$root/$kOfflineBundleFileName');
-      if (await bundle.exists()) await bundle.delete();
+      if (await bundle.exists()) {
+        await bundle.delete();
+        deleted = true;
+      }
       for (final name in kRetiredModelBundles) {
         final path = '$root/$name';
         if (await File(path).exists()) await File(path).delete();
@@ -162,6 +205,9 @@ class SttModelNotifier extends Notifier<SttModelState> {
       }
     } catch (e) {
       debugPrint('[tanu] model delete failed: $e');
+    }
+    if (deleted) {
+      ref.read(analyticsProvider).capture('stt model deleted');
     }
     await refresh();
   }

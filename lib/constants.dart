@@ -62,3 +62,15 @@ const int kSampleRate = 16000;
 const int kButtonShortPress = 0;
 const int kButtonLongPress = 1;
 
+/// ---- PostHog analytics ---------------------------------------------------
+/// Public write key, supplied at build time and never committed:
+///   flutter run --dart-define=POSTHOG_TOKEN=phc_xxx
+/// An empty token leaves [AnalyticsService] inert, so a plain `flutter run`
+/// without the define produces a clean, silent build.
+const String kPostHogToken = String.fromEnvironment('POSTHOG_TOKEN');
+
+/// `https://us.i.posthog.com` (US) or `https://eu.i.posthog.com` (EU).
+const String kPostHogHost = String.fromEnvironment(
+  'POSTHOG_HOST',
+  defaultValue: 'https://us.i.posthog.com',
+);

@@ -47,6 +47,7 @@ dependencies:
   record: ^6.1.2
   flutter_foreground_task: ^11.0.3
   google_fonts: ^8.2.1
+  posthog_flutter: ^5.50.0
 
 dev_dependencies:
   flutter_test:

@@ -8,6 +8,11 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Tanu</string>
+	<!-- Tanu initialises PostHog from Dart (AnalyticsService) so the
+	     beforeSend redaction hook applies. Native AUTO_INIT would bypass it
+	     and initialise with a token baked into this file. -->
+	<key>com.posthog.posthog.AUTO_INIT</key>
+	<false/>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
