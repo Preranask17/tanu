@@ -9,6 +9,7 @@ import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
+import '../widgets/audio_waveform.dart';
 import '../widgets/connection_status_bar.dart';
 import '../widgets/state_indicator.dart';
 
@@ -76,6 +77,7 @@ class ChatPage extends ConsumerWidget {
                       session: conversation.active!,
                       livePartial: conversation.liveTranscript,
                       isListening: conversation.isListening,
+                      micLevel: conversation.micLevel,
                     ),
             ),
           ],
@@ -244,12 +246,27 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                       ),
                     )
                   else
-                    ...session.segments.map(
-                      (s) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _SegmentRow(segment: s),
-                      ),
-                    ),
+                    ...() {
+                      final List<List<TranscriptSegment>> groupedSegments = [];
+                      for (final seg in session.segments) {
+                        if (groupedSegments.isEmpty) {
+                          groupedSegments.add([seg]);
+                        } else {
+                          final lastGroup = groupedSegments.last;
+                          final lastSeg = lastGroup.last;
+                          final lastEnd = lastSeg.endMs ?? lastSeg.startMs;
+                          if (seg.startMs - lastEnd < 3000) {
+                            lastGroup.add(seg);
+                          } else {
+                            groupedSegments.add([seg]);
+                          }
+                        }
+                      }
+                      return groupedSegments.asMap().entries.map((e) => _SegmentGroupRow(
+                        segments: e.value,
+                        isLast: e.key == groupedSegments.length - 1,
+                      ));
+                    }(),
                   if (_messages.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     Container(
@@ -417,73 +434,127 @@ class _SessionTranscript extends StatelessWidget {
     required this.session,
     required this.livePartial,
     required this.isListening,
+    required this.micLevel,
   });
 
   final ConversationSession session;
   final String livePartial;
   final bool isListening;
+  final double micLevel;
 
   @override
   Widget build(BuildContext context) {
+    // Smart Segment Grouping: Combine segments if they are within 3 seconds of each other
+    final List<List<TranscriptSegment>> groupedSegments = [];
+    for (final seg in session.segments) {
+      if (groupedSegments.isEmpty) {
+        groupedSegments.add([seg]);
+      } else {
+        final lastGroup = groupedSegments.last;
+        final lastSeg = lastGroup.last;
+        final lastEnd = lastSeg.endMs ?? lastSeg.startMs;
+        if (seg.startMs - lastEnd < 3000) {
+          lastGroup.add(seg);
+        } else {
+          groupedSegments.add([seg]);
+        }
+      }
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        for (final segment in session.segments) _SegmentRow(segment: segment),
+        for (int i = 0; i < groupedSegments.length; i++)
+          _SegmentGroupRow(
+            segments: groupedSegments[i],
+            isLast: i == groupedSegments.length - 1 && livePartial.trim().isEmpty && !isListening,
+          ),
+        
         if (livePartial.trim().isNotEmpty)
+          _LivePartialRow(
+            partial: livePartial, 
+            ms: session.segments.isNotEmpty ? (session.segments.last.endMs ?? session.segments.last.startMs) : 0,
+          ),
+
+        if (isListening)
           Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: AudioWaveform(level: micLevel),
+          ),
+      ],
+    );
+  }
+}
+
+class _LivePartialRow extends StatelessWidget {
+  const _LivePartialRow({required this.partial, required this.ms});
+  final String partial;
+  final int ms;
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 44,
+            child: Column(
               children: [
                 Text(
-                  _offsetLabel(
-                    session.segments.isNotEmpty ? livePartialMs(session) : 0,
-                  ),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF888888),
-                  ),
+                  _offsetLabel(ms),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(height: 8),
                 Expanded(
-                  child: Text(
-                    livePartial.trim(),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontStyle: FontStyle.italic,
-                      height: 1.35,
+                  child: Container(
+                    width: 2,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).primaryColor.withOpacity(0.5),
+                          Theme.of(context).primaryColor.withOpacity(0.0),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        if (isListening && livePartial.trim().isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.mic,
-                  size: 14,
-                  color: Theme.of(context).primaryColor,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.05),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  'Listening...',
-                  style: TextStyle(color: Theme.of(context).primaryColor),
+                child: Text(
+                  partial.trim(),
+                  key: ValueKey<String>(partial.trim()),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontStyle: FontStyle.italic,
+                    height: 1.5,
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
-      ],
+        ],
+      ),
     );
-  }
-
-  int livePartialMs(ConversationSession session) {
-    final last = session.segments.isEmpty ? null : session.segments.last;
-    return last?.endMs ?? 0;
   }
 }
 
@@ -498,47 +569,81 @@ String _offsetLabel(int ms) {
   return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
 }
 
-class _SegmentRow extends StatelessWidget {
-  const _SegmentRow({required this.segment});
-
-  final TranscriptSegment segment;
+class _SegmentGroupRow extends StatelessWidget {
+  const _SegmentGroupRow({required this.segments, required this.isLast});
+  final List<TranscriptSegment> segments;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    final text = segment.text.trim();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 44,
-          child: Text(
-            _offsetLabel(segment.startMs),
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF888888),
+    final combinedText = segments.map((s) => s.text.trim()).join(' ');
+    final startMs = segments.first.startMs;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Timeline column
+          SizedBox(
+            width: 44,
+            child: Column(
+              children: [
+                Text(
+                  _offsetLabel(startMs),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                ),
+                const SizedBox(height: 8),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Theme.of(context).primaryColor.withOpacity(0.5),
+                            Theme.of(context).primaryColor.withOpacity(0.1),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-                width: 1,
+          const SizedBox(width: 10),
+          // Bubble column
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  combinedText.isEmpty ? '...' : combinedText,
+                  style: const TextStyle(height: 1.5, fontSize: 15),
+                ),
               ),
             ),
-            child: Text(
-              text.isEmpty ? '...' : text,
-              style: const TextStyle(height: 1.4, fontSize: 15),
-            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

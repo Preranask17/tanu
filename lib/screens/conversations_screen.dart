@@ -5,6 +5,7 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../widgets/conversation_tile.dart';
+import 'trash_screen.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
@@ -74,6 +75,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final query = _query.text.trim().toLowerCase();
 
     final visible = sessions.where((s) {
+      if (s.isDeleted) return false;
       if (query.isEmpty) return true;
       if (s.title.toLowerCase().contains(query)) return true;
       if (s.summary != null && s.summary!.toLowerCase().contains(query))
@@ -81,10 +83,19 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       return s.segments.any((seg) => seg.text.toLowerCase().contains(query));
     }).toList();
 
-    // Group by calendar day, newest first.
+    // Group by calendar day, newest first. Pinned items get their own group at the top.
+    final pinned = visible.where((s) => s.isPinned).toList();
+    final unpinned = visible.where((s) => !s.isPinned).toList();
+
     final groups = <String, List<ConversationSession>>{};
     final order = <String>[];
-    for (final session in visible) {
+
+    if (pinned.isNotEmpty) {
+      groups['Pinned'] = pinned;
+      order.add('Pinned');
+    }
+
+    for (final session in unpinned) {
       final label = _dayLabel(session.finishedAt ?? session.startedAt);
       if (!groups.containsKey(label)) {
         groups[label] = [];
@@ -107,23 +118,85 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
           ),
           slivers: [
             SliverAppBar(
-              expandedHeight: 120,
+              expandedHeight: 140,
               floating: true,
               pinned: true,
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(
-                  'Memories',
+                  'Your Memories',
                   style: Theme.of(context).textTheme.displayMedium,
                 ),
-                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                titlePadding: const EdgeInsets.only(left: 20, bottom: 20),
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned(
+                      top: -50,
+                      right: -50,
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Theme.of(context).primaryColor.withOpacity(0.15),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -80,
+                      left: -50,
+                      child: Container(
+                        width: 250,
+                        height: 250,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.blueAccent.withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
-                IconButton(
-                  onPressed: toggleSearch,
-                  icon: Icon(
-                    _searching ? Icons.close : Icons.search,
-                    color: isDark ? Colors.white : Colors.black,
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: IconButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TrashScreen()),
+                      );
+                    },
+                    style: IconButton.styleFrom(
+                      backgroundColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: IconButton(
+                    onPressed: toggleSearch,
+                    style: IconButton.styleFrom(
+                      backgroundColor: _searching
+                          ? Theme.of(context).primaryColor.withOpacity(0.1)
+                          : isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Icon(
+                      _searching ? Icons.close : Icons.search,
+                      color: _searching
+                          ? Theme.of(context).primaryColor
+                          : isDark ? Colors.white : Colors.black,
+                    ),
                   ),
                 ),
               ],
@@ -131,16 +204,17 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             if (_searching)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: TextField(
                     controller: _query,
                     autofocus: true,
+                    style: const TextStyle(fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Search memories...',
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: query.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear),
+                              icon: const Icon(Icons.clear_rounded),
                               onPressed: () {
                                 _query.clear();
                                 setState(() {});
@@ -148,12 +222,27 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                      fillColor: isDark ? const Color(0xFF161618) : Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(100), // Pill shape
+                        borderSide: BorderSide(
+                          color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(100),
+                        borderSide: BorderSide(
+                          color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(100),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).primaryColor,
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
@@ -198,6 +287,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                   onDelete: () => ref
                                       .read(conversationProvider.notifier)
                                       .removeSession(session.id),
+                                  onPin: () => ref
+                                      .read(conversationProvider.notifier)
+                                      .togglePin(session.id),
                                 ),
                               ),
                           ],
@@ -218,16 +310,35 @@ class _DayHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4, left: 4),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: Color(0xFF888888),
-        ),
+      padding: const EdgeInsets.only(top: 24, bottom: 12, left: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF222222) : const Color(0xFFE5E5E5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: isDark ? const Color(0xFFCCCCCC) : const Color(0xFF666666),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Divider(
+              color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+              thickness: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -261,34 +372,53 @@ class _EmptyConversations extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.inventory_2_outlined,
-              color: Color(0xFF888888),
-              size: 48,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.memory_rounded,
+                color: Theme.of(context).primaryColor.withOpacity(0.8),
+                size: 64,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 32),
             const Text(
-              'No memories yet.\nConnect your pendant and start talking.',
+              'A blank slate',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Connect your pendant and let it listen to the world.\nYour memories will magically appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF888888),
                 height: 1.5,
-                fontSize: 16,
+                fontSize: 15,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed: () =>
                   ref.read(navigationTabProvider.notifier).goToHome(),
               style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(100),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
               child: const Text(
-                'Go to Home',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                'Start capturing',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ),
           ],

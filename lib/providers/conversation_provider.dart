@@ -680,7 +680,43 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final conversations = List<ConversationSession>.of(state.conversations);
     final idx = conversations.indexWhere((c) => c.id == id);
     if (idx < 0) return;
+    // Soft delete
+    conversations[idx] = conversations[idx].copyWith(isDeleted: true);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void togglePin(String id) {
+    final conversations = List<ConversationSession>.of(state.conversations);
+    final idx = conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    conversations[idx] = conversations[idx].copyWith(isPinned: !conversations[idx].isPinned);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void restoreSession(String id) {
+    final conversations = List<ConversationSession>.of(state.conversations);
+    final idx = conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    conversations[idx] = conversations[idx].copyWith(isDeleted: false);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void deleteSessionPermanently(String id) {
+    final conversations = List<ConversationSession>.of(state.conversations);
+    final idx = conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
     conversations.removeAt(idx);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void emptyTrash() {
+    final conversations = List<ConversationSession>.of(state.conversations)
+        .where((c) => !c.isDeleted)
+        .toList();
     state = state.copyWith(conversations: conversations);
     _persist();
   }

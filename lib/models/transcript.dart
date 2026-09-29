@@ -82,6 +82,8 @@ class ConversationSession {
     this.status = ConversationStatus.inProgress,
     this.segments = const [],
     this.summary,
+    this.isDeleted = false,
+    this.isPinned = false,
   });
 
   final String id;
@@ -91,6 +93,8 @@ class ConversationSession {
   final ConversationStatus status;
   final List<TranscriptSegment> segments;
   final String? summary;
+  final bool isDeleted;
+  final bool isPinned;
 
   String get transcriptText => segments.map((s) => s.text).join(' ').trim();
 
@@ -102,6 +106,8 @@ class ConversationSession {
     ConversationStatus? status,
     List<TranscriptSegment>? segments,
     String? summary,
+    bool? isDeleted,
+    bool? isPinned,
   }) {
     return ConversationSession(
       id: id,
@@ -111,6 +117,8 @@ class ConversationSession {
       status: status ?? this.status,
       segments: segments ?? this.segments,
       summary: summary ?? this.summary,
+      isDeleted: isDeleted ?? this.isDeleted,
+      isPinned: isPinned ?? this.isPinned,
     );
   }
 
@@ -121,6 +129,8 @@ class ConversationSession {
     'status': status.name,
     'segments': segments.map((s) => s.toJson()).toList(),
     'summary': summary,
+    'isDeleted': isDeleted,
+    'isPinned': isPinned,
   };
 
   factory ConversationSession.fromJson(Map<String, dynamic> json) {
@@ -141,6 +151,8 @@ class ConversationSession {
       status: status ?? ConversationStatus.completed,
       segments: segments,
       summary: json['summary'] as String?,
+      isDeleted: json['isDeleted'] as bool? ?? false,
+      isPinned: json['isPinned'] as bool? ?? false,
     );
   }
 }
