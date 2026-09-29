@@ -70,7 +70,7 @@ void main() {
     test('strips user-property payloads so no person profile is written', () {
       final event = PostHogEvent(
         event: 'session started',
-        properties: {'stt_model': 'SenseVoice'},
+        properties: {'stt_model': 'Moonshine'},
         userProperties: {'email': 'someone@example.com'},
         userPropertiesSetOnce: {'device_id': 'remote-1234'},
       );
@@ -173,12 +173,12 @@ void main() {
       // symptom is a working-looking event with a silent hole in it.
       final event = PostHogEvent(
         event: 'session started',
-        properties: {'stt_model': 'SenseVoice', 'not_allowlisted': 'value'},
+        properties: {'stt_model': 'Moonshine', 'not_allowlisted': 'value'},
       );
 
       final result = AnalyticsService.beforeSend(event);
 
-      expect(result!.properties, {'stt_model': 'SenseVoice'});
+      expect(result!.properties, {'stt_model': 'Moonshine'});
     });
 
     test('every advertised event is on the allowlist', () {

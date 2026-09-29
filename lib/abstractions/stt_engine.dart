@@ -15,9 +15,9 @@ class SttCallbacks {
 }
 
 /// Speech-to-text. This interface is the ONE deliberate swap point: today we
-/// have Moonshine on-device (sherpa-onnx) with a Deepgram cloud fallback, both
-/// reached through [ContinuousSttEngine]. The interface stays tight: PCM in,
-/// transcript out.
+/// have Moonshine v2 base-en on-device (sherpa-onnx) with VAD-gated
+/// continuous decoding, reached through [ContinuousSttEngine]. The interface
+/// stays tight: PCM in, transcript out.
 abstract class SttEngine {
   /// Transcribe a single mono PCM16 utterance at 16000 Hz.
   Future<String> transcribe(Uint8List pcmUtterance, {SttCallbacks? callbacks});
@@ -37,9 +37,9 @@ abstract class SttEngine {
 
 /// A recognizer that keeps a live ambient session running off the pendant's
 /// PCM16 stream rather than clamping at a single fixed utterance. This is the
-/// shape `conversation_provider` talks to, and today it is implemented by the
-/// routing engine ([RoutingSttEngine]): deepgram streaming when a key is
-/// configured, otherwise the on-device Moonshine fallback engine.
+/// shape `conversation_provider` talks to, and today it is implemented by
+/// [MoonshineSttEngine]: on-device Moonshine + Silero VAD segmentation with
+/// hallucination guards.
 abstract class ContinuousSttEngine extends SttEngine {
   /// Begin a continuous, pendant-fed session. The engine consumes PCM16 mono
   /// chunks at 16000 Hz from [chunks], delivering finished utterances through

@@ -16,12 +16,11 @@ import 'agent_provider.dart';
 import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
-import 'settings_provider.dart';
 
-import '../services/stt/sense_voice_stt_engine.dart';
+import '../services/stt/moonshine_stt_engine.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = SenseVoiceSttEngine();
+  final engine = MoonshineSttEngine();
   ref.onDispose(() => engine.dispose());
   return engine;
 });
