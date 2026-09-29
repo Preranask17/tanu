@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:isolate';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
@@ -21,12 +22,10 @@ class ModelDownloadProgress {
 
 /// Single owner of the on-device Moonshine bundle download.
 ///
-/// The STT engine's startup warm-up and the Settings download button used to
-/// call `downloadCatalogModel` independently, so two streams wrote the same
-/// `.part` file at once: progress reset mid-transfer, the partial grew and
-/// shrank, and the model never landed. Every caller routes through [ensure],
-/// which is single-flight (concurrent callers await the same download) and
-/// retries a fresh attempt if the server drops a range-request resume.
+/// Single-flight: concurrent callers await the same in-flight download.
+/// Downloads the `.tar.bz2` with range-resume, verifies the BZip2 CRC while
+/// extracting into `appSupport/<kMoonshineDirName>/`, then fetches the
+/// shared-needs Silero VAD model into the same directory.
 final class ModelDownloadCoordinator {
   ModelDownloadCoordinator._();
 
@@ -54,18 +53,18 @@ final class ModelDownloadCoordinator {
 
   /// Ensures the Moonshine bundle is on disk, downloading it if needed.
   /// Single-flight: a concurrent caller awaits the same in-flight download.
-  /// Returns the verified `tokens.txt` inside the extracted model directory,
+  /// Returns the verified `tokens.txt` inside the model directory,
   /// or `null` if the bundle could not be obtained.
   static Future<File?> ensure({void Function(String)? onEvent}) {
-    final task = _singleton._tasks[kOfflineBundleFileName];
+    final task = _singleton._tasks[kMoonshineBundleFileName];
     if (task != null) {
-      onEvent?.call('downloading modelsâ€¦ (already running)');
+      onEvent?.call('downloading models… (already running)');
       return task.done;
     }
     final started = _ActiveTask(onEvent);
-    _singleton._tasks[kOfflineBundleFileName] = started;
+    _singleton._tasks[kMoonshineBundleFileName] = started;
     started.done.whenComplete(() {
-      _singleton._tasks.remove(kOfflineBundleFileName);
+      _singleton._tasks.remove(kMoonshineBundleFileName);
       _completions.add(started.ok);
     });
     started.done.ignore();
@@ -92,59 +91,37 @@ final class _ActiveTask {
     } catch (e) {
       final msg = 'model download failed: $e';
       onEvent?.call(msg);
-      debugPrint('[tanu] moonshine model lookup failed: $e');
+      debugPrint('[tanu] model lookup failed: $e');
       return null;
     }
 
     for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt++) {
       try {
-        await _ensureVad(onEvent);
         final file = await _downloadAndExtract();
         if (file != null) {
           ok = true;
           return file;
         }
       } catch (e) {
-        debugPrint('[tanu] moonshine download attempt $attempt failed: $e');
+        debugPrint('[tanu] download attempt $attempt failed: $e');
         if (attempt == _maxDownloadAttempts) {
           final msg = 'model download failed: $e';
           onEvent?.call(msg);
           return null;
         }
       }
-      onEvent?.call('downloading modelsâ€¦ retry $attempt/$_maxDownloadAttempts');
+      onEvent?.call('downloading models… retry $attempt/$_maxDownloadAttempts');
       await Future<void>.delayed(Duration(seconds: 2 * attempt));
     }
     return null;
   }
 
-  Future<void> _ensureVad(void Function(String)? onEvent) async {
-    final support = await getApplicationSupportDirectory();
-    final file = File('${support.path}/$kSileroVadFileName');
-    if (file.existsSync() && file.lengthSync() > 0) return;
-
-    onEvent?.call('downloading VAD modelâ€¦');
-    final client = http.Client();
-    try {
-      final response = await client.get(Uri.parse(kSileroVadUrl));
-      if (response.statusCode == 200) {
-        await file.writeAsBytes(response.bodyBytes);
-      } else {
-        throw HttpException('vad download failed: ${response.statusCode}');
-      }
-    } finally {
-      client.close();
-    }
-  }
-
-  /// The model directory sherpa_onnx reads from: `appSupport/<bundle-stem>`,
-  /// mirroring [MoonshineSttEngine]'s resolution so `ensure` can land the files
-  /// exactly where the engine looks.
+  /// The model directory sherpa_onnx reads from:
+  /// `appSupport/<kMoonshineDirName>`.
   Future<String?> _modelDir() async {
     try {
       final support = await getApplicationSupportDirectory();
-      final stem = kOfflineBundleFileName.replaceFirst('.tar.bz2', '');
-      return '${support.path}/$stem';
+      return '${support.path}/$kMoonshineDirName';
     } catch (e) {
       debugPrint('[tanu] model dir unavailable: $e');
       return null;
@@ -155,8 +132,8 @@ final class _ActiveTask {
     final dir = await _modelDir();
     if (dir == null) return null;
     if (_verified(dir)) return File('$dir/tokens.txt');
-    // A byte-mismatched extraction (interrupted write, half-upgrade) can't be
-    // trusted: drop it so the fresh download lands in a clean directory.
+    // A half-written extraction can't be trusted: drop it so the fresh
+    // download lands in a clean directory.
     try {
       final stale = Directory(dir);
       if (stale.existsSync()) await stale.delete(recursive: true);
@@ -167,36 +144,26 @@ final class _ActiveTask {
   }
 
   /// True when every expected bundle member is present on disk and non-empty.
-  /// The authoritative integrity guard is BZip2's own `verify: true` stream CRC
-  /// (any truncated/corrupt archive fails in the decoder before a single file
-  /// lands); per-file byte counts are deliberately NOT compared here â€” the
-  /// release asset is republished by upstream without notice, so a baked-in
-  /// byte table silently rots and turns every legitimate re-download into a
-  /// false "failed size verification". Existence + non-empty is the stable
-  /// contract the recognizer needs (all three files must be loadable).
+  /// The authoritative integrity guard is BZip2's own `verify: true` stream
+  /// CRC (any truncated/corrupt archive fails in the decoder before a single
+  /// file lands). Existence + non-empty is the stable contract the
+  /// recognizer needs (all files must be loadable).
   bool _verified(String dir) {
-    for (final f in kOfflineBundleFiles) {
+    for (final f in kMoonshineBundleFiles) {
       final file = File('$dir/${f.name}');
       if (!file.existsSync() || file.lengthSync() == 0) return false;
     }
+    final vad = File('$dir/$kSileroVadFileName');
+    if (!vad.existsSync() || vad.lengthSync() == 0) return false;
     return true;
   }
 
   Future<File?> _downloadAndExtract() async {
-    Future<void> _ensureVad(void Function(String)? onEvent) async {
-      final dir = await _modelDir();
-      final vad = File('$dir/silero_vad.onnx');
-      if (!vad.existsSync()) {
-        onEvent?.call('downloading VAD model...');
-        final res = await http.get(Uri.parse('https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx'));
-        await vad.writeAsBytes(res.bodyBytes);
-      }
-    }
     final dir = await _modelDir();
     if (dir == null) return null;
     final support = Directory(dir).parent;
-    final archiveFile = File('${support.path}/$kOfflineBundleFileName');
-    final part = File('${support.path}/$kOfflineBundleFileName.part');
+    final archiveFile = File('${support.path}/$kMoonshineBundleFileName');
+    final part = File('${support.path}/$kMoonshineBundleFileName.part');
     await support.create(recursive: true);
 
     if (!archiveFile.existsSync()) {
@@ -222,13 +189,31 @@ final class _ActiveTask {
       await _cleanupDownload(archiveFile, part, dir);
       rethrow;
     }
-    await _ensureVad(null);
-      if (!_verified(dir)) {
+    await _ensureVad(dir);
+    if (!_verified(dir)) {
       await _cleanupDownload(archiveFile, part, dir);
-      throw const FormatException('downloaded bundle failed size verification');
+      throw const FormatException('downloaded bundle failed verification');
     }
     await _retireRetiredBundles(support);
     return File('$dir/tokens.txt');
+  }
+
+  Future<void> _ensureVad(String dir) async {
+    final file = File('$dir/$kSileroVadFileName');
+    if (file.existsSync() && file.lengthSync() > 0) return;
+
+    onEvent?.call('downloading VAD model…');
+    final client = http.Client();
+    try {
+      final response = await client.get(Uri.parse(kSileroVadUrl));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+      } else {
+        throw HttpException('vad download failed: ${response.statusCode}');
+      }
+    } finally {
+      client.close();
+    }
   }
 
   /// Range-resumes into [part] from its existing length, emitting byte-level
@@ -238,7 +223,7 @@ final class _ActiveTask {
     final client = http.Client();
     try {
       final start = part.existsSync() ? part.lengthSync() : 0;
-      final request = http.Request('GET', Uri.parse(kOfflineBundleUrl));
+      final request = http.Request('GET', Uri.parse(kMoonshineBundleUrl));
       if (start > 0) {
         request.headers[HttpHeaders.rangeHeader] = 'bytes=$start-';
       }
@@ -282,33 +267,17 @@ final class _ActiveTask {
     }
   }
 
-  /// Expands the commit archive into [dir]. `BZip2Decoder(verify: true)`
-  /// checks the stream CRC, so a truncated set of bytes can never be silently
-  /// unpacked into broken model files; per-file byte counts are re-checked by
-  /// [_verified] against [kOfflineBundleFiles] afterwards.
-  ///
-  /// Extraction runs inside an `Isolate.run` worker: the archive package's
-  /// BZip2/TAR decode + per-file writes are megabytes of CPU-bound byte work
-  /// that would stall the calling isolate (the Settings download button, or
-  /// the conversation provider's warm-up) for several seconds otherwise.
-  /// Expands the archive in the background and returns the exact name â†’ bytes
-  /// map of what was written, taken from the archive's own members. This is the
-  /// truth the caller re-checks on disk, so the pending smoke path needs no
-  /// hardcoded per-file byte table that rots every time upstream republishes
-  /// the bundle with the same names.
-  Future<Map<String, int>> _extract(File archiveFile, String dir) {
+  /// Expands the archive into [dir]. `BZip2Decoder(verify: true)` checks the
+  /// stream CRC, so truncated bytes can never silently unpack into broken
+  /// model files. Runs inside `Isolate.run`: BZip2/TAR decode of ~100 MB is
+  /// CPU-bound work that would stall the UI isolate for seconds otherwise.
+  /// Only allowlisted members are written, taken from the archive's own
+  /// entries.
+  Future<void> _extract(File archiveFile, String dir) {
     return Isolate.run(() => _extractSync(archiveFile.path, dir));
   }
 
-  /// Top-level companion for [_extract] so `Isolate.run` gets a closure with no
-  /// `this` capture (isolates can't take instance state by reference here).
-  /// BZip2's `verify: true` CRC is what guards against truncated/corrupt
-  /// archives; per-member sizes are simply reported so [_verified] can compare
-  /// on-disk bytes against the decode, never against a stale constant.
-  static Future<Map<String, int>> _extractSync(
-    String archivePath,
-    String dir,
-  ) async {
+  static Future<void> _extractSync(String archivePath, String dir) async {
     final bytes = await File(archivePath).readAsBytes();
     final tarBytes = Uint8List.fromList(
       BZip2Decoder().decodeBytes(bytes, verify: true),
@@ -317,16 +286,13 @@ final class _ActiveTask {
     final out = Directory(dir);
     if (out.existsSync()) await out.delete(recursive: true);
     await out.create(recursive: true);
-    final expected = kOfflineBundleFiles.map((f) => f.name).toSet();
-    final written = <String, int>{};
+    final expected = kMoonshineBundleFiles.map((f) => f.name).toSet();
     for (final f in archive.files) {
       final name = f.name.split('/').last;
       if (name.isEmpty || !expected.contains(name)) continue;
       final content = f.content as List<int>;
       await File('${out.path}/$name').writeAsBytes(content);
-      written[name] = content.length;
     }
-    return written;
   }
 
   Future<void> _cleanupDownload(File archiveFile, File part, String dir) async {
@@ -339,8 +305,9 @@ final class _ActiveTask {
     } catch (_) {}
   }
 
-  /// Once the Moonshine bundle is usable, the retired model weights shipped
-  /// under [kRetiredModelBundles] are dead weight in app support.
+  /// Deletes retired bundles (files, directories, stale `.part`s) plus any
+  /// leftover per-language `stt-*` directories from the multilingual
+  /// experiment.
   Future<void> _retireRetiredBundles(Directory support) async {
     for (final name in kRetiredModelBundles) {
       final file = File('${support.path}/$name');
@@ -351,6 +318,35 @@ final class _ActiveTask {
         }
       } catch (e) {
         debugPrint('[tanu] could not remove retired bundle $name: $e');
+      }
+      try {
+        final dir = Directory('${support.path}/$name');
+        if (dir.existsSync()) {
+          await dir.delete(recursive: true);
+          debugPrint('[tanu] removed retired bundle dir $name');
+        }
+      } catch (e) {
+        debugPrint('[tanu] could not remove retired bundle dir $name: $e');
+      }
+      try {
+        final part = File('${support.path}/$name.part');
+        if (part.existsSync()) {
+          await part.delete();
+          debugPrint('[tanu] removed retired part $name.part');
+        }
+      } catch (_) {}
+    }
+    for (final prefix in kRetiredModelPrefixes) {
+      try {
+        await for (final e in support.list()) {
+          if (e is Directory &&
+              e.path.split(Platform.pathSeparator).last.startsWith(prefix)) {
+            await e.delete(recursive: true);
+            debugPrint('[tanu] removed retired prefixed dir ${e.path}');
+          }
+        }
+      } catch (e) {
+        debugPrint('[tanu] could not sweep retired prefix $prefix: $e');
       }
     }
   }

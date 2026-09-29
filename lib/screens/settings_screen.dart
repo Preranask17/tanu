@@ -7,6 +7,7 @@ import '../providers/commitment_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/dev_capture_provider.dart';
 import '../providers/settings_provider.dart';
+import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
@@ -398,7 +399,9 @@ class _SttModelDashboard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Zipformer Streaming', style: TextStyle(fontWeight: FontWeight.bold)),
+const Text(kOfflineModelLabel,
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+
                     const SizedBox(height: 4),
                     Text(statusText, style: const TextStyle(color: Color(0xFF888888), fontSize: 12)),
                   ],
@@ -416,7 +419,7 @@ class _SttModelDashboard extends ConsumerWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.download),
-                label: const Text('Download Offline Model (~57MB)'),
+                label: const Text('Download Offline Model (~106MB)'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
@@ -444,9 +447,9 @@ class _SttModelDashboard extends ConsumerWidget {
                 onPressed: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Model?'),
-                      content: const Text('This will delete the downloaded speech model. You will need to download it again to use offline transcription.'),
+                      builder: (context) => AlertDialog(
+                       title: const Text('Delete Model?'),
+                       content: const Text('This will delete the downloaded speech model. You will need to download it again to use offline transcription.'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),

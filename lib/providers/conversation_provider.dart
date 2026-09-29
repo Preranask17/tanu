@@ -11,15 +11,17 @@ import '../abstractions/stt_engine.dart';
 import '../models/conversation.dart';
 import '../models/transcript.dart';
 import '../services/storage_service.dart';
+import '../services/simulator_pendant_source.dart';
 import 'agent_provider.dart';
+import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
-import 'settings_provider.dart';
 
-import '../services/stt/zipformer_stt_engine.dart';
+import '../services/stt/moonshine_stt_engine.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = ZipformerSttEngine();
+  final engine = MoonshineSttEngine();
+
   ref.onDispose(() => engine.dispose());
   return engine;
 });
@@ -135,12 +137,24 @@ class ConversationNotifier extends Notifier<ConversationState> {
       // lights the receiving flag for a short window.
       _receivingSub?.cancel();
       _receivingSub = source.pcmAudio.listen((_) => _bumpReceiving());
+      ref
+          .read(analyticsProvider)
+          .capture(
+            'session started',
+            properties: {
+              'stt_model': engine.modelLabel,
+              'simulated': source is SimulatorPendantSource,
+            },
+          );
     }
   }
 
   /// Closes the current memory into the conversations list. Recording keeps
   /// flowing into a brand-new session, exactly like Omi after a force-process.
-  void forceEndSession() {
+  ///
+  /// [reason] is only used to label the `session ended` analytics event; it
+  /// defaults to `manual` so existing call sites keep working.
+  void forceEndSession([String reason = 'manual']) {
     final session = state.active;
     if (session != null && session.segments.isNotEmpty) {
       final finished = session.copyWith(
@@ -149,12 +163,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
       state = state.copyWith(
         conversations: [...state.conversations, finished],
-        active: null,
+        clearActive: true,
         liveTranscript: '',
       );
+      _trackSessionEnded(finished, reason);
       _processMemoryAsync(finished);
     } else {
-      state = state.copyWith(active: null, liveTranscript: '');
+      state = state.copyWith(clearActive: true, liveTranscript: '');
     }
     _idleTimer?.cancel();
     _idleTimer = null;
@@ -197,17 +212,18 @@ class ConversationNotifier extends Notifier<ConversationState> {
         finishedAt: DateTime.now(),
       );
       state = state.copyWith(
-        active: null,
+        clearActive: true,
         conversations: [...state.conversations, finished],
         liveTranscript: '',
         isListening: false,
         receivingAudio: false,
         micLevel: 0,
       );
+      _trackSessionEnded(finished, 'disconnect');
       _processMemoryAsync(finished);
     } else {
       state = state.copyWith(
-        active: null,
+        clearActive: true,
         liveTranscript: '',
         isListening: false,
         receivingAudio: false,
@@ -342,8 +358,29 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _idleTimer?.cancel();
     _idleTimer = Timer(kSessionIdleTimeout, () {
       if (!_continuousStarted || _micTestActive) return;
-      forceEndSession();
+      forceEndSession('idle');
     });
+  }
+
+  /// Reports how a memory ended. Deliberately aggregate-only: a duration, a
+  /// segment count and why it closed. The words themselves never leave the
+  /// phone — the `transcript` property key is stripped by the redaction hook
+  /// even if someone adds it here later.
+  void _trackSessionEnded(ConversationSession session, String reason) {
+    final finishedAt = session.finishedAt;
+    final startedAt = session.startedAt;
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'session ended',
+          properties: {
+            'close_reason': reason,
+            'segment_count': session.segmentCount,
+            if (finishedAt != null)
+              'duration_s':
+                  finishedAt.difference(startedAt).inMilliseconds ~/ 1000,
+          },
+        );
   }
 
   /// --- Pendant button (double-tap = end memory, like Omi) ----------------
@@ -357,7 +394,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       _lastShortPressAt = null;
       _doubleTapTimer?.cancel();
       _doubleTapTimer = null;
-      forceEndSession();
+      forceEndSession('button');
       return;
     }
     _doubleTapTimer?.cancel();
@@ -446,7 +483,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
         state = state.copyWith(
           liveTranscript: '',
           isListening: false,
-          sttEvent: 'no words recognized Ã‚Â· mic peak ${(peak * 100).round()}%',
+          sttEvent:
+              'no words recognized Ã‚Â· mic peak ${(peak * 100).round()}%',
           micLevel: 0,
         );
       }
@@ -501,6 +539,16 @@ class ConversationNotifier extends Notifier<ConversationState> {
         }
       }
     }
+
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'memory processed',
+          properties: {
+            'commitment_count': result.commitments.length,
+            'has_summary': result.summary.isNotEmpty,
+          },
+        );
   }
 
   /// --- Persistence -------------------------------------------------------
@@ -642,6 +690,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   String _clip(String text) {
     final t = text.trim();
-    return t.length <= _titleCutoff ? t : '${t.substring(0, _titleCutoff)}Ã¢â‚¬Â¦';
+    return t.length <= _titleCutoff
+        ? t
+        : '${t.substring(0, _titleCutoff)}Ã¢â‚¬Â¦';
   }
 }

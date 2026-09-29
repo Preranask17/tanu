@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models/conversation.dart';
 import 'abstractions/audio_source.dart';
-import 'providers/ble_provider.dart';
+import 'providers/analytics_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
@@ -33,9 +33,22 @@ class _TanuAppState extends ConsumerState<TanuApp> {
   final _homeKey = GlobalKey<HomeScreenState>();
   final _conversationsKey = GlobalKey<ConversationsScreenState>();
 
+  /// Tab index -> screen name. Indexed in step with the `BottomNavigationBarItem`
+  /// list in [build] and with the `items` passed to `ResponsiveScaffold`.
+  static const _tabScreens = ['capture', 'memories', 'settings'];
+
   @override
   void initState() {
     super.initState();
+    // Tab navigation is an IndexedStack, not a Navigator, so PostHog's
+    // `PosthogObserver` sees none of it — report screens explicitly instead.
+    // `fireImmediately` covers the landing tab.
+    ref.listenManual<int>(navigationTabProvider, (prev, next) {
+      if (next == prev) return;
+      if (next >= 0 && next < _tabScreens.length) {
+        ref.read(analyticsProvider).screen(_tabScreens[next]);
+      }
+    }, fireImmediately: true);
     // Start the STT engine warm-up as soon as the UI settles. Skipped in
     // widget tests where the native plugin is unavailable.
     if (Platform.environment['FLUTTER_TEST'] != 'true') {
@@ -155,8 +168,6 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       (prev, next) => _syncForegroundTask(next),
     );
     final index = ref.watch(navigationTabProvider);
-    final status = ref.watch(pendantStatusProvider).value;
-    final connected = status?.isConnected ?? false;
     final settings = ref.watch(settingsProvider);
     final platformBrightness = MediaQuery.platformBrightnessOf(context);
     final brightness = settings.themeMode == ThemeMode.dark

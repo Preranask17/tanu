@@ -22,6 +22,12 @@
         android:label="Tanu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Tanu initialises PostHog from Dart (AnalyticsService) so the
+             beforeSend redaction hook applies. Native AUTO_INIT would bypass
+             it and initialise with a token baked into this file. -->
+        <meta-data
+            android:name="com.posthog.posthog.AUTO_INIT"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

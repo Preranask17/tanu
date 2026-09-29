@@ -48,7 +48,8 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         builder: (context) => AlertDialog(
           title: const Text('STT Model Upgrade'),
           content: const Text(
-            'We\'ve upgraded the offline speech engine to a highly accurate Moonshine model. '
+            'We\'ve upgraded the offline speech engine to Moonshine '
+            '(fast, accurate English, fully offline). '
             'Please delete the old model to make room and install the latest one.',
           ),
           actions: [

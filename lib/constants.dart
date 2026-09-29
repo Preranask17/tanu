@@ -14,41 +14,56 @@ const String kPendantName = 'Omi';
 
 
 
-/// ---- Moonshine v2 on-device bundle (fallback recognizer) ----------------
-/// Quantized "base-en" bundle, ~85 MB, tar.bz2. The single download replaces
-/// the retired on-device ggml-base.en.bin (~148 MB) one-for-one: same storage
-/// slot in app support, downloaded the same way, but ~1.7ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â lighter and built
-/// for streaming feedback latency. `sherpa_onnx` ships the onnx runtime; this
-/// is just the weights + tokens.
-const String kOfflineBundleUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-02-21.tar.bz2';
-const String kOfflineBundleFileName = 'sherpa-onnx-streaming-zipformer-en-2023-02-21.tar.bz2';
+/// ---- Moonshine v2 base-en on-device bundle (NeMo-style offline) --------
+/// English-only speech recognition, ~106 MB download. `sherpa_onnx` ships
+/// the runtime; this is just weights + tokens. Extracts into
+/// `appSupport/<kMoonshineDirName>/`. English-only is deliberate: the
+/// multilingual experiment decoded English audio as Hindi, so one accurate
+/// English model beats a confused multilingual one.
+const String kMoonshineBundleUrl =
+    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2';
+const String kMoonshineBundleFileName =
+    'sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2';
+const String kMoonshineDirName =
+    'sherpa-onnx-moonshine-base-en-quantized-2026-02-27';
+
 
 const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
 const String kSileroVadFileName = 'silero_vad.onnx';
 
-/// The archive extracts into a directory of the same stem name inside app
-/// support; these are the three files sherpa_onnx loads, with the bytes the
-/// archive should contain. `decoder_model_merged.ort` is the merged-decoder
-/// variant (no separate cached/uncached decoder pairs), matching
-/// `OfflineMoonshineModelConfig.mergedDecoder`.
-const List<({String name, int bytes})> kOfflineBundleFiles = [ (name: 'encoder-epoch-99-avg-1.int8.onnx', bytes: 0),
-  (name: 'decoder-epoch-99-avg-1.int8.onnx', bytes: 0),
-  (name: 'joiner-epoch-99-avg-1.int8.onnx', bytes: 0), (name: 'tokens.txt', bytes: 0) ];
+/// Files the Moonshine recognizer loads from the model directory.
+/// `silero_vad.onnx` is fetched separately via [kSileroVadUrl].
+const List<({String name, int bytes})> kMoonshineBundleFiles = [
+  (name: 'encoder_model.ort', bytes: 0),
+  (name: 'decoder_model_merged.ort', bytes: 0),
+  (name: 'tokens.txt', bytes: 0),
+];
+
 
 /// Human label shown in Settings and the Home warm-up chip.
-const String kOfflineModelLabel = 'SenseVoice Â· 163 MB';
+const String kOfflineModelLabel = 'Moonshine Base · 106 MB';
 
-/// Names of on-disk bundles that are no longer the on-device fallback model.
-/// Any of these found in app support are deleted on startup. The retired
-/// on-device model shipped under `ggml-...` file names.
+/// Names of on-disk bundles that are no longer the on-device model.
+/// Any of these found in app support are deleted on upgrade, along with
+/// their `.part` files and any `stt-*` per-language directories left over
+/// from the multilingual experiment.
 const List<String> kRetiredModelBundles = [
   'ggml-base.en.bin',
   'ggml-tiny.en.bin',
   'moonshine-tiny-en.tar.bz2',
   'sherpa-onnx-whisper-base.tar.bz2',
-  'sherpa-onnx-whisper-base', 'sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2', 'sherpa-onnx-moonshine-base-en-quantized-2026-02-27',
+  'sherpa-onnx-whisper-base',
+  'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2',
+  'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17',
+  'sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06',
+  'indic-conformer-multi',
 ];
+
+/// Directory prefixes retired as a group (the per-language `stt-<code>`
+/// experiment). Any app-support directory starting with one of these is
+/// deleted on upgrade.
+const List<String> kRetiredModelPrefixes = ['stt-'];
 
 
 
@@ -64,3 +79,15 @@ const int kSampleRate = 16000;
 const int kButtonShortPress = 0;
 const int kButtonLongPress = 1;
 
+/// ---- PostHog analytics ---------------------------------------------------
+/// Public write key, supplied at build time and never committed:
+///   flutter run --dart-define=POSTHOG_TOKEN=phc_xxx
+/// An empty token leaves [AnalyticsService] inert, so a plain `flutter run`
+/// without the define produces a clean, silent build.
+const String kPostHogToken = String.fromEnvironment('POSTHOG_TOKEN');
+
+/// `https://us.i.posthog.com` (US) or `https://eu.i.posthog.com` (EU).
+const String kPostHogHost = String.fromEnvironment(
+  'POSTHOG_HOST',
+  defaultValue: 'https://us.i.posthog.com',
+);

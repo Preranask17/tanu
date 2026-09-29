@@ -9,8 +9,10 @@ import 'package:tanu_app/abstractions/audio_source.dart';
 import 'package:tanu_app/abstractions/stt_engine.dart';
 import 'package:tanu_app/app.dart';
 import 'package:tanu_app/models/ble_device.dart';
+import 'package:tanu_app/providers/analytics_provider.dart';
 import 'package:tanu_app/providers/ble_provider.dart';
 import 'package:tanu_app/providers/conversation_provider.dart';
+import 'package:tanu_app/services/analytics/analytics_service.dart';
 import 'package:tanu_app/services/storage_service.dart';
 
 void main() {
@@ -33,6 +35,10 @@ void main() {
           // pending timers" assertion at teardown). A no-op engine keeps the
           // tree timer-free and the test fully hermetic.
           sttEngineProvider.overrideWithValue(FakeSttEngine()),
+          // Analytics bails out under FLUTTER_TEST (the SDK force-opens its
+          // method channel there and would throw MissingPluginException), but
+          // override it anyway so the test never depends on that env guard.
+          analyticsProvider.overrideWith((_) => FakeAnalyticsService()),
         ],
         child: const TanuApp(),
       ),
@@ -149,4 +155,21 @@ class FakeAudioSource implements AudioSource {
 
   @override
   void dispose() {}
+}
+
+/// Records events instead of sending them, so the smoke test can assert on
+/// analytics without a token or a network.
+class FakeAnalyticsService extends AnalyticsService {
+  final captured = <String>[];
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  void capture(String event, {Map<String, Object?>? properties}) {
+    captured.add(event);
+  }
+
+  @override
+  void screen(String name) => capture('screen viewed');
 }

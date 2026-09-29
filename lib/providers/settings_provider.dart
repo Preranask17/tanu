@@ -4,6 +4,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../constants.dart';
 import '../services/storage_service.dart';
+import 'analytics_provider.dart';
 
 class AppSettings {
   const AppSettings({
@@ -64,8 +65,15 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   void setThemeMode(ThemeMode mode) {
+    if (mode == state.themeMode) return;
     state = state.copyWith(themeMode: mode);
     _save();
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'setting changed',
+          properties: {'setting': 'theme_mode', 'value': mode.name},
+        );
   }
 
   void completeOnboarding() {
