@@ -511,6 +511,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
+    // AI processing temporarily disabled
+    return;
+
     final processor = ref.read(memoryProcessorProvider);
     final result = await processor.process(text);
 

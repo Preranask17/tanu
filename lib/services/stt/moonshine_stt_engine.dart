@@ -119,7 +119,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     _continuousActive = true;
     _hasActiveUtterance = false;
 
-    _onEventCb?.call('Starting Moonshine...');
+    _onEventCb?.call('Starting Offline Model...');
     final ready = await _ensureWorker();
     if (!ready || !_continuousActive) {
       _warmingUp.value = false;
@@ -127,7 +127,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     }
 
     _warmingUp.value = false;
-    _onEventCb?.call('Moonshine Listening');
+    _onEventCb?.call('Offline Model Listening');
 
     _workerPort?.send(['reset']);
 
