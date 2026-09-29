@@ -45,7 +45,7 @@ class ChatPage extends ConsumerWidget {
               if (!show) return const SizedBox.shrink();
               final title = model.phase == SttModelPhase.downloading
                   ? model.label
-                  : 'Loading model…';
+                  : 'Loading model...';
               return _ModelLoadingChip(title: title);
             },
           ),
@@ -471,7 +471,7 @@ class _SessionTranscript extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Listening…',
+                  'Listening...',
                   style: TextStyle(color: Theme.of(context).primaryColor),
                 ),
               ],
@@ -533,7 +533,7 @@ class _SegmentRow extends StatelessWidget {
               ),
             ),
             child: Text(
-              text.isEmpty ? '…' : text,
+              text.isEmpty ? '...' : text,
               style: const TextStyle(height: 1.4, fontSize: 15),
             ),
           ),

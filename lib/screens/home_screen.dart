@@ -284,7 +284,7 @@ class _LiveCaptureCard extends ConsumerWidget {
     final label = switch (conversation.sttEvent) {
       'stt unavailable' => 'Transcription unavailable',
       'Model missing. Download in Settings.' => 'Model missing. Download in Settings.',
-      _ => conversation.isListening ? 'Listeningâ€¦' : 'Capturingâ€¦',
+      _ => conversation.isListening ? 'Listening...' : 'Capturing...',
     };
 
     final preview = words.isNotEmpty
@@ -592,7 +592,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               connected
-                  ? 'Listeningâ€¦ speak to capture a memory.'
+                  ? 'Listening... speak to capture a memory.'
                   : 'Nothing here yet.\nConnect your pendant and say something.',
               textAlign: TextAlign.center,
               style: const TextStyle(

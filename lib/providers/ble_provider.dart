@@ -62,6 +62,16 @@ final connectToDeviceProvider = Provider<Future<void> Function(String)>((ref) {
   return (remoteId) => source.connectToDevice(remoteId);
 });
 
+/// Disconnect the currently connected pendant.
+final pendantDisconnectProvider = Provider<void Function()>((ref) {
+  final source = ref.watch(pendantProvider);
+  return () {
+    source.disconnect().catchError(
+      (e) => debugPrint('[tanu] disconnect failed: '),
+    );
+  };
+});
+
 /// Forget the stored pendant device.
 final pendantForgetProvider = Provider<void Function()>((ref) {
   final source = ref.watch(pendantProvider);

@@ -223,7 +223,7 @@ class _PendantDashboard extends StatelessWidget {
               ),
               onPressed: () {
                 if (isConnected) {
-                  ProviderScope.containerOf(context).read(pendantForgetProvider)();
+                  ProviderScope.containerOf(context).read(pendantDisconnectProvider)();
                 } else {
                   showModalBottomSheet<void>(
                     context: context,
