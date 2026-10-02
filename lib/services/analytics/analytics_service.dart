@@ -54,7 +54,7 @@ class AnalyticsService {
     'screen',
     // 'pendant connected' / 'pendant disconnected' / 'session started'
     'codec', 'battery_pct', 'simulated',
-    // 'session started' — the engine's own label, e.g. 'SenseVoice', never a
+    // 'session started' — the engine's own label, e.g. 'Moonshine', never a
     // path or a file name.
     'stt_model',
     // 'session ended'
