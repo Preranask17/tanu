@@ -27,6 +27,7 @@ const String kMoonshineBundleFileName =
 const String kMoonshineDirName =
     'sherpa-onnx-moonshine-base-en-quantized-2026-02-27';
 
+
 const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
 const String kSileroVadFileName = 'silero_vad.onnx';
@@ -38,6 +39,7 @@ const List<({String name, int bytes})> kMoonshineBundleFiles = [
   (name: 'decoder_model_merged.ort', bytes: 0),
   (name: 'tokens.txt', bytes: 0),
 ];
+
 
 /// Human label shown in Settings and the Home warm-up chip.
 const String kOfflineModelLabel = 'Moonshine Base · 106 MB';

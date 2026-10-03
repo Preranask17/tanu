@@ -36,19 +36,19 @@ class ZipformerSttEngine implements ContinuousSttEngine {
   bool get hasActiveUtterance => _hasActiveUtterance;
 
   @override
-  String get modelLabel => 'Zipformer Streaming Ãƒâ€šÃ‚Â· 120 MB';
+  String get modelLabel => 'Zipformer Streaming Â· 120 MB';
 
   @override
   Future<bool> isAvailable() async {
     final support = await getApplicationSupportDirectory();
-    final bundle = Directory('${support.path}/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06');
+    final bundle = Directory('${support.path}/sherpa-onnx-streaming-zipformer-en-2023-02-21');
     return bundle.existsSync();
   }
 
   Future<bool> _ensureWorker() async {
     if (_workerPort != null) return true;
     final support = await getApplicationSupportDirectory();
-    final bundlePath = '${support.path}/sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06';
+    final bundlePath = '${support.path}/sherpa-onnx-streaming-zipformer-en-2023-02-21';
     
     final p = ReceivePort();
     _isolate = await Isolate.spawn(_zipformerWorker, [bundlePath, p.sendPort]);
@@ -183,14 +183,14 @@ Future<void> _zipformerWorker(List<dynamic> args) async {
   final config = OnlineRecognizerConfig(
     model: OnlineModelConfig(
       transducer: OnlineTransducerModelConfig(
-        encoder: '$bundlePath/encoder.onnx',
-        decoder: '$bundlePath/decoder.onnx',
-        joiner: '$bundlePath/joiner.onnx',
+        encoder: '$bundlePath/encoder-epoch-99-avg-1.int8.onnx',
+        decoder: '$bundlePath/decoder-epoch-99-avg-1.int8.onnx',
+        joiner: '$bundlePath/joiner-epoch-99-avg-1.int8.onnx',
       ),
       tokens: '$bundlePath/tokens.txt',
       provider: 'cpu',
       numThreads: 2,
-      debug: false,
+      debug: true,
     ),
     ruleFsts: '',
   );
@@ -213,32 +213,33 @@ Future<void> _zipformerWorker(List<dynamic> args) async {
       final cmd = msg[0] as String;
       if (cmd == 'shutdown') {
         stream?.free();
-        recognizer.free();
+        recognizer?.free();
         break;
       } else if (cmd == 'reset') {
         if (lastText.isNotEmpty) {
           replyPort.send(['final', lastText]);
         }
         stream?.free();
-        stream = recognizer.createStream();
+        stream = recognizer?.createStream();
         lastText = '';
       } else if (cmd == 'audio') {
         final samples = msg[1] as Float32List;
         if (stream != null) {
           stream.acceptWaveform(samples: samples, sampleRate: 16000);
           
-          while (recognizer.isReady(stream) == true) {
-            recognizer.decode(stream);
+          while (recognizer?.isReady(stream) == true) {
+            recognizer?.decode(stream);
           }
 
-          final result = recognizer.getResult(stream);
+          final result = recognizer?.getResult(stream);
           final text = result?.text.trim() ?? '';
+          if (text.isEmpty && samples.isNotEmpty) { replyPort.send(['partial', '?dbg: got  samples, text empty, ready: ']); }
           
-          if (recognizer.isEndpoint(stream) == true) {
+          if (recognizer?.isEndpoint(stream) == true) {
             if (text.isNotEmpty) {
               replyPort.send(['final', text]);
             }
-            recognizer.reset(stream);
+            recognizer?.reset(stream);
             lastText = '';
           } else {
             if (text.isNotEmpty && text != lastText) {

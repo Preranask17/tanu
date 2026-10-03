@@ -21,6 +21,7 @@ import '../services/stt/moonshine_stt_engine.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
   final engine = MoonshineSttEngine();
+
   ref.onDispose(() => engine.dispose());
   return engine;
 });
@@ -109,6 +110,12 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _buttonSub?.cancel();
     _buttonSub = source.buttonEvents.listen(_onButtonEvent);
 
+    final available = await engine.isAvailable();
+    if (!available) {
+      state = state.copyWith(isListening: false, sttEvent: "Model missing. Download in Settings.");
+      _continuousStarted = false;
+      return;
+    }
     final ok = await engine.startContinuous(
       source.pcmAudio,
       onUtterance: _onUtterance,

@@ -399,8 +399,9 @@ class _SttModelDashboard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(kOfflineModelLabel,
+const Text(kOfflineModelLabel,
                         style: TextStyle(fontWeight: FontWeight.bold)),
+
                     const SizedBox(height: 4),
                     Text(statusText, style: const TextStyle(color: Color(0xFF888888), fontSize: 12)),
                   ],

@@ -71,7 +71,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     final state = ref.read(sttModelProvider);
     if (state.phase == SttModelPhase.missing) {
       debugPrint('[tanu] STT model missing -- auto-downloading...');
-      notifier.download();
+      // notifier.download(); // Auto-download disabled
     }
   }
 
@@ -283,6 +283,7 @@ class _LiveCaptureCard extends ConsumerWidget {
     final active = conversation.active;
     final label = switch (conversation.sttEvent) {
       'stt unavailable' => 'Transcription unavailable',
+      'Model missing. Download in Settings.' => 'Model missing. Download in Settings.',
       _ => conversation.isListening ? 'Listeningâ€¦' : 'Capturingâ€¦',
     };
 
