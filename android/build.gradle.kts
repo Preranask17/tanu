@@ -56,11 +56,11 @@ fun Project.forceNdk25() {
 subprojects {
     if (state.executed) {
         forceCompileSdk36()
-        forceNdk25()
+        // forceNdk25()
     } else {
         afterEvaluate { 
             forceCompileSdk36() 
-            forceNdk25()
+            // forceNdk25()
         }
     }
 }
