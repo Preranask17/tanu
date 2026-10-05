@@ -1,0 +1,16 @@
+{
+  "gradle.autoDetect": "off",
+  "gradle.nestedProjects": [
+    "android"
+  ],
+  "java.import.gradle.enabled": false,
+  "java.gradle.buildServer.enabled": "off",
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.dart_tool/**": true,
+    "**/build/**": true,
+    "**/AppData/Local/Pub/Cache/**": true
+  }
+}
