@@ -88,7 +88,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
         final text = msg[1] as String;
         if (_continuousActive && text.isNotEmpty) {
           _hasActiveUtterance = true;
-          _onPartialCb?.call('?$text');
+          _onPartialCb?.call(text);
         }
       } else if (msg is List && msg[0] == 'final') {
         final text = msg[1] as String;
@@ -153,7 +153,10 @@ class MoonshineSttEngine implements ContinuousSttEngine {
   }
 
   @override
-  Future<String> transcribe(Uint8List pcmUtterance, {SttCallbacks? callbacks}) async {
+  Future<String> transcribe(
+    Uint8List pcmUtterance, {
+    SttCallbacks? callbacks,
+  }) async {
     return '';
   }
 
@@ -207,9 +210,6 @@ bool _isJunk(String text) {
     'thanks for watching',
     'bye',
     'goodbye',
-    'you',
-    'yes',
-    'no',
     'oh',
     'ah',
     'um',
@@ -249,8 +249,12 @@ Future<void> _moonshineWorker(List<dynamic> args) async {
   final vadConfig = VadModelConfig(
     sileroVad: SileroVadModelConfig(
       model: '$bundlePath/$kSileroVadFileName',
+      // A higher confidence boundary prevents room noise and pendant taps
+      // from being sent to Moonshine as speech.
       threshold: 0.5,
-      minSilenceDuration: 0.5,
+      // Keep a short but meaningful trailing pause so final words are not
+      // clipped when someone speaks naturally.
+      minSilenceDuration: 0.45,
       minSpeechDuration: 0.3,
       windowSize: 512,
     ),
@@ -309,6 +313,7 @@ Future<void> _moonshineWorker(List<dynamic> args) async {
 
           // Guard 3: drop hallucinated filler phrases.
           if (text.isEmpty || _isJunk(text)) continue;
+          replyPort.send(['partial', text]);
           replyPort.send(['final', text]);
         }
       }

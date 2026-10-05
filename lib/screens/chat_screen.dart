@@ -9,7 +9,6 @@ import '../providers/agent_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
-import '../widgets/connection_status_bar.dart';
 
 /// Live memory page: the in-progress session's timestamped transcript streams
 /// here, partial words in italic, locked lines in place — Omi's chat. Pushed
@@ -24,23 +23,19 @@ class ChatPage extends ConsumerWidget {
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          conversation.active?.title.isNotEmpty == true
-              ? conversation.active!.title
-              : 'Tanu',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-      ),
+      backgroundColor: Colors.black,
       body: SafeArea(
-        top: false,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const ConnectionStatusBar(),
+            _LiveHeader(
+              status: status,
+              onClose: () => Navigator.of(context).maybePop(),
+            ),
+            if (conversation.isListening)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+                child: AudioWaveform(level: conversation.micLevel),
+              ),
             Expanded(
               child: conversation.active == null
                   ? _ChatWelcome(status: status)
@@ -48,8 +43,84 @@ class ChatPage extends ConsumerWidget {
                       session: conversation.active!,
                       livePartial: conversation.liveTranscript,
                       isListening: conversation.isListening,
-                      micLevel: conversation.micLevel,
                     ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveHeader extends StatelessWidget {
+  const _LiveHeader({required this.status, required this.onClose});
+
+  final PendantStatus status;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = status.isConnected
+        ? Colors.greenAccent
+        : Colors.white54;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
+      child: SizedBox(
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                tooltip: 'Close',
+                onPressed: onClose,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 25,
+                ),
+              ),
+            ),
+            const Text(
+              'Tanu',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    status.isConnected
+                        ? Icons.bluetooth
+                        : Icons.bluetooth_disabled,
+                    color: statusColor,
+                    size: 16,
+                  ),
+                  if (status.batteryPercent != null) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.battery_full_rounded,
+                      color: Colors.white60,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${status.batteryPercent}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -418,13 +489,11 @@ class _SessionTranscript extends StatelessWidget {
     required this.session,
     required this.livePartial,
     required this.isListening,
-    required this.micLevel,
   });
 
   final ConversationSession session;
   final String livePartial;
   final bool isListening;
-  final double micLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -463,12 +532,6 @@ class _SessionTranscript extends StatelessWidget {
             ms: session.segments.isNotEmpty
                 ? (session.segments.last.endMs ?? session.segments.last.startMs)
                 : 0,
-          ),
-
-        if (isListening)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: AudioWaveform(level: micLevel),
           ),
       ],
     );

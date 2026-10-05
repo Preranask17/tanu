@@ -48,6 +48,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
   bool _continuousStarted = false;
   bool _micTestActive = false;
   bool _resumeAfterMicTest = false;
+
   /// User paused from the VoicePill — blocks auto-restart while connected.
   bool _userPaused = false;
   StreamSubscription<Uint8List>? _receivingSub;
@@ -120,7 +121,10 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
     final available = await engine.isAvailable();
     if (!available) {
-      state = state.copyWith(isListening: false, sttEvent: "Model missing. Download in Settings.");
+      state = state.copyWith(
+        isListening: false,
+        sttEvent: "Model missing. Download in Settings.",
+      );
       _continuousStarted = false;
       return;
     }
@@ -194,7 +198,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
   /// Resume after [pauseListening]. No-op if the pendant is disconnected.
   Future<void> resumeListening() async {
     _userPaused = false;
-    final status = ref.read(pendantStatusProvider).value ??
+    final status =
+        ref.read(pendantStatusProvider).value ??
         ref.read(pendantProvider).currentStatus;
     if (!status.isConnected) return;
     await _startContinuous(resumeExisting: state.active != null);
@@ -312,8 +317,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
     'thanks for watching.',
     'thanks for watching!',
     'subtitles by amara.org',
-    'you',
-    'you.',
   };
 
   bool _isHallucination(String text) {
@@ -341,7 +344,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
           text: trimmed,
           timestamp: DateTime.now(),
           startMs: ms,
-          endMs: ms,
         ),
       );
     }
@@ -748,7 +750,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final conversations = List<ConversationSession>.of(state.conversations);
     final idx = conversations.indexWhere((c) => c.id == id);
     if (idx < 0) return;
-    conversations[idx] = conversations[idx].copyWith(isPinned: !conversations[idx].isPinned);
+    conversations[idx] = conversations[idx].copyWith(
+      isPinned: !conversations[idx].isPinned,
+    );
     state = state.copyWith(conversations: conversations);
     _persist();
   }
@@ -772,9 +776,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
   }
 
   void emptyTrash() {
-    final conversations = List<ConversationSession>.of(state.conversations)
-        .where((c) => !c.isDeleted)
-        .toList();
+    final conversations = List<ConversationSession>.of(
+      state.conversations,
+    ).where((c) => !c.isDeleted).toList();
     state = state.copyWith(conversations: conversations);
     _persist();
   }

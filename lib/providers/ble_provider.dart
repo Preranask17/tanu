@@ -19,9 +19,13 @@ final pendantProvider = Provider<AudioSource>((ref) {
   return source;
 });
 
-final pendantStatusProvider = StreamProvider<PendantStatus>(
-  (ref) => ref.watch(pendantProvider).statusStream,
-);
+final pendantStatusProvider = StreamProvider<PendantStatus>((ref) async* {
+  final source = ref.watch(pendantProvider);
+  // Do not make the UI wait for the next BLE event when the source already
+  // knows its current state (common after reconnecting an existing device).
+  yield source.currentStatus;
+  yield* source.statusStream;
+});
 
 /// Live audio-path stats for debugging on a real pendant.
 final pendantStatsProvider = Provider<ValueNotifier<PendantStats>>(

@@ -6,6 +6,7 @@ import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../widgets/conversation_tile.dart';
 import 'trash_screen.dart';
+import '../widgets/page_layout.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
@@ -78,8 +79,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       if (s.isDeleted) return false;
       if (query.isEmpty) return true;
       if (s.title.toLowerCase().contains(query)) return true;
-      if (s.summary != null && s.summary!.toLowerCase().contains(query))
+      if (s.summary != null && s.summary!.toLowerCase().contains(query)) {
         return true;
+      }
       return s.segments.any((seg) => seg.text.toLowerCase().contains(query));
     }).toList();
 
@@ -123,11 +125,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
               pinned: true,
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  'Your Memories',
-                  style: Theme.of(context).textTheme.displayMedium,
-                ),
-                titlePadding: const EdgeInsets.only(left: 20, bottom: 20),
+                centerTitle: false,
+                title: const TanuPageTitle('Memories'),
+                titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
                 background: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -139,7 +139,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         height: 200,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Theme.of(context).primaryColor.withOpacity(0.15),
+                          color: Theme.of(
+                            context,
+                          ).primaryColor.withValues(alpha: 0.15),
                         ),
                       ),
                     ),
@@ -151,7 +153,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         height: 250,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.blueAccent.withOpacity(0.08),
+                          color: Colors.blueAccent.withValues(alpha: 0.08),
                         ),
                       ),
                     ),
@@ -167,36 +169,14 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         MaterialPageRoute(builder: (_) => const TrashScreen()),
                       );
                     },
-                    style: IconButton.styleFrom(
-                      backgroundColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: Icon(
-                      Icons.delete_outline,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
+                    icon: const Icon(Icons.delete_outline),
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: IconButton(
                     onPressed: toggleSearch,
-                    style: IconButton.styleFrom(
-                      backgroundColor: _searching
-                          ? Theme.of(context).primaryColor.withOpacity(0.1)
-                          : isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: Icon(
-                      _searching ? Icons.close : Icons.search,
-                      color: _searching
-                          ? Theme.of(context).primaryColor
-                          : isDark ? Colors.white : Colors.black,
-                    ),
+                    icon: Icon(_searching ? Icons.close : Icons.search),
                   ),
                 ),
               ],
@@ -204,7 +184,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             if (_searching)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                   child: TextField(
                     controller: _query,
                     autofocus: true,
@@ -222,17 +202,23 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF161618) : Colors.white,
+                      fillColor: isDark
+                          ? const Color(0xFF161618)
+                          : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(100), // Pill shape
                         borderSide: BorderSide(
-                          color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
+                          color: isDark
+                              ? const Color(0xFF2A2A2C)
+                              : const Color(0xFFE9ECEF),
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(100),
                         borderSide: BorderSide(
-                          color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
+                          color: isDark
+                              ? const Color(0xFF2A2A2C)
+                              : const Color(0xFFE9ECEF),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
@@ -242,7 +228,10 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                           width: 2,
                         ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
@@ -257,8 +246,8 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
               SliverPadding(
                 padding: EdgeInsets.only(
                   top: _searching ? 4 : 12,
-                  left: 16,
-                  right: 16,
+                  left: 24,
+                  right: 24,
                   bottom: bottomInset,
                 ),
                 sliver: visible.isEmpty && query.isNotEmpty
@@ -267,7 +256,10 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         delegate: SliverChildListDelegate([
                           for (final label in order) ...[
                             Padding(
-                              padding: const EdgeInsets.only(top: 16, bottom: 4),
+                              padding: const EdgeInsets.only(
+                                top: 16,
+                                bottom: 4,
+                              ),
                               child: _DayHeader(label: label),
                             ),
                             for (final session in groups[label]!)
@@ -327,7 +319,9 @@ class _DayHeader extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: isDark ? const Color(0xFFCCCCCC) : const Color(0xFF666666),
+                color: isDark
+                    ? const Color(0xFFCCCCCC)
+                    : const Color(0xFF666666),
               ),
             ),
           ),
@@ -375,12 +369,12 @@ class _EmptyConversations extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.08),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.memory_rounded,
-                color: Theme.of(context).primaryColor.withOpacity(0.8),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
                 size: 64,
               ),
             ),
@@ -388,10 +382,7 @@ class _EmptyConversations extends ConsumerWidget {
             const Text(
               'A blank slate',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -414,7 +405,10 @@ class _EmptyConversations extends ConsumerWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(100),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
               ),
               child: const Text(
                 'Start capturing',

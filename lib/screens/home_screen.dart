@@ -4,12 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
-import '../providers/navigation_provider.dart';
 import '../providers/stt_model_provider.dart';
 import '../widgets/aura_orb.dart';
-import '../widgets/conversation_tile.dart';
-import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
+import '../widgets/page_layout.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -87,156 +85,167 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final status =
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
 
-    // Floating pill sits above the dock: dock = safe + 16 + 64; gap 16 → +96.
-    // VoicePill height is 56; leave 16 above it for scroll clearance.
+    // The VoicePill is part of the page now, so only reserve room for the
+    // mobile navigation dock at the bottom.
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
     final bottomPadding =
-        MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
-    final bottomInset = bottomPadding + 56 + 16;
-
-    final recent = conversation.conversations.length > 3
-        ? conversation.conversations
-              .sublist(conversation.conversations.length - 3)
-              .reversed
-              .toList()
-        : conversation.conversations.reversed.toList();
-
-    final hasMemories = conversation.active != null ||
-        conversation.conversations.isNotEmpty;
+        MediaQuery.paddingOf(context).bottom + (isDesktop ? 24 : 96);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            onRefresh: () async =>
-                ref.read(conversationProvider.notifier).reloadFromStorage(),
-            child: CustomScrollView(
-              controller: _scroll,
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+      body: RefreshIndicator(
+        onRefresh: () async =>
+            ref.read(conversationProvider.notifier).reloadFromStorage(),
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 140,
+              floating: true,
+              pinned: true,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              flexibleSpace: FlexibleSpaceBar(
+                centerTitle: false,
+                title: const TanuPageTitle('Capture'),
+                titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
               ),
-              slivers: [
-                SliverAppBar(
-                  expandedHeight: 160,
-                  floating: true,
-                  pinned: true,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: Text(
-                      'Capture',
-                      style: Theme.of(context).textTheme.displayMedium,
-                    ),
-                    titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-                  ),
-                  actions: [
-                    const SizedBox(width: 8),
-                  ],
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 16, bottom: bottomInset),
+              actions: const [SizedBox(width: 8)],
+            ),
+            SliverToBoxAdapter(
+              child: SafeArea(
+                top: false,
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomPadding),
+                  child: TanuPageRail(
+                    bottom: 0,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 32),
-                          child: Center(
-                            child: AuraOrb(
-                              micLevel: conversation.micLevel,
-                              isConnected: status.isConnected,
-                            ),
-                          ),
+                        Center(child: _ConnectionCard(status: status)),
+                        const SizedBox(height: 16),
+                        _CaptureHero(
+                          micLevel: conversation.micLevel,
+                          isConnected: status.isConnected,
                         ),
-                        // Voice Pill right beneath the Orb
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: HomeChatBar(),
-                        ),
-                        if (hasMemories) ...[
-                          const SizedBox(height: 16),
-                          _SectionHeader(
-                            title: 'Recent Memories',
-                            pillLabel: 'View All',
-                            interactive: true,
-                            onPillTap: () => ref
-                                .read(navigationTabProvider.notifier)
-                                .goToConversations(),
-                          ),
-                          const SizedBox(height: 8),
-                          for (final (i, session) in recent.indexed)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                              child: ConversationTile(
-                                session: session,
-                                isNew: i == 0,
-                              ),
-                            ),
-                        ],
+                        const SizedBox(height: 14),
+                        const HomeChatBar(),
                       ],
                     ),
                   ),
                 ),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectionCard extends StatelessWidget {
+  const _ConnectionCard({required this.status});
+
+  final PendantStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final connected = status.isConnected;
+    final accent = connected ? Colors.green : const Color(0xFF888888);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? const Color(0xFF252525) : const Color(0xFFE5E5E5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              connected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+              size: 17,
+              color: accent,
             ),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              switch (status.state) {
+                PendantState.connected => status.deviceName ?? 'Connected',
+                PendantState.reconnecting => 'Reconnecting...',
+                PendantState.scanning => 'Looking for pendant...',
+                PendantState.connecting => 'Connecting...',
+                PendantState.disconnected => 'Not connected',
+              },
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: accent,
+              ),
+            ),
+          ),
+          if (status.batteryPercent != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Text(
+                '${status.batteryPercent}%',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
+class _CaptureHero extends StatelessWidget {
+  const _CaptureHero({required this.micLevel, required this.isConnected});
 
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.pillLabel,
-    this.interactive = false,
-    this.onPillTap,
-  });
-
-  final String title;
-  final String pillLabel;
-  final bool interactive;
-  final VoidCallback? onPillTap;
+  final double micLevel;
+  final bool isConnected;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: interactive ? onPillTap : null,
-            child: Text(
-              pillLabel,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        Text(
+          isConnected
+              ? 'Listening for your thoughts'
+              : 'Connect your pendant to begin',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 17),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isConnected
+              ? 'Tap the control below when you are ready'
+              : 'Your conversations stay on this device',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: AuraOrb(micLevel: micLevel, isConnected: isConnected),
+        ),
+      ],
     );
   }
 }

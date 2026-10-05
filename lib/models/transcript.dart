@@ -112,7 +112,7 @@ class ConversationSession {
     return ConversationSession(
       id: id,
       title: title ?? this.title,
-      startedAt: startedAt ?? this.startedAt,
+      startedAt: startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       status: status ?? this.status,
       segments: segments ?? this.segments,
