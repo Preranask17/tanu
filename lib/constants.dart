@@ -42,7 +42,7 @@ const List<({String name, int bytes})> kMoonshineBundleFiles = [
 
 
 /// Human label shown in Settings and the Home warm-up chip.
-const String kOfflineModelLabel = 'Moonshine Base · 106 MB';
+const String kOfflineModelLabel = 'Offline AI Model · 106 MB';
 
 /// Names of on-disk bundles that are no longer the on-device model.
 /// Any of these found in app support are deleted on upgrade, along with

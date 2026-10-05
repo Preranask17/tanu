@@ -39,14 +39,29 @@ fun Project.forceCompileSdk36() {
     }
 }
 
+fun Project.forceNdk25() {
+    val androidExt = extensions.findByName("android") ?: return
+    try {
+        androidExt.javaClass
+            .getMethod("setNdkVersion", String::class.java)
+            .invoke(androidExt, "25.2.9519653")
+    } catch (e: Exception) {
+        logger.warn("tanu: could not force ndkVersion for ${project.name}: ${e.message}")
+    }
+}
+
 // Force every Android plugin subproject to compile against SDK 36. Several
 // plugins (opus_flutter_android, speech_to_text) ship stale compileSdk values
 // that their own androidx dependencies no longer accept.
 subprojects {
     if (state.executed) {
         forceCompileSdk36()
+        // forceNdk25()
     } else {
-        afterEvaluate { forceCompileSdk36() }
+        afterEvaluate { 
+            forceCompileSdk36() 
+            // forceNdk25()
+        }
     }
 }
 

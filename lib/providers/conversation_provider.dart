@@ -48,6 +48,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
   bool _continuousStarted = false;
   bool _micTestActive = false;
   bool _resumeAfterMicTest = false;
+
+  /// User paused from the VoicePill — blocks auto-restart while connected.
+  bool _userPaused = false;
   StreamSubscription<Uint8List>? _receivingSub;
   StreamSubscription<int>? _buttonSub;
   Timer? _receivingTimer;
@@ -78,41 +81,50 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   void _syncContinuous(PendantStatus? status) {
     final connected = status?.isConnected ?? false;
-    if (connected && !_micTestActive && !_continuousStarted) {
+    if (connected && !_micTestActive && !_continuousStarted && !_userPaused) {
       unawaited(_startContinuous());
     } else if (!connected && _continuousStarted) {
+      _userPaused = false;
       unawaited(_stopContinuous());
     }
   }
 
-  Future<void> _startContinuous() async {
+  Future<void> _startContinuous({bool resumeExisting = false}) async {
     if (_continuousStarted || _micTestActive) return;
     _continuousStarted = true;
+    _userPaused = false;
 
     final engine = ref.read(sttEngineProvider);
     final source = ref.read(pendantProvider);
 
-    // Every connect opens a brand-new memory (Omi: a new session starts each
-    // time streaming begins). Stored sessions are never resumed.
-    final now = DateTime.now();
-    state = state.copyWith(
-      active: ConversationSession(
-        id: 's${now.microsecondsSinceEpoch}',
-        title: '',
-        startedAt: now,
-        status: ConversationStatus.inProgress,
-      ),
-      isListening: true,
-      sttEvent: 'listeningÃ¢â‚¬Â¦',
-    );
-    _clock = Stopwatch()..start();
+    // Fresh connects open a new memory. Manual resume keeps the active one.
+    if (!resumeExisting || state.active == null) {
+      final now = DateTime.now();
+      state = state.copyWith(
+        active: ConversationSession(
+          id: 's${now.microsecondsSinceEpoch}',
+          title: '',
+          startedAt: now,
+          status: ConversationStatus.inProgress,
+        ),
+        isListening: true,
+        sttEvent: 'listening…',
+      );
+      _clock = Stopwatch()..start();
+    } else {
+      state = state.copyWith(isListening: true, sttEvent: 'listening…');
+      if (!_clock.isRunning) _clock.start();
+    }
 
     _buttonSub?.cancel();
     _buttonSub = source.buttonEvents.listen(_onButtonEvent);
 
     final available = await engine.isAvailable();
     if (!available) {
-      state = state.copyWith(isListening: false, sttEvent: "Model missing. Download in Settings.");
+      state = state.copyWith(
+        isListening: false,
+        sttEvent: "Model missing. Download in Settings.",
+      );
       _continuousStarted = false;
       return;
     }
@@ -147,6 +159,57 @@ class ConversationNotifier extends Notifier<ConversationState> {
             },
           );
     }
+  }
+
+  /// Pause STT while keeping the in-progress memory. Pill collapses until
+  /// [resumeListening] (or a fresh connect after disconnect clears the pause).
+  Future<void> pauseListening() async {
+    _userPaused = true;
+    if (!_continuousStarted) {
+      state = state.copyWith(
+        isListening: false,
+        receivingAudio: false,
+        micLevel: 0,
+      );
+      return;
+    }
+    _continuousStarted = false;
+    _buttonSub?.cancel();
+    _buttonSub = null;
+    _receivingSub?.cancel();
+    _receivingSub = null;
+    _receivingTimer?.cancel();
+    _receivingTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _clock.stop();
+
+    final engine = ref.read(sttEngineProvider);
+    await engine.stopContinuous();
+
+    state = state.copyWith(
+      isListening: false,
+      receivingAudio: false,
+      micLevel: 0,
+      liveTranscript: '',
+    );
+  }
+
+  /// Resume after [pauseListening]. No-op if the pendant is disconnected.
+  Future<void> resumeListening() async {
+    _userPaused = false;
+    final status =
+        ref.read(pendantStatusProvider).value ??
+        ref.read(pendantProvider).currentStatus;
+    if (!status.isConnected) return;
+    await _startContinuous(resumeExisting: state.active != null);
+  }
+
+  /// End the current memory and pause listening so the pill collapses.
+  Future<void> stopListening([String reason = 'manual']) async {
+    // Pause first so [forceEndSession] does not open a replacement session.
+    await pauseListening();
+    forceEndSession(reason);
   }
 
   /// Closes the current memory into the conversations list. Recording keeps
@@ -254,8 +317,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
     'thanks for watching.',
     'thanks for watching!',
     'subtitles by amara.org',
-    'you',
-    'you.',
   };
 
   bool _isHallucination(String text) {
@@ -283,7 +344,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
           text: trimmed,
           timestamp: DateTime.now(),
           startMs: ms,
-          endMs: ms,
         ),
       );
     }
@@ -511,6 +571,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
+    // AI processing temporarily disabled
+    return;
+
     final processor = ref.read(memoryProcessorProvider);
     final result = await processor.process(text);
 
@@ -677,7 +740,45 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final conversations = List<ConversationSession>.of(state.conversations);
     final idx = conversations.indexWhere((c) => c.id == id);
     if (idx < 0) return;
+    // Soft delete
+    conversations[idx] = conversations[idx].copyWith(isDeleted: true);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void togglePin(String id) {
+    final conversations = List<ConversationSession>.of(state.conversations);
+    final idx = conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    conversations[idx] = conversations[idx].copyWith(
+      isPinned: !conversations[idx].isPinned,
+    );
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void restoreSession(String id) {
+    final conversations = List<ConversationSession>.of(state.conversations);
+    final idx = conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
+    conversations[idx] = conversations[idx].copyWith(isDeleted: false);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void deleteSessionPermanently(String id) {
+    final conversations = List<ConversationSession>.of(state.conversations);
+    final idx = conversations.indexWhere((c) => c.id == id);
+    if (idx < 0) return;
     conversations.removeAt(idx);
+    state = state.copyWith(conversations: conversations);
+    _persist();
+  }
+
+  void emptyTrash() {
+    final conversations = List<ConversationSession>.of(
+      state.conversations,
+    ).where((c) => !c.isDeleted).toList();
     state = state.copyWith(conversations: conversations);
     _persist();
   }

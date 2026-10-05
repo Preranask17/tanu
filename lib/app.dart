@@ -6,7 +6,6 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models/conversation.dart';
-import 'abstractions/audio_source.dart';
 import 'providers/analytics_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'providers/navigation_provider.dart';
@@ -17,7 +16,6 @@ import 'screens/onboarding_screen.dart';
 import 'screens/settings_screen.dart';
 import 'theme.dart';
 
-import 'widgets/home_chat_bar.dart';
 import 'widgets/responsive_scaffold.dart';
 
 class TanuApp extends ConsumerStatefulWidget {
@@ -108,7 +106,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       _fgNotice = '';
       unawaited(FlutterForegroundTask.stopService());
     } else if (active) {
-      final notice = 'Listening…';
+      final notice = 'Listening...';
       if (notice != _fgNotice) {
         _fgNotice = notice;
         unawaited(
@@ -123,14 +121,14 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       if (await FlutterForegroundTask.isRunningService) {
         await FlutterForegroundTask.updateService(
           notificationTitle: 'Tanu',
-          notificationText: 'Listening…',
+          notificationText: 'Listening...',
         );
       } else {
         await FlutterForegroundTask.startService(
           serviceId: 1010,
           serviceTypes: const [ForegroundServiceTypes.connectedDevice],
           notificationTitle: 'Tanu',
-          notificationText: 'Listening…',
+          notificationText: 'Listening...',
           callback: _fgTaskCallback,
         );
       }
