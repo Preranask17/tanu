@@ -17,7 +17,6 @@ import 'screens/onboarding_screen.dart';
 import 'screens/settings_screen.dart';
 import 'theme.dart';
 
-import 'widgets/home_chat_bar.dart';
 import 'widgets/responsive_scaffold.dart';
 
 class TanuApp extends ConsumerStatefulWidget {

@@ -4,14 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
-import '../providers/stt_model_provider.dart';
 import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
 import '../widgets/connection_status_bar.dart';
-import '../widgets/state_indicator.dart';
 
 /// Live memory page: the in-progress session's timestamped transcript streams
 /// here, partial words in italic, locked lines in place — Omi's chat. Pushed
@@ -24,8 +22,6 @@ class ChatPage extends ConsumerWidget {
     final conversation = ref.watch(conversationProvider);
     final status =
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
-    final model = ref.watch(sttModelProvider);
-    final engine = ref.watch(sttEngineProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -38,20 +34,6 @@ class ChatPage extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.titleLarge,
         ),
-        actions: [
-          ValueListenableBuilder<bool>(
-            valueListenable: engine.warmingUp,
-            builder: (context, warming, _) {
-              final show = model.busy || warming;
-              if (!show) return const SizedBox.shrink();
-              final title = model.phase == SttModelPhase.downloading
-                  ? model.label
-                  : 'Loading model...';
-              return _ModelLoadingChip(title: title);
-            },
-          ),
-          const SizedBox(width: 16),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -59,17 +41,6 @@ class ChatPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const ConnectionStatusBar(),
-            const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: StateIndicator(
-                state: status.state,
-                isListening: conversation.isListening,
-                isThinking: false,
-                error: conversation.error,
-              ),
-            ),
-            const SizedBox(height: 4),
             Expanded(
               child: conversation.active == null
                   ? _ChatWelcome(status: status)
@@ -173,7 +144,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -197,10 +168,14 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+                        color: isDark
+                            ? const Color(0xFF111111)
+                            : const Color(0xFFFFFFFF),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                          color: isDark
+                              ? const Color(0xFF2A2A2A)
+                              : const Color(0xFFE5E5E5),
                           width: 1,
                         ),
                       ),
@@ -262,10 +237,12 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                           }
                         }
                       }
-                      return groupedSegments.asMap().entries.map((e) => _SegmentGroupRow(
-                        segments: e.value,
-                        isLast: e.key == groupedSegments.length - 1,
-                      ));
+                      return groupedSegments.asMap().entries.map(
+                        (e) => _SegmentGroupRow(
+                          segments: e.value,
+                          isLast: e.key == groupedSegments.length - 1,
+                        ),
+                      );
                     }(),
                   if (_messages.isNotEmpty) ...[
                     const SizedBox(height: 24),
@@ -288,9 +265,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                   if (_isGenerating)
                     const Padding(
                       padding: EdgeInsets.all(16.0),
-                      child: Center(
-                        child: CircularProgressIndicator(),
-                      ),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
                 ],
               ),
@@ -301,7 +276,9 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                 color: Theme.of(context).scaffoldBackgroundColor,
                 border: Border(
                   top: BorderSide(
-                    color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                    color: isDark
+                        ? const Color(0xFF2A2A2A)
+                        : const Color(0xFFE5E5E5),
                   ),
                 ),
               ),
@@ -317,17 +294,23 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                           vertical: 12,
                         ),
                         filled: true,
-                        fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                        fillColor: isDark
+                            ? const Color(0xFF1C1C1E)
+                            : const Color(0xFFF2F2F7),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
                           borderSide: BorderSide(
-                            color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                            color:
+                                Theme.of(context).dividerTheme.color ??
+                                Colors.transparent,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
                           borderSide: BorderSide(
-                            color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
+                            color:
+                                Theme.of(context).dividerTheme.color ??
+                                Colors.transparent,
                           ),
                         ),
                       ),
@@ -345,10 +328,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                       shape: const CircleBorder(),
                       padding: const EdgeInsets.all(12),
                     ),
-                    icon: const Icon(
-                      Icons.arrow_upward,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.arrow_upward, size: 20),
                   ),
                 ],
               ),
@@ -378,10 +358,14 @@ class _ChatBubble extends StatelessWidget {
               ? (isDark ? const Color(0xFF333333) : const Color(0xFFE5E5E5))
               : (isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF)),
           borderRadius: BorderRadius.circular(12),
-          border: isUser ? null : Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-            width: 1,
-          ),
+          border: isUser
+              ? null
+              : Border.all(
+                  color: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFE5E5E5),
+                  width: 1,
+                ),
         ),
         child: Text(
           message.content,
@@ -467,13 +451,18 @@ class _SessionTranscript extends StatelessWidget {
         for (int i = 0; i < groupedSegments.length; i++)
           _SegmentGroupRow(
             segments: groupedSegments[i],
-            isLast: i == groupedSegments.length - 1 && livePartial.trim().isEmpty && !isListening,
+            isLast:
+                i == groupedSegments.length - 1 &&
+                livePartial.trim().isEmpty &&
+                !isListening,
           ),
-        
+
         if (livePartial.trim().isNotEmpty)
           _LivePartialRow(
-            partial: livePartial, 
-            ms: session.segments.isNotEmpty ? (session.segments.last.endMs ?? session.segments.last.startMs) : 0,
+            partial: livePartial,
+            ms: session.segments.isNotEmpty
+                ? (session.segments.last.endMs ?? session.segments.last.startMs)
+                : 0,
           ),
 
         if (isListening)
@@ -503,7 +492,10 @@ class _LivePartialRow extends StatelessWidget {
               children: [
                 Text(
                   _offsetLabel(ms),
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF888888),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -591,7 +583,10 @@ class _SegmentGroupRow extends StatelessWidget {
               children: [
                 Text(
                   _offsetLabel(startMs),
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF888888),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 if (!isLast)
@@ -619,12 +614,19 @@ class _SegmentGroupRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+                  color: isDark
+                      ? const Color(0xFF161618)
+                      : const Color(0xFFF8F9FA),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
+                    color: isDark
+                        ? const Color(0xFF2A2A2C)
+                        : const Color(0xFFE9ECEF),
                     width: 1,
                   ),
                   boxShadow: [
@@ -640,42 +642,6 @@ class _SegmentGroupRow extends StatelessWidget {
                   style: const TextStyle(height: 1.5, fontSize: 15),
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModelLoadingChip extends StatelessWidget {
-  const _ModelLoadingChip({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 10,
-            height: 10,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF888888),
             ),
           ),
         ],
