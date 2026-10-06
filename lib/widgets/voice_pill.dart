@@ -219,17 +219,12 @@ class _IdleControl extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Tap to capture',
+            'Ready to capture',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
               color: dark ? Colors.white : Colors.black,
             ),
           ),
-        ),
-        Icon(
-          Icons.arrow_upward_rounded,
-          size: 20,
-          color: dark ? Colors.white54 : Colors.black45,
         ),
         const SizedBox(width: 16),
       ],
@@ -289,22 +284,7 @@ class _ActiveControl extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 6),
-        IconButton(
-          tooltip: paused ? 'Resume' : 'Pause',
-          onPressed: paused ? onResume : onPause,
-          icon: Icon(
-            paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-            color: primary,
-          ),
-        ),
-        if (paused)
-          IconButton(
-            tooltip: 'Stop and save',
-            onPressed: onStop,
-            icon: const Icon(Icons.check_rounded, color: Colors.green),
-          ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 16),
       ],
     );
   }
