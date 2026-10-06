@@ -100,75 +100,71 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: RefreshIndicator(
-        onRefresh: () async =>
-            ref.read(conversationProvider.notifier).reloadFromStorage(),
-        child: CustomScrollView(
-          controller: _scroll,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: [
-            SliverAppBar(
-              expandedHeight: 140,
-              floating: true,
-              pinned: true,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: false,
-                title: const TanuPageTitle('Capture'),
-                titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async =>
+                ref.read(conversationProvider.notifier).reloadFromStorage(),
+            child: CustomScrollView(
+              controller: _scroll,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
-              actions: const [SizedBox(width: 8)],
-            ),
-            SliverToBoxAdapter(
-              child: SafeArea(
-                top: false,
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomPadding),
-                  child: Builder(
-                    builder: (context) {
-                      final screenHeight = MediaQuery.sizeOf(context).height;
-                      final topPadding = MediaQuery.paddingOf(context).top;
-                      final appBarHeight = 140.0;
-                      
-                      // Calculate exactly how much space is left for the body content
-                      final availableHeight = math.max(
-                        400.0,
-                        screenHeight - topPadding - appBarHeight - bottomPadding,
-                      );
-                      
-                      return ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: availableHeight,
-                          maxHeight: availableHeight,
+              slivers: [
+                SliverAppBar(
+                  expandedHeight: 140,
+                  floating: true,
+                  pinned: true,
+                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                  flexibleSpace: FlexibleSpaceBar(
+                    centerTitle: false,
+                    title: const TanuPageTitle('Capture'),
+                    titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
+                  ),
+                  actions: const [SizedBox(width: 8)],
+                ),
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: bottomPadding + 100),
+                      child: TanuPageRail(
+                        top: 8,
+                        bottom: 0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(child: _ConnectionCard(status: status)),
+                            const SizedBox(height: 64),
+                            _CaptureHero(
+                              micLevel: conversation.micLevel,
+                              isConnected: status.isConnected,
+                            ),
+                          ],
                         ),
-                        child: TanuPageRail(
-                          top: 8,
-                          bottom: 0,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Center(child: _ConnectionCard(status: status)),
-                              const Spacer(flex: 1),
-                              _CaptureHero(
-                                micLevel: conversation.micLevel,
-                                isConnected: status.isConnected,
-                              ),
-                              const Spacer(flex: 1),
-                              const HomeChatBar(),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: bottomPadding,
+            left: 0,
+            right: 0,
+            child: const SafeArea(
+              top: false,
+              bottom: false,
+              child: TanuPageRail(
+                top: 0,
+                bottom: 0,
+                child: HomeChatBar(),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
