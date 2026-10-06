@@ -75,3 +75,5 @@ app.*.map.json
 *.tar.bz2
 ref.txt
 build_in_c.ps1
+
+.env

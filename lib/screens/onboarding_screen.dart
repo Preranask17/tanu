@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/settings_provider.dart';
+import '../services/auth_service.dart';
 
 /// A cinematic, editorial onboarding screen replacing the generic iOS feature list.
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -16,6 +19,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   late final Animation<double> _fadeTitle;
   late final Animation<double> _fadeSubtitle;
   late final Animation<double> _fadeButton;
+  
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -40,6 +45,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
     
     _anim.forward();
+
+    // Listen to Supabase auth state changes to detect when browser login finishes
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.session != null && mounted) {
+        ref.read(settingsProvider.notifier).completeOnboarding();
+      }
+    });
   }
 
   @override
@@ -102,12 +114,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed: () {
-                          // TODO: Actually perform Google Sign-In here
-                          ref
-                              .read(settingsProvider.notifier)
-                              .completeOnboarding();
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () async {
+                                setState(() => _isLoading = true);
+                                try {
+                                  await AuthService.signInWithGoogle();
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to sign in: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _isLoading = false);
+                                  }
+                                }
+                              },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -119,14 +143,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Text(
-                                'G',
-                                style: TextStyle(
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 16,
-                                  height: 1.1,
-                                ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: Image.asset('assets/images/google_logo.png'),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -140,6 +159,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                           ],
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FadeTransition(
+                    opacity: _fadeButton,
+                    child: TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              ref.read(settingsProvider.notifier).completeOnboarding();
+                            },
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF888888),
+                      ),
+                      child: const Text('Skip for now'),
                     ),
                   ),
                 ],

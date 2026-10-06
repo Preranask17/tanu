@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
@@ -9,6 +10,7 @@ import '../providers/dev_capture_provider.dart';
 import '../providers/settings_provider.dart';
 import '../constants.dart';
 import '../providers/stt_model_provider.dart';
+import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/page_layout.dart';
@@ -818,19 +820,35 @@ class _ConsoleMetric extends StatelessWidget {
   }
 }
 
-class _CloudSyncCard extends StatefulWidget {
+class _CloudSyncCard extends ConsumerStatefulWidget {
   const _CloudSyncCard();
 
   @override
-  State<_CloudSyncCard> createState() => _CloudSyncCardState();
+  ConsumerState<_CloudSyncCard> createState() => _CloudSyncCardState();
 }
 
-class _CloudSyncCardState extends State<_CloudSyncCard> {
-  bool _isSignedIn = false;
+class _CloudSyncCardState extends ConsumerState<_CloudSyncCard> {
+  User? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = Supabase.instance.client.auth.currentUser;
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (mounted) {
+        setState(() {
+          _user = data.session?.user;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSignedIn = _user != null;
+    final email = _user?.email;
+    final avatarUrl = _user?.userMetadata?['avatar_url'] as String?;
 
     return Container(
       width: double.infinity,
@@ -839,14 +857,14 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
         color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: _isSignedIn
+          color: isSignedIn
               ? Colors.blue.withValues(alpha: 0.35)
               : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5)),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: _isSignedIn
+            color: isSignedIn
                 ? Colors.blue.withValues(alpha: isDark ? 0.1 : 0.05)
                 : Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 24,
@@ -859,15 +877,18 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
         children: [
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.cloud_done_rounded, color: Colors.blue),
-              ),
+              if (avatarUrl != null)
+                ClipOval(
+                  child: Image.network(
+                    avatarUrl,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildFallbackIcon(),
+                  ),
+                )
+              else
+                _buildFallbackIcon(),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -881,13 +902,13 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _isSignedIn ? 'Syncing to connected account' : 'Not connected',
+                      isSignedIn ? (email ?? 'Syncing to connected account') : 'Not connected',
                       style: TextStyle(
-                        color: _isSignedIn
+                        color: isSignedIn
                             ? Colors.blue
                             : Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 14,
-                        fontWeight: _isSignedIn ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: isSignedIn ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -905,13 +926,21 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
             ),
           ),
           const SizedBox(height: 24),
-          if (!_isSignedIn)
+          if (!isSignedIn)
             SizedBox(
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: () {
-                  setState(() => _isSignedIn = true);
+                onPressed: () async {
+                  try {
+                    await AuthService.signInWithGoogle();
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Sign in failed: $e')),
+                      );
+                    }
+                  }
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: isDark ? Colors.white : Colors.black,
@@ -931,14 +960,9 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Text(
-                        'G',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          height: 1.1,
-                        ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Image.asset('assets/images/google_logo.png'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -968,8 +992,12 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {
-                      setState(() => _isSignedIn = false);
+                    onPressed: () async {
+                      await AuthService.signOut();
+                      if (context.mounted) {
+                        // User signed out of Google Drive sync.
+                        // State automatically updates via onAuthStateChange listener.
+                      }
                     },
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.redAccent,
@@ -977,13 +1005,25 @@ class _CloudSyncCardState extends State<_CloudSyncCard> {
                       minimumSize: const Size(0, 0),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text('Disconnect', style: TextStyle(fontWeight: FontWeight.w600)),
+                    child: const Text('Sign out', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFallbackIcon() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.cloud_done_rounded, color: Colors.blue),
     );
   }
 }
