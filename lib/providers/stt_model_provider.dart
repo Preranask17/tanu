@@ -90,6 +90,8 @@ class SttModelNotifier extends Notifier<SttModelState> {
         state = const SttModelState(
           phase: SttModelPhase.missing,
         ).copyWith(modelName: kMoonshineDirName);
+        // Automatically start the download so the user doesn't have to manually fetch it
+        unawaited(download());
       }
     } catch (e) {
       state = SttModelState(
@@ -97,6 +99,8 @@ class SttModelNotifier extends Notifier<SttModelState> {
         modelName: kMoonshineDirName,
         error: '$e',
       );
+      // Auto-start download if there was an initialization error but we want to retry fetching
+      unawaited(download());
     }
   }
 
