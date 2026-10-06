@@ -16,6 +16,7 @@ class VoicePill extends StatefulWidget {
     required this.onResume,
     required this.onStop,
     required this.onCancel,
+    required this.onOpenChat,
   });
 
   final VoicePillState state;
@@ -26,6 +27,7 @@ class VoicePill extends StatefulWidget {
   final VoidCallback onResume;
   final VoidCallback onStop;
   final VoidCallback onCancel;
+  final VoidCallback onOpenChat;
 
   @override
   State<VoicePill> createState() => _VoicePillState();
@@ -189,6 +191,7 @@ class _VoicePillState extends State<VoicePill>
                 onPause: widget.onPause,
                 onResume: widget.onResume,
                 onStop: widget.onStop,
+                onOpenChat: widget.onOpenChat,
               )
             : _IdleControl(dark: dark, primary: primary),
       ),
@@ -248,6 +251,7 @@ class _ActiveControl extends StatelessWidget {
     required this.onPause,
     required this.onResume,
     required this.onStop,
+    required this.onOpenChat,
   });
 
   final VoicePillState state;
@@ -259,6 +263,7 @@ class _ActiveControl extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onStop;
+  final VoidCallback onOpenChat;
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +294,12 @@ class _ActiveControl extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        IconButton(
+          tooltip: 'Open chat',
+          onPressed: onOpenChat,
+          icon: Icon(Icons.chevron_right_rounded, color: primary),
+        ),
+        const SizedBox(width: 4),
       ],
     );
   }

@@ -68,6 +68,9 @@ class HomeChatBar extends ConsumerWidget {
       onCancel: () {
         ref.read(conversationProvider.notifier).stopListening('cancel');
       },
+      onOpenChat: () {
+        _openChat(context);
+      },
     );
   }
 }
