@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -126,21 +127,42 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                 bottom: false,
                 child: Padding(
                   padding: EdgeInsets.only(bottom: bottomPadding),
-                  child: TanuPageRail(
-                    bottom: 0,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(child: _ConnectionCard(status: status)),
-                        const SizedBox(height: 16),
-                        _CaptureHero(
-                          micLevel: conversation.micLevel,
-                          isConnected: status.isConnected,
+                  child: Builder(
+                    builder: (context) {
+                      final screenHeight = MediaQuery.sizeOf(context).height;
+                      final topPadding = MediaQuery.paddingOf(context).top;
+                      final appBarHeight = 140.0;
+                      
+                      // Calculate exactly how much space is left for the body content
+                      final availableHeight = math.max(
+                        400.0,
+                        screenHeight - topPadding - appBarHeight - bottomPadding,
+                      );
+                      
+                      return ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: availableHeight,
+                          maxHeight: availableHeight,
                         ),
-                        const SizedBox(height: 14),
-                        const HomeChatBar(),
-                      ],
-                    ),
+                        child: TanuPageRail(
+                          top: 8,
+                          bottom: 0,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _ConnectionCard(status: status),
+                              const Spacer(flex: 1),
+                              _CaptureHero(
+                                micLevel: conversation.micLevel,
+                                isConnected: status.isConnected,
+                              ),
+                              const Spacer(flex: 1),
+                              const HomeChatBar(),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -231,17 +253,20 @@ class _CaptureHero extends StatelessWidget {
               ? 'Listening for your thoughts'
               : 'Connect your pendant to begin',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 17),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
           isConnected
               ? 'Tap the control below when you are ready'
               : 'Your conversations stay on this device',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 28),
         Center(
           child: AuraOrb(micLevel: micLevel, isConnected: isConnected),
         ),
