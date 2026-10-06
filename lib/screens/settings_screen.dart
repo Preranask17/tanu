@@ -76,6 +76,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   // Ã¢â€â‚¬Ã¢â€â‚¬ Memory & Privacy Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
                   const _SectionHeader(
+                    title: 'Cloud Backup',
+                    subtitle: 'Securely sync to your Google Drive',
+                  ),
+                  const SizedBox(height: 16),
+                  const _CloudSyncCard(),
+
+                  const SizedBox(height: 36),
+
+                  const _SectionHeader(
                     title: 'Memory',
                     subtitle: 'All your data stays on this device',
                   ),
@@ -804,6 +813,176 @@ class _ConsoleMetric extends StatelessWidget {
           fontSize: 12,
           height: 1.35,
         ),
+      ),
+    );
+  }
+}
+
+class _CloudSyncCard extends StatefulWidget {
+  const _CloudSyncCard();
+
+  @override
+  State<_CloudSyncCard> createState() => _CloudSyncCardState();
+}
+
+class _CloudSyncCardState extends State<_CloudSyncCard> {
+  bool _isSignedIn = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _isSignedIn
+              ? Colors.blue.withValues(alpha: 0.35)
+              : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5)),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _isSignedIn
+                ? Colors.blue.withValues(alpha: isDark ? 0.1 : 0.05)
+                : Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.cloud_done_rounded, color: Colors.blue),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Google Drive Sync',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _isSignedIn ? 'Syncing to connected account' : 'Not connected',
+                      style: TextStyle(
+                        color: _isSignedIn
+                            ? Colors.blue
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 14,
+                        fontWeight: _isSignedIn ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Keep your memories safe. Automatically upload transcripts directly to a private folder in your Google Drive.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (!_isSignedIn)
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: () {
+                  setState(() => _isSignedIn = true);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: isDark ? Colors.white : Colors.black,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Sign in with Google',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Connected and syncing',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _isSignedIn = false);
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Disconnect', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

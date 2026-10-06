@@ -67,7 +67,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   FadeTransition(
                     opacity: _fadeTitle,
                     child: Text(
-                      'Your memories, distilled.',
+                      'Your memories, secured.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.displayLarge?.copyWith(
                             fontSize: 42,
@@ -79,10 +79,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   FadeTransition(
                     opacity: _fadeSubtitle,
                     child: Text(
-                      'Never lose what was said.',
+                      'To securely save your transcripts and sync your memories, we need permission to access your Google Drive and Calendar.\n\nAbsolute privacy: no data is ever sent to our servers. It stays exclusively in your personal accounts.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         height: 1.5,
                         color: const Color(0xFF888888),
                       ),
@@ -92,28 +92,52 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   FadeTransition(
                     opacity: _fadeButton,
                     child: SizedBox(
-                      width: 200,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
                           backgroundColor: isDark ? Colors.white : Colors.black,
                           foregroundColor: isDark ? Colors.black : Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         onPressed: () {
+                          // TODO: Actually perform Google Sign-In here
                           ref
                               .read(settingsProvider.notifier)
                               .completeOnboarding();
                         },
-                        child: const Text(
-                          'Begin',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Text(
+                                'G',
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Sign in with Google',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
