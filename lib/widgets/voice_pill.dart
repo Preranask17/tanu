@@ -214,17 +214,22 @@ class _IdleControl extends StatelessWidget {
             color: primary.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.mic_rounded, color: primary, size: 21),
+          child: Icon(Icons.chat_bubble_outline_rounded, color: primary, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Ready to capture',
+            'Open chat',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.w600,
               color: dark ? Colors.white : Colors.black,
             ),
           ),
+        ),
+        Icon(
+          Icons.chevron_right_rounded,
+          size: 20,
+          color: dark ? Colors.white54 : Colors.black45,
         ),
         const SizedBox(width: 16),
       ],
