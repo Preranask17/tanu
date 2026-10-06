@@ -150,7 +150,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _ConnectionCard(status: status),
+                              Center(child: _ConnectionCard(status: status)),
                               const Spacer(flex: 1),
                               _CaptureHero(
                                 micLevel: conversation.micLevel,
