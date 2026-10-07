@@ -54,8 +54,8 @@ class AnalyticsService {
     'screen',
     // 'pendant connected' / 'pendant disconnected' / 'session started'
     'codec', 'battery_pct', 'simulated',
-    // 'session started' — the engine's own label, e.g. 'Moonshine', never a
-    // path or a file name.
+    // 'session started' — the engine's own label, e.g. 'Whisper Small ·
+    // 375 MB', never a path or a file name.
     'stt_model',
     // 'session ended'
     'close_reason', 'segment_count', 'duration_s',

@@ -10,7 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../constants.dart';
 
-/// Byte-level progress of the Moonshine bundle download.
+/// Byte-level progress of the Whisper Small bundle download.
 class ModelDownloadProgress {
   ModelDownloadProgress({required this.received, required this.total});
 
@@ -20,11 +20,11 @@ class ModelDownloadProgress {
   double? get fraction => total > 0 ? received / total : null;
 }
 
-/// Single owner of the on-device Moonshine bundle download.
+/// Single owner of the on-device Whisper Small bundle download.
 ///
 /// Single-flight: concurrent callers await the same in-flight download.
 /// Downloads the `.tar.bz2` with range-resume, verifies the BZip2 CRC while
-/// extracting into `appSupport/<kMoonshineDirName>/`, then fetches the
+/// extracting into `appSupport/<kWhisperSmallDirName>/`, then fetches the
 /// shared-needs Silero VAD model into the same directory.
 final class ModelDownloadCoordinator {
   ModelDownloadCoordinator._();
@@ -51,20 +51,20 @@ final class ModelDownloadCoordinator {
 
   static bool get active => _singleton._tasks.isNotEmpty;
 
-  /// Ensures the Moonshine bundle is on disk, downloading it if needed.
+  /// Ensures the Whisper Small bundle is on disk, downloading it if needed.
   /// Single-flight: a concurrent caller awaits the same in-flight download.
-  /// Returns the verified `tokens.txt` inside the model directory,
+  /// Returns the verified `small-tokens.txt` inside the model directory,
   /// or `null` if the bundle could not be obtained.
   static Future<File?> ensure({void Function(String)? onEvent}) {
-    final task = _singleton._tasks[kMoonshineBundleFileName];
+    final task = _singleton._tasks[kWhisperSmallTarFileName];
     if (task != null) {
       onEvent?.call('downloading models… (already running)');
       return task.done;
     }
     final started = _ActiveTask(onEvent);
-    _singleton._tasks[kMoonshineBundleFileName] = started;
+    _singleton._tasks[kWhisperSmallTarFileName] = started;
     started.done.whenComplete(() {
-      _singleton._tasks.remove(kMoonshineBundleFileName);
+      _singleton._tasks.remove(kWhisperSmallTarFileName);
       _completions.add(started.ok);
     });
     started.done.ignore();
@@ -117,11 +117,11 @@ final class _ActiveTask {
   }
 
   /// The model directory sherpa_onnx reads from:
-  /// `appSupport/<kMoonshineDirName>`.
+  /// `appSupport/<kWhisperSmallDirName>`.
   Future<String?> _modelDir() async {
     try {
       final support = await getApplicationSupportDirectory();
-      return '${support.path}/$kMoonshineDirName';
+      return '${support.path}/$kWhisperSmallDirName';
     } catch (e) {
       debugPrint('[tanu] model dir unavailable: $e');
       return null;
@@ -131,7 +131,7 @@ final class _ActiveTask {
   Future<File?> _find() async {
     final dir = await _modelDir();
     if (dir == null) return null;
-    if (_verified(dir)) return File('$dir/tokens.txt');
+    if (_verified(dir)) return File('$dir/small-tokens.txt');
     // A half-written extraction can't be trusted: drop it so the fresh
     // download lands in a clean directory.
     try {
@@ -149,7 +149,7 @@ final class _ActiveTask {
   /// file lands). Existence + non-empty is the stable contract the
   /// recognizer needs (all files must be loadable).
   bool _verified(String dir) {
-    for (final f in kMoonshineBundleFiles) {
+    for (final f in kWhisperSmallBundleFiles) {
       final file = File('$dir/${f.name}');
       if (!file.existsSync() || file.lengthSync() == 0) return false;
     }
@@ -162,8 +162,8 @@ final class _ActiveTask {
     final dir = await _modelDir();
     if (dir == null) return null;
     final support = Directory(dir).parent;
-    final archiveFile = File('${support.path}/$kMoonshineBundleFileName');
-    final part = File('${support.path}/$kMoonshineBundleFileName.part');
+    final archiveFile = File('${support.path}/$kWhisperSmallTarFileName');
+    final part = File('${support.path}/$kWhisperSmallTarFileName.part');
     await support.create(recursive: true);
 
     if (!archiveFile.existsSync()) {
@@ -195,7 +195,7 @@ final class _ActiveTask {
       throw const FormatException('downloaded bundle failed verification');
     }
     await _retireRetiredBundles(support);
-    return File('$dir/tokens.txt');
+    return File('$dir/small-tokens.txt');
   }
 
   Future<void> _ensureVad(String dir) async {
@@ -223,7 +223,7 @@ final class _ActiveTask {
     final client = http.Client();
     try {
       final start = part.existsSync() ? part.lengthSync() : 0;
-      final request = http.Request('GET', Uri.parse(kMoonshineBundleUrl));
+      final request = http.Request('GET', Uri.parse(kWhisperSmallTarUrl));
       if (start > 0) {
         request.headers[HttpHeaders.rangeHeader] = 'bytes=$start-';
       }
@@ -286,7 +286,7 @@ final class _ActiveTask {
     final out = Directory(dir);
     if (out.existsSync()) await out.delete(recursive: true);
     await out.create(recursive: true);
-    final expected = kMoonshineBundleFiles.map((f) => f.name).toSet();
+    final expected = kWhisperSmallBundleFiles.map((f) => f.name).toSet();
     for (final f in archive.files) {
       final name = f.name.split('/').last;
       if (name.isEmpty || !expected.contains(name)) continue;

@@ -14,35 +14,32 @@ const String kPendantName = 'Omi';
 
 
 
-/// ---- Moonshine v2 base-en on-device bundle (NeMo-style offline) --------
-/// English-only speech recognition, ~106 MB download. `sherpa_onnx` ships
-/// the runtime; this is just weights + tokens. Extracts into
-/// `appSupport/<kMoonshineDirName>/`. English-only is deliberate: the
-/// multilingual experiment decoded English audio as Hindi, so one accurate
-/// English model beats a confused multilingual one.
-const String kMoonshineBundleUrl =
-    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2';
-const String kMoonshineBundleFileName =
-    'sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2';
-const String kMoonshineDirName =
-    'sherpa-onnx-moonshine-base-en-quantized-2026-02-27';
+/// ---- Whisper Small (multilingual) on-device bundle ---------------------
+/// Multilingual speech recognition (English + Kannada/Tamil/Telugu/Malayalam
+/// and 90+ more), ~375 MB download. `sherpa_onnx` ships the runtime; this is
+/// just int8 weights + tokens. Extracts into
+/// `appSupport/<kWhisperSmallDirName>/`.
+const String kWhisperSmallTarUrl =
+    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2';
+const String kWhisperSmallTarFileName = 'sherpa-onnx-whisper-small.tar.bz2';
+const String kWhisperSmallDirName = 'sherpa-onnx-whisper-small';
 
 
 const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
 const String kSileroVadFileName = 'silero_vad.onnx';
 
-/// Files the Moonshine recognizer loads from the model directory.
+/// Files the Whisper Small recognizer loads from the model directory.
 /// `silero_vad.onnx` is fetched separately via [kSileroVadUrl].
-const List<({String name, int bytes})> kMoonshineBundleFiles = [
-  (name: 'encoder_model.ort', bytes: 0),
-  (name: 'decoder_model_merged.ort', bytes: 0),
-  (name: 'tokens.txt', bytes: 0),
+const List<({String name, int bytes})> kWhisperSmallBundleFiles = [
+  (name: 'small-encoder.int8.onnx', bytes: 0),
+  (name: 'small-decoder.int8.onnx', bytes: 0),
+  (name: 'small-tokens.txt', bytes: 0),
 ];
 
 
 /// Human label shown in Settings and the Home warm-up chip.
-const String kOfflineModelLabel = 'Offline AI Model · 106 MB';
+const String kOfflineModelLabel = 'Whisper Small · 375 MB';
 
 /// Names of on-disk bundles that are no longer the on-device model.
 /// Any of these found in app support are deleted on upgrade, along with
@@ -52,6 +49,8 @@ const List<String> kRetiredModelBundles = [
   'ggml-base.en.bin',
   'ggml-tiny.en.bin',
   'moonshine-tiny-en.tar.bz2',
+  'sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2',
+  'sherpa-onnx-moonshine-base-en-quantized-2026-02-27',
   'sherpa-onnx-whisper-base.tar.bz2',
   'sherpa-onnx-whisper-base',
   'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2',

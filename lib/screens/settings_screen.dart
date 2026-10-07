@@ -559,7 +559,7 @@ class _SttModelDashboard extends ConsumerWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.download),
-                label: const Text('Download Offline Model (~106MB)'),
+                label: const Text('Download Offline Model (~375MB)'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
