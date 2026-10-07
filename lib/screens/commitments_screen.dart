@@ -82,12 +82,12 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
             color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isDark ? const Color(0xFF2A2A2C).withOpacity(0.5) : const Color(0xFFE9ECEF).withOpacity(0.8),
+              color: isDark ? const Color(0xFF2A2A2C).withValues(alpha: 0.5) : const Color(0xFFE9ECEF).withValues(alpha: 0.8),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.03),
+                color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -151,7 +151,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                           height: 200,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Theme.of(context).primaryColor.withOpacity(0.15),
+                            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
                           ),
                         ),
                       ),
@@ -163,7 +163,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                           height: 250,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.redAccent.withOpacity(0.08),
+                            color: Colors.redAccent.withValues(alpha: 0.08),
                           ),
                         ),
                       ),
@@ -328,7 +328,7 @@ class _CommitmentTile extends ConsumerWidget {
                   shape: BoxShape.circle,
                   color: isDone 
                       ? Theme.of(context).primaryColor 
-                      : (highlight ? Colors.red.withOpacity(0.1) : Colors.transparent),
+                      : (highlight ? Colors.red.withValues(alpha: 0.1) : Colors.transparent),
                   border: Border.all(
                     color: isDone 
                         ? Theme.of(context).primaryColor 
@@ -363,7 +363,7 @@ class _CommitmentTile extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: highlight 
-                            ? Colors.red.withOpacity(0.1) 
+                            ? Colors.red.withValues(alpha: 0.1) 
                             : (isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF)),
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -411,13 +411,13 @@ class _EmptyState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.08),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.task_alt_rounded,
               size: 64,
-              color: Theme.of(context).primaryColor.withOpacity(0.8),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(height: 32),
@@ -461,6 +461,7 @@ class _ManualAddBar extends StatelessWidget {
   final VoidCallback onPickDue;
   final VoidCallback onSubmit;
 
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -475,7 +476,7 @@ class _ManualAddBar extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.4 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -548,7 +549,7 @@ class _ManualAddBar extends StatelessWidget {
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: due != null 
-                      ? Theme.of(context).primaryColor.withOpacity(0.1)
+                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
                       : (isDark ? const Color(0xFF222222) : Colors.white),
                   foregroundColor: due != null 
                       ? Theme.of(context).primaryColor

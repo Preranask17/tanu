@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -164,7 +163,9 @@ class ZipformerSttEngine implements ContinuousSttEngine {
   double _level(Float32List samples) {
     if (samples.isEmpty) return 0;
     var sum = 0.0;
-    for (final v in samples) sum += v * v;
+    for (final v in samples) {
+      sum += v * v;
+    }
     return math.min(1.0, math.sqrt(sum / samples.length) * 3);
   }
 
@@ -213,33 +214,33 @@ Future<void> _zipformerWorker(List<dynamic> args) async {
       final cmd = msg[0] as String;
       if (cmd == 'shutdown') {
         stream?.free();
-        recognizer?.free();
+        recognizer.free();
         break;
       } else if (cmd == 'reset') {
         if (lastText.isNotEmpty) {
           replyPort.send(['final', lastText]);
         }
         stream?.free();
-        stream = recognizer?.createStream();
+        stream = recognizer.createStream();
         lastText = '';
       } else if (cmd == 'audio') {
         final samples = msg[1] as Float32List;
         if (stream != null) {
           stream.acceptWaveform(samples: samples, sampleRate: 16000);
           
-          while (recognizer?.isReady(stream) == true) {
-            recognizer?.decode(stream);
+          while (recognizer.isReady(stream) == true) {
+            recognizer.decode(stream);
           }
 
-          final result = recognizer?.getResult(stream);
-          final text = result?.text.trim() ?? '';
+          final result = recognizer.getResult(stream);
+          final text = result.text.trim();
           if (text.isEmpty && samples.isNotEmpty) { replyPort.send(['partial', '?dbg: got  samples, text empty, ready: ']); }
           
-          if (recognizer?.isEndpoint(stream) == true) {
+          if (recognizer.isEndpoint(stream) == true) {
             if (text.isNotEmpty) {
               replyPort.send(['final', text]);
             }
-            recognizer?.reset(stream);
+            recognizer.reset(stream);
             lastText = '';
           } else {
             if (text.isNotEmpty && text != lastText) {
