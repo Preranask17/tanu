@@ -422,14 +422,18 @@ class ConversationNotifier extends Notifier<ConversationState> {
     try {
       final ok = await ref.read(sttEngineProvider).isAvailable();
       if (!ok) {
-        state = state.copyWith(error: 'Speech recognition not available.');
+        state = state.copyWith(
+          error: 'Speech recognition not available.',
+          isListening: false,
+          sttEvent: '',
+        );
         return;
       }
       state = state.copyWith(
         isListening: true,
         liveTranscript: '',
         micLevel: 0,
-        sttEvent: 'listeningÃ¢â‚¬Â¦',
+        sttEvent: 'listening…',
         clearError: true,
       );
       var peak = 0.0;
@@ -484,7 +488,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
           liveTranscript: '',
           isListening: false,
           sttEvent:
-              'no words recognized Ã‚Â· mic peak ${(peak * 100).round()}%',
+              'no words recognized · mic peak ${(peak * 100).round()}%',
           micLevel: 0,
         );
       }

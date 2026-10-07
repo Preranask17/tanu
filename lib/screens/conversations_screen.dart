@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transcript.dart';
+import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../abstractions/audio_source.dart';
 import '../widgets/conversation_tile.dart';
+import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
 import '../widgets/page_header.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
@@ -36,6 +40,15 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     }
   }
 
+  void _openDevicePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DevicePickerSheet(),
+    );
+  }
+
   String _dayLabel(DateTime time) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -65,6 +78,8 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   @override
   Widget build(BuildContext context) {
     final sessions = ref.watch(conversationProvider).conversations;
+    final status =
+        ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 16;
     final query = _query.text.trim().toLowerCase();
 
@@ -101,11 +116,18 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            // Consistent page header (logo top-left, heading below) plus
-            // an always-visible glass search. UI only: filters the
-            // already-loaded sessions locally, no backend changes.
-            const SliverToBoxAdapter(
-              child: PageHeader(title: 'Memories'),
+            // Consistent page header (logo top-left, status top-right,
+            // heading below) plus an always-visible glass search. UI only.
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Memories',
+                actions: [
+                  DeviceStatusActions(
+                    status: status,
+                    onBluetoothTap: _openDevicePicker,
+                  ),
+                ],
+              ),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -148,7 +170,16 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                   .withValues(alpha: 0.4),
                               fontSize: 15,
                             ),
+                            // Fully transparent input: no border, no fill, no
+                            // underline — the pill container is the only
+                            // visible surface.
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            filled: false,
                             contentPadding: EdgeInsets.zero,
                             isDense: true,
                           ),

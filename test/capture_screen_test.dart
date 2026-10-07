@@ -49,10 +49,10 @@ void main() {
     expect(find.text('Ready'), findsOneWidget);
     expect(find.text('Capturing...'), findsNothing);
 
-    // 4. Empty memories placeholder (no Scan card anymore).
+    // 4. Memories section is gone: no empty-state text, no cards.
     expect(
       find.text('No memories recorded yet. TANU is listening...'),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.text('Scan'), findsNothing);
     expect(find.text('No pendant yet'), findsNothing);

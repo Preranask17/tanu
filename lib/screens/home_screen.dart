@@ -8,13 +8,11 @@ import '../abstractions/audio_source.dart';
 import '../models/conversation.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
-import '../providers/navigation_provider.dart';
-import '../screens/chat_screen.dart';
 import '../providers/stt_model_provider.dart';
+import '../screens/chat_screen.dart';
 import '../widgets/ai_presence_orb.dart';
-import '../widgets/conversation_tile.dart';
 import '../widgets/device_picker_sheet.dart';
-import '../widgets/home_chat_bar.dart';
+import '../widgets/device_status_controls.dart';
 import '../widgets/page_header.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -108,223 +106,60 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
 
-    // Calculate padding for the persistent bottom chat bar
+    // Bottom cushion clears the floating nav dock (no chat bar anymore).
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
-    // On mobile, bottom dock is safeAreaBottom + 16 (bottom offset) + 64 (height) = safeAreaBottom + 80.
-    // We want 16px padding above the dock, so we need 96.
     final bottomPadding =
         MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
-    final bottomInset = bottomPadding + 62 + 16; // space for chat bar
-
-    final recent = conversation.conversations.length > 3
-        ? conversation.conversations
-              .sublist(conversation.conversations.length - 3)
-              .reversed
-              .toList()
-        : conversation.conversations.reversed.toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            onRefresh: () async =>
-                ref.read(conversationProvider.notifier).reloadFromStorage(),
-            child: CustomScrollView(
-              controller: _scroll,
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
+      body: RefreshIndicator(
+        onRefresh: () async =>
+            ref.read(conversationProvider.notifier).reloadFromStorage(),
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            // Consistent page header: logo top-left, status top-right,
+            // heading below. UI only: reads existing status, opens the
+            // existing picker.
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Capture',
+                actions: [
+                  DeviceStatusActions(
+                    status: status,
+                    onBluetoothTap: _openDevicePicker,
+                  ),
+                ],
               ),
-              slivers: [
-                // Consistent page header: logo top-left, status top-right,
-                // heading below. UI only: reads existing status, opens the
-                // existing picker.
-                SliverToBoxAdapter(
-                  child: PageHeader(
-                    title: 'Capture',
-                    actions: [
-                      if (status.isConnected &&
-                          status.batteryPercent != null)
-                        _BatteryPill(
-                          percent: status.batteryPercent!,
-                        ),
-                      _PendantButton(
-                        status: status,
-                        onTap: _openDevicePicker,
-                      ),
-                    ],
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 8, bottom: bottomInset),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Calm AI presence. Pure visual: only reads the
-                        // already-watched mic level / listening flag.
-                        AiPresenceOrb(
-                          level: conversation.micLevel,
-                          listening: conversation.isListening,
-                        ),
-                        // Live transcription: always visible (placeholder when
-                        // idle), capped height with internal scrolling.
-                        _LiveCaptureCard(
-                          status: status,
-                          conversation: conversation,
-                        ),
-                        if (conversation.active == null &&
-                            conversation.conversations.isEmpty)
-                          _EmptyState(connected: status.isConnected)
-                        else ...[
-                          const SizedBox(height: 32),
-                          _SectionHeader(
-                            title: 'Recent Memories',
-                            pillLabel: 'View All',
-                            interactive: true,
-                            onPillTap: () => ref
-                                .read(navigationTabProvider.notifier)
-                                .goToConversations(),
-                          ),
-                          const SizedBox(height: 8),
-                          for (final (i, session) in recent.indexed)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 4,
-                              ),
-                              child: ConversationTile(
-                                session: session,
-                                isNew: i == 0,
-                              ),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
             ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: bottomPadding,
-            child: const Center(child: HomeChatBar()),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Compact top-left pendant status button. Presentation only: reads the
-/// existing [PendantStatus] and opens the existing device picker sheet.
-/// All BLE/scan logic lives elsewhere and is untouched.
-class _PendantButton extends StatelessWidget {
-  const _PendantButton({
-    required this.status,
-    required this.onTap,
-  });
-
-  final PendantStatus status;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final connected = status.isConnected;
-    final reconnecting = status.state == PendantState.reconnecting;
-
-    final IconData icon;
-    final Color iconColor;
-    if (connected) {
-      icon = Icons.bluetooth_connected;
-      iconColor = const Color(0xFF4CAF50);
-    } else if (reconnecting) {
-      icon = Icons.sync;
-      iconColor = Colors.orange;
-    } else {
-      icon = Icons.bluetooth;
-      iconColor = const Color(0xFF888888);
-    }
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-          border: Border.all(
-            color: connected
-                ? (isDark
-                      ? const Color(0xFF2A2A2A)
-                      : const Color(0xFFE5E5E5))
-                : Colors.red.withValues(alpha: 0.45),
-            width: 1,
-          ),
-          boxShadow: [
-            if (!connected)
-              BoxShadow(
-                color: Colors.red.withValues(alpha: 0.30),
-                blurRadius: 14,
-                spreadRadius: 1,
-              )
-            else
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Calm AI presence. Pure visual: only reads the
+                    // already-watched mic level / listening flag.
+                    AiPresenceOrb(
+                      level: conversation.micLevel,
+                      listening: conversation.isListening,
+                    ),
+                    // Live transcription: always visible (placeholder when
+                    // idle), capped height with internal scrolling.
+                    _LiveCaptureCard(
+                      status: status,
+                      conversation: conversation,
+                    ),
+                  ],
+                ),
               ),
+            ),
           ],
         ),
-        child: Icon(icon, size: 20, color: iconColor),
-      ),
-    );
-  }
-}
-
-/// Compact top-right battery pill. Display only: the value comes straight
-/// from the existing pendant status, no battery logic here.
-class _BatteryPill extends StatelessWidget {
-  const _BatteryPill({required this.percent});
-
-  final int percent;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.battery_std, size: 18, color: Color(0xFF888888)),
-          const SizedBox(width: 6),
-          Text(
-            '$percent%',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF888888),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -624,89 +459,6 @@ class _EqualizerState extends State<_Equalizer>
           ],
         );
       },
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.pillLabel,
-    this.interactive = false,
-    this.onPillTap,
-  });
-
-  final String title;
-  final String pillLabel;
-  final bool interactive;
-  final VoidCallback? onPillTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: interactive ? onPillTap : null,
-            child: Text(
-              pillLabel,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.connected});
-
-  final bool connected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'No memories recorded yet. TANU is listening...',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF888888),
-                height: 1.5,
-                fontSize: 15,
-              ),
-            ),
-            if (!connected) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Connect your pendant to capture moments.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF888888),
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

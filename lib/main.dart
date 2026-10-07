@@ -13,7 +13,39 @@ Future<void> main() async {
   if (!kIsWeb) {
     FlutterForegroundTask.initCommunicationPort();
   }
-  await StorageService.initialize();
+  try {
+    await StorageService.initialize();
+  } catch (e) {
+    debugPrint('[tanu] storage init failed: $e');
+    runApp(const _StartupErrorApp());
+    return;
+  }
 
   runApp(const ProviderScope(child: TanuApp()));
+}
+
+/// Minimal fallback when local storage cannot start: a plain message
+/// instead of a red screen. No backend involved.
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Text(
+              'Tanu could not start its local storage.\nPlease restart the app.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF888888), fontSize: 16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import 'package:tanu_app/abstractions/audio_source.dart';
 import 'package:tanu_app/abstractions/stt_engine.dart';
@@ -19,6 +21,13 @@ void main() {
   setUpAll(() async {
     final dir = Directory.systemTemp.createTempSync('tanu_test');
     await StorageService.initialize(overridePath: dir.path);
+    // Seed onboarding as completed so the smoke test lands on the main
+    // tab scaffold (fresh installs show WelcomeFlow instead).
+    await Hive.box(Boxes.settings).put('settings', {
+      'deviceName': 'Omi',
+      'themeMode': 'system',
+      'hasCompletedOnboarding': true,
+    });
   });
 
   tearDownAll(() async {
@@ -44,9 +53,12 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Not connected'), findsWidgets);
-    expect(find.text('Conversations'), findsWidgets);
+    // Main tab scaffold: Capture / Memories / Settings tabs with the
+    // pendant status visible. Matches the current UI copy.
+    expect(find.text('Capture'), findsWidgets);
+    expect(find.text('Memories'), findsWidgets);
     expect(find.text('Settings'), findsWidgets);
+    expect(find.byIcon(Icons.bluetooth_connected), findsWidgets);
   });
 }
 
@@ -148,7 +160,10 @@ class FakeAudioSource implements AudioSource {
   ValueNotifier<PendantStats> get stats => _stats;
 
   @override
-  Stream<PendantStatus> get statusStream => _statusStream.stream;
+  Stream<PendantStatus> get statusStream async* {
+    yield _status.value;
+    yield* _statusStream.stream;
+  }
 
   @override
   Stream<Uint8List> get utterances => _utterances.stream;

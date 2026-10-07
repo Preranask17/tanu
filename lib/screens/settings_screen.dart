@@ -11,6 +11,7 @@ import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
 import '../widgets/page_header.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -23,6 +24,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _developerOpen = false;
 
+  void _openDevicePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DevicePickerSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final status =
@@ -30,16 +40,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final capture = ref.watch(devCaptureProvider);
     final stats = ref.watch(pendantStatsProvider);
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          // Consistent page header (logo top-left, heading below).
-          // Sections below are untouched and fully functional.
-          const SliverToBoxAdapter(
-            child: PageHeader(title: 'Settings'),
+          // Consistent page header (logo top-left, status top-right,
+          // heading below). Sections below are untouched and functional.
+          SliverToBoxAdapter(
+            child: PageHeader(
+              title: 'Settings',
+              actions: [
+                DeviceStatusActions(
+                  status: status,
+                  onBluetoothTap: _openDevicePicker,
+                ),
+              ],
+            ),
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -176,13 +192,13 @@ class _PendantDashboard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  isConnected ? 'Tanu is\nConnected' : 'Tanu is\nOffline',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    height: 1.1,
-                    fontSize: 32,
+                  child: Text(
+                    isConnected ? 'Tanu is\nConnected' : 'Tanu is\nOffline',
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      height: 1.1,
+                      fontSize: 32,
+                    ),
                   ),
-                ),
               ),
               if (isConnected && status.batteryPercent != null)
                 Container(

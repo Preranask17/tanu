@@ -115,8 +115,6 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
         MediaQuery.paddingOf(context).bottom +
         50 +
         100; // Keyboard avoiding + Nav bar + bottom bar padding
-        
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
