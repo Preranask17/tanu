@@ -194,6 +194,19 @@ class SttModelNotifier extends Notifier<SttModelState> {
         await bundle.delete();
         deleted = true;
       }
+      // Resumable partial downloads live outside the model dir.
+      for (final f in kWhisperSmallBundleFiles) {
+        final part = File('$root/${f.name}.part');
+        if (await part.exists()) {
+          await part.delete();
+          deleted = true;
+        }
+      }
+      final vadPart = File('$root/$kSileroVadFileName.part');
+      if (await vadPart.exists()) {
+        await vadPart.delete();
+        deleted = true;
+      }
       for (final name in kRetiredModelBundles) {
         final path = '$root/$name';
         if (await File(path).exists()) await File(path).delete();
@@ -255,11 +268,16 @@ class SttModelNotifier extends Notifier<SttModelState> {
     }
   }
 
+  /// True when every bundle member is on disk at its expected size — the
+  /// same contract the coordinator uses, so a truncated leftover never
+  /// shows as "ready" while a re-download runs.
   bool _bundleExists(String dir) {
     final ok = kWhisperSmallBundleFiles.every(
       (f) =>
           File('$dir/${f.name}').existsSync() &&
-          File('$dir/${f.name}').lengthSync() > 0,
+          (f.bytes > 0
+              ? File('$dir/${f.name}').lengthSync() >= f.bytes
+              : File('$dir/${f.name}').lengthSync() > 0),
     );
     if (!ok) return false;
     final vad = File('$dir/$kSileroVadFileName');
