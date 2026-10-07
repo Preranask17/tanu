@@ -12,8 +12,10 @@ import '../models/conversation.dart';
 import '../models/transcript.dart';
 import '../services/storage_service.dart';
 import '../services/simulator_pendant_source.dart';
+import 'agent_provider.dart';
 import 'analytics_provider.dart';
 import 'ble_provider.dart';
+import 'commitment_provider.dart';
 
 import '../services/stt/whisper_small_engine.dart';
 
@@ -480,18 +482,14 @@ class ConversationNotifier extends Notifier<ConversationState> {
     try {
       final ok = await ref.read(sttEngineProvider).isAvailable();
       if (!ok) {
-        state = state.copyWith(
-          error: 'Speech recognition not available.',
-          isListening: false,
-          sttEvent: '',
-        );
+        state = state.copyWith(error: 'Speech recognition not available.');
         return;
       }
       state = state.copyWith(
         isListening: true,
         liveTranscript: '',
         micLevel: 0,
-        sttEvent: 'listening…',
+        sttEvent: 'listeningÃ¢â‚¬Â¦',
         clearError: true,
       );
       var peak = 0.0;
@@ -546,7 +544,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
           liveTranscript: '',
           isListening: false,
           sttEvent:
-              'no words recognized · mic peak ${(peak * 100).round()}%',
+              'no words recognized Ã‚Â· mic peak ${(peak * 100).round()}%',
           micLevel: 0,
         );
       }
@@ -573,9 +571,47 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
-    // AI processing temporarily disabled. The implementation below is kept
-    // out of the build (see git history) so the analyzer stays clean.
-    return;
+    final processor = ref.read(memoryProcessorProvider);
+    final result = await processor.process(text);
+
+    // Update the session in state with the new AI summary and title
+    final idx = state.conversations.indexWhere((c) => c.id == session.id);
+    if (idx != -1) {
+      final conversations = List<ConversationSession>.of(state.conversations);
+      conversations[idx] = conversations[idx].copyWith(
+        title: result.title,
+        summary: result.summary,
+        cleanedTranscript: result.cleanedTranscript.isEmpty
+            ? null
+            : result.cleanedTranscript,
+      );
+      state = state.copyWith(conversations: conversations);
+      _persist();
+    }
+
+    // Push any extracted commitments to the commitments provider
+    if (result.commitments.isNotEmpty) {
+      final cNotifier = ref.read(commitmentsProvider.notifier);
+      for (final c in result.commitments) {
+        if (c.isCommitment && c.action != null && c.action!.isNotEmpty) {
+          cNotifier.addManual(
+            action: c.action!,
+            person: c.person?.trim().isEmpty == true ? null : c.person?.trim(),
+            due: c.due != null ? DateTime.tryParse(c.due!) : null,
+          );
+        }
+      }
+    }
+
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'memory processed',
+          properties: {
+            'commitment_count': result.commitments.length,
+            'has_summary': result.summary.isNotEmpty,
+          },
+        );
   }
 
   /// --- Persistence -------------------------------------------------------

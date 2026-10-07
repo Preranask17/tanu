@@ -143,6 +143,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
   final _chatCtrl = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isGenerating = false;
+  bool _showCleaned = true;
   final ScrollController _scrollCtrl = ScrollController();
 
   @override
@@ -163,10 +164,12 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
     });
     _scrollToBottom();
 
-    final engine = ref.read(localEngineProvider);
+    final engine = ref.read(geminiEngineProvider);
     try {
       final reply = await engine.prompt(
-        widget.session.transcriptText,
+        (widget.session.cleanedTranscript?.trim().isNotEmpty ?? false)
+            ? widget.session.cleanedTranscript!
+            : widget.session.transcriptText,
         history: [
           const ChatMessage(
             role: 'system',
@@ -281,7 +284,33 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     ),
                     const SizedBox(height: 24),
                   ],
-                  if (session.segments.isEmpty)
+                  if (session.cleanedTranscript != null &&
+                      session.cleanedTranscript!.trim().isNotEmpty) ...[
+                    Row(
+                      children: [
+                        _TranscriptToggle(
+                          label: 'Cleaned',
+                          selected: _showCleaned,
+                          onTap: () => setState(() => _showCleaned = true),
+                        ),
+                        const SizedBox(width: 8),
+                        _TranscriptToggle(
+                          label: 'Raw',
+                          selected: !_showCleaned,
+                          onTap: () => setState(() => _showCleaned = false),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (_showCleaned &&
+                      session.cleanedTranscript != null &&
+                      session.cleanedTranscript!.trim().isNotEmpty)
+                    Text(
+                      session.cleanedTranscript!,
+                      style: const TextStyle(height: 1.6, fontSize: 15),
+                    )
+                  else if (session.segments.isEmpty)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(32.0),
@@ -405,6 +434,43 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TranscriptToggle extends StatelessWidget {
+  const _TranscriptToggle({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? Theme.of(context).primaryColor
+              : (isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : const Color(0xFF888888),
+          ),
         ),
       ),
     );
