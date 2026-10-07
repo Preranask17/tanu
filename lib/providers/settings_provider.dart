@@ -40,7 +40,7 @@ class AppSettings {
     deviceName: json['deviceName'] as String? ?? kPendantName,
     themeMode:
         ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
-    hasCompletedOnboarding: false, // Hardcoded for testing the new UI
+    hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,
   );
 }
 
