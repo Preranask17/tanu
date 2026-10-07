@@ -14,6 +14,8 @@ import 'package:tanu_app/models/ble_device.dart';
 import 'package:tanu_app/providers/analytics_provider.dart';
 import 'package:tanu_app/providers/ble_provider.dart';
 import 'package:tanu_app/providers/conversation_provider.dart';
+import 'package:tanu_app/providers/settings_provider.dart';
+import 'package:tanu_app/providers/stt_model_provider.dart';
 import 'package:tanu_app/services/analytics/analytics_service.dart';
 import 'package:tanu_app/services/storage_service.dart';
 
@@ -48,6 +50,14 @@ void main() {
           // method channel there and would throw MissingPluginException), but
           // override it anyway so the test never depends on that env guard.
           analyticsProvider.overrideWith((_) => FakeAnalyticsService()),
+          // Fresh temp storage would force onboarding (see SettingsNotifier),
+          // so pin settings to a completed-onboarding state and assert on
+          // the Home screen instead.
+          settingsProvider.overrideWith(TestSettingsNotifier.new),
+          // The real notifier auto-starts a 375 MB model download whose
+          // retry backoff leaves pending timers; a ready stub keeps the
+          // smoke test offline and timer-free.
+          sttModelProvider.overrideWith(FakeSttModelNotifier.new),
         ],
         child: const TanuApp(),
       ),
@@ -55,6 +65,8 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     // Main tab scaffold: Capture / Memories / Settings tabs with the
     // pendant status visible. Matches the current UI copy.
+    // The fake pendant reports connected as "Omi".
+    expect(find.text('Omi'), findsWidgets);
     expect(find.text('Capture'), findsWidgets);
     expect(find.text('Memories'), findsWidgets);
     expect(find.text('Settings'), findsWidgets);
@@ -187,4 +199,21 @@ class FakeAnalyticsService extends AnalyticsService {
 
   @override
   void screen(String name) => capture('screen viewed');
+}
+
+/// Onboarding already done, so the smoke test lands on Home.
+class TestSettingsNotifier extends SettingsNotifier {
+  @override
+  AppSettings build() => const AppSettings();
+}
+
+/// Model already present: no download, no retry timers.
+class FakeSttModelNotifier extends SttModelNotifier {
+  @override
+  SttModelState build() => const SttModelState(
+    phase: SttModelPhase.ready,
+    modelName: 'test-bundle',
+    downloadedBytes: 1,
+    totalBytes: 1,
+  );
 }

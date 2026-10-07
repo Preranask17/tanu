@@ -84,17 +84,28 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final query = _query.text.trim().toLowerCase();
 
     final visible = sessions.where((s) {
+      if (s.isDeleted) return false;
       if (query.isEmpty) return true;
       if (s.title.toLowerCase().contains(query)) return true;
-      if (s.summary != null && s.summary!.toLowerCase().contains(query))
+      if (s.summary != null && s.summary!.toLowerCase().contains(query)) {
         return true;
+      }
       return s.segments.any((seg) => seg.text.toLowerCase().contains(query));
     }).toList();
 
-    // Group by calendar day, newest first.
+    // Group by calendar day, newest first. Pinned items get their own group at the top.
+    final pinned = visible.where((s) => s.isPinned).toList();
+    final unpinned = visible.where((s) => !s.isPinned).toList();
+
     final groups = <String, List<ConversationSession>>{};
     final order = <String>[];
-    for (final session in visible) {
+
+    if (pinned.isNotEmpty) {
+      groups['Pinned'] = pinned;
+      order.add('Pinned');
+    }
+
+    for (final session in unpinned) {
       final label = _dayLabel(session.finishedAt ?? session.startedAt);
       if (!groups.containsKey(label)) {
         groups[label] = [];
@@ -274,7 +285,10 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         delegate: SliverChildListDelegate([
                           for (final label in order) ...[
                             Padding(
-                              padding: const EdgeInsets.only(top: 16, bottom: 4),
+                              padding: const EdgeInsets.only(
+                                top: 16,
+                                bottom: 4,
+                              ),
                               child: _DayHeader(label: label),
                             ),
                             for (final session in groups[label]!)
@@ -294,6 +308,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                   onDelete: () => ref
                                       .read(conversationProvider.notifier)
                                       .removeSession(session.id),
+                                  onPin: () => ref
+                                      .read(conversationProvider.notifier)
+                                      .togglePin(session.id),
                                 ),
                               ),
                           ],
@@ -404,16 +421,37 @@ class _DayHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4, left: 4),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-          color: Color(0xFF888888),
-        ),
+      padding: const EdgeInsets.only(top: 24, bottom: 12, left: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF222222) : const Color(0xFFE5E5E5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: isDark
+                    ? const Color(0xFFCCCCCC)
+                    : const Color(0xFF666666),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Divider(
+              color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+              thickness: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -450,34 +488,53 @@ class _EmptyConversations extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.inventory_2_outlined,
-              color: Color(0xFF888888),
-              size: 48,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.memory_rounded,
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                size: 64,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 32),
             const Text(
-              'No memories yet.\nConnect your pendant and start talking.',
+              'A blank slate',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Connect your pendant and let it listen to the world.\nYour memories will magically appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Color(0xFF888888),
                 height: 1.5,
-                fontSize: 16,
+                fontSize: 15,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed: () =>
                   ref.read(navigationTabProvider.notifier).goToHome(),
               style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(100),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
               ),
               child: const Text(
-                'Go to Home',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                'Start capturing',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ),
           ],

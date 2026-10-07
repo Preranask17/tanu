@@ -11,7 +11,7 @@ import 'analytics_provider.dart';
 
 enum SttModelPhase { checking, missing, downloading, ready }
 
-/// Live state of the on-device Moonshine bundle stored in app-support storage.
+/// Live state of the on-device Whisper Small bundle stored in app-support storage.
 class SttModelState {
   const SttModelState({
     this.phase = SttModelPhase.checking,
@@ -69,34 +69,38 @@ class SttModelNotifier extends Notifier<SttModelState> {
   @override
   SttModelState build() {
     unawaited(refresh());
-    return SttModelState(modelName: kMoonshineDirName);
+    return SttModelState(modelName: kWhisperSmallDirName);
   }
 
   Future<void> refresh() async {
     state = const SttModelState(
       phase: SttModelPhase.checking,
-    ).copyWith(modelName: kMoonshineDirName);
+    ).copyWith(modelName: kWhisperSmallDirName);
     try {
       final dir = await _modelDirectory();
       if (dir != null && _bundleExists(dir)) {
         final size = await _bundleSize(dir);
         state = SttModelState(
           phase: SttModelPhase.ready,
-          modelName: kMoonshineDirName,
+          modelName: kWhisperSmallDirName,
           downloadedBytes: size,
           totalBytes: size,
         );
       } else {
         state = const SttModelState(
           phase: SttModelPhase.missing,
-        ).copyWith(modelName: kMoonshineDirName);
+        ).copyWith(modelName: kWhisperSmallDirName);
+        // Automatically start the download so the user doesn't have to manually fetch it
+        unawaited(download());
       }
     } catch (e) {
       state = SttModelState(
         phase: SttModelPhase.missing,
-        modelName: kMoonshineDirName,
+        modelName: kWhisperSmallDirName,
         error: '$e',
       );
+      // Auto-start download if there was an initialization error but we want to retry fetching
+      unawaited(download());
     }
   }
 
@@ -105,7 +109,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
     state = const SttModelState(
       phase: SttModelPhase.downloading,
       modelName: '',
-    ).copyWith(modelName: kMoonshineDirName);
+    ).copyWith(modelName: kWhisperSmallDirName);
 
     // The coordinator is single-flight: if the engine's warm-up is already
     // downloading, [ensure] awaits that same transfer and the progress stream
@@ -115,7 +119,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
     _progressSub = ModelDownloadCoordinator.progress.listen((p) {
       state = SttModelState(
         phase: SttModelPhase.downloading,
-        modelName: kMoonshineDirName,
+        modelName: kWhisperSmallDirName,
         downloadedBytes: p.received,
         totalBytes: p.total,
       );
@@ -144,7 +148,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
       } else {
         state = SttModelState(
           phase: SttModelPhase.missing,
-          modelName: kMoonshineDirName,
+          modelName: kWhisperSmallDirName,
           error: 'Model download failed.',
         );
         ref.read(analyticsProvider).capture(
@@ -160,7 +164,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
       _progressSub = null;
       state = SttModelState(
         phase: SttModelPhase.missing,
-        modelName: kMoonshineDirName,
+        modelName: kWhisperSmallDirName,
         error: 'Download failed: $e',
       );
       ref.read(analyticsProvider).capture(
@@ -180,14 +184,27 @@ class SttModelNotifier extends Notifier<SttModelState> {
     var deleted = false;
     try {
       final root = (await getApplicationSupportDirectory()).path;
-      final modelDir = Directory('$root/$kMoonshineDirName');
+      final modelDir = Directory('$root/$kWhisperSmallDirName');
       if (await modelDir.exists()) {
         await modelDir.delete(recursive: true);
         deleted = true;
       }
-      final bundle = File('$root/$kMoonshineBundleFileName');
+      final bundle = File('$root/$kWhisperSmallTarFileName');
       if (await bundle.exists()) {
         await bundle.delete();
+        deleted = true;
+      }
+      // Resumable partial downloads live outside the model dir.
+      for (final f in kWhisperSmallBundleFiles) {
+        final part = File('$root/${f.name}.part');
+        if (await part.exists()) {
+          await part.delete();
+          deleted = true;
+        }
+      }
+      final vadPart = File('$root/$kSileroVadFileName.part');
+      if (await vadPart.exists()) {
+        await vadPart.delete();
         deleted = true;
       }
       for (final name in kRetiredModelBundles) {
@@ -239,23 +256,28 @@ class SttModelNotifier extends Notifier<SttModelState> {
     return false;
   }
 
-  /// Mirrors the Moonshine engine's model directory:
-  /// `appSupport/<kMoonshineDirName>`.
+  /// Mirrors the Whisper Small engine's model directory:
+  /// `appSupport/<kWhisperSmallDirName>`.
   Future<String?> _modelDirectory() async {
     try {
       final support = await getApplicationSupportDirectory();
-      return '${support.path}/$kMoonshineDirName';
+      return '${support.path}/$kWhisperSmallDirName';
     } catch (e) {
       debugPrint('[tanu] model dir unavailable: $e');
       return null;
     }
   }
 
+  /// True when every bundle member is on disk at its expected size — the
+  /// same contract the coordinator uses, so a truncated leftover never
+  /// shows as "ready" while a re-download runs.
   bool _bundleExists(String dir) {
-    final ok = kMoonshineBundleFiles.every(
+    final ok = kWhisperSmallBundleFiles.every(
       (f) =>
           File('$dir/${f.name}').existsSync() &&
-          File('$dir/${f.name}').lengthSync() > 0,
+          (f.bytes > 0
+              ? File('$dir/${f.name}').lengthSync() >= f.bytes
+              : File('$dir/${f.name}').lengthSync() > 0),
     );
     if (!ok) return false;
     final vad = File('$dir/$kSileroVadFileName');
@@ -264,7 +286,7 @@ class SttModelNotifier extends Notifier<SttModelState> {
 
   Future<int> _bundleSize(String dir) async {
     var total = 0;
-    for (final f in kMoonshineBundleFiles) {
+    for (final f in kWhisperSmallBundleFiles) {
       try {
         total += await File('$dir/${f.name}').length();
       } catch (_) {}

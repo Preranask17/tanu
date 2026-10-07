@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,7 +33,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  /// Auto-downloads the Moonshine STT model on first launch, or upgrades
+  /// Auto-downloads the Whisper Small STT model on first launch, or upgrades
   /// from a retired model if one exists.
   Future<void> _ensureSttModel() async {
     final notifier = ref.read(sttModelProvider.notifier);
@@ -48,7 +47,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         builder: (context) => AlertDialog(
           title: const Text('STT Model Upgrade'),
           content: const Text(
-            'We\'ve upgraded the offline speech engine to Moonshine '
+            'We\'ve upgraded the offline speech engine '
             '(fast, accurate English, fully offline). '
             'Please delete the old model to make room and install the latest one.',
           ),

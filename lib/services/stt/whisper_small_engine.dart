@@ -2,31 +2,32 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart';
 
 import '../../abstractions/stt_engine.dart';
+import '../../config/stt_config.dart';
 import '../../constants.dart';
 
-/// Moonshine v2 base-en on-device engine (English-only).
+/// Whisper Small (multilingual) on-device engine.
 ///
-/// Hallucinations ("thank you", "bye", ...) come almost entirely from
-/// decoding near-silence: the model would rather emit a learned phrase than
-/// nothing. This engine kills them at three levels, so the transcript stays
-/// live AND honest:
+/// Decodes English plus South Indian languages (Kannada, Tamil, Telugu,
+/// Malayalam) entirely offline via sherpa-onnx. Hallucinations ("thank you",
+/// "bye", "um", ...) come almost entirely from decoding near-silence, so the
+/// transcript stays live AND honest through three guards:
 /// 1. VAD gating — only Silero-confirmed speech segments are ever decoded;
 ///    silence is never sent to the recognizer.
 /// 2. Segment guards — segments under 0.4 s or with near-zero energy are
 ///    dropped before decode.
 /// 3. Junk-phrase filter — decoded text matching known hallucination
 ///    patterns is dropped (mirrors the provider filter as defense in depth).
-/// UI thread converts PCM16 -> Float32 + mic level, worker isolate owns
-/// `OfflineRecognizer` + `VoiceActivityDetector`.
-class MoonshineSttEngine implements ContinuousSttEngine {
-  MoonshineSttEngine() {
+/// Main isolate converts PCM16 -> Float32 + mic level and forwards audio;
+/// the worker isolate owns `OfflineRecognizer` + `VoiceActivityDetector` so
+/// a Whisper decode never blocks audio capture.
+class WhisperSmallEngine implements ContinuousSttEngine {
+  WhisperSmallEngine() {
     _warmingUp.value = true;
   }
 
@@ -55,16 +56,16 @@ class MoonshineSttEngine implements ContinuousSttEngine {
 
   static Future<String> _bundlePath() async {
     final support = await getApplicationSupportDirectory();
-    return '${support.path}/$kMoonshineDirName';
+    return '${support.path}/$kWhisperSmallDirName';
   }
 
   @override
   Future<bool> isAvailable() async {
     try {
       final bundlePath = await _bundlePath();
-      return File('$bundlePath/encoder_model.ort').existsSync() &&
-          File('$bundlePath/decoder_model_merged.ort').existsSync() &&
-          File('$bundlePath/tokens.txt').existsSync();
+      return File('$bundlePath/small-encoder.int8.onnx').existsSync() &&
+          File('$bundlePath/small-decoder.int8.onnx').existsSync() &&
+          File('$bundlePath/small-tokens.txt').existsSync();
     } catch (_) {
       return false;
     }
@@ -75,20 +76,20 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     final bundlePath = await _bundlePath();
 
     final p = ReceivePort();
-    _isolate = await Isolate.spawn(_moonshineWorker, [bundlePath, p.sendPort]);
+    _isolate = await Isolate.spawn(_whisperWorker, [bundlePath, p.sendPort]);
 
     final completer = Completer<SendPort?>();
     p.listen((msg) {
       if (msg is List && msg[0] == 'ready') {
         completer.complete(msg[1] as SendPort);
       } else if (msg is List && msg[0] == 'error') {
-        _log('[tanu] moonshine worker error: ${msg[1]}');
+        _log('[tanu] whisper worker error: ${msg[1]}');
         if (!completer.isCompleted) completer.complete(null);
       } else if (msg is List && msg[0] == 'partial') {
         final text = msg[1] as String;
         if (_continuousActive && text.isNotEmpty) {
           _hasActiveUtterance = true;
-          _onPartialCb?.call('?$text');
+          _onPartialCb?.call(text);
         }
       } else if (msg is List && msg[0] == 'final') {
         final text = msg[1] as String;
@@ -119,7 +120,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     _continuousActive = true;
     _hasActiveUtterance = false;
 
-    _onEventCb?.call('Starting Moonshine...');
+    _onEventCb?.call('Starting Offline Model...');
     final ready = await _ensureWorker();
     if (!ready || !_continuousActive) {
       _warmingUp.value = false;
@@ -127,7 +128,7 @@ class MoonshineSttEngine implements ContinuousSttEngine {
     }
 
     _warmingUp.value = false;
-    _onEventCb?.call('Moonshine Listening');
+    _onEventCb?.call('Offline Model Listening');
 
     _workerPort?.send(['reset']);
 
@@ -153,7 +154,10 @@ class MoonshineSttEngine implements ContinuousSttEngine {
   }
 
   @override
-  Future<String> transcribe(Uint8List pcmUtterance, {SttCallbacks? callbacks}) async {
+  Future<String> transcribe(
+    Uint8List pcmUtterance, {
+    SttCallbacks? callbacks,
+  }) async {
     return '';
   }
 
@@ -188,7 +192,9 @@ class MoonshineSttEngine implements ContinuousSttEngine {
   double _level(Float32List samples) {
     if (samples.isEmpty) return 0;
     var sum = 0.0;
-    for (final v in samples) sum += v * v;
+    for (final v in samples) {
+      sum += v * v;
+    }
     return math.min(1.0, math.sqrt(sum / samples.length) * 3);
   }
 
@@ -207,9 +213,6 @@ bool _isJunk(String text) {
     'thanks for watching',
     'bye',
     'goodbye',
-    'you',
-    'yes',
-    'no',
     'oh',
     'ah',
     'um',
@@ -222,7 +225,7 @@ bool _isJunk(String text) {
   return junk.contains(t);
 }
 
-Future<void> _moonshineWorker(List<dynamic> args) async {
+Future<void> _whisperWorker(List<dynamic> args) async {
   final bundlePath = args[0] as String;
   final replyPort = args[1] as SendPort;
 
@@ -231,16 +234,16 @@ Future<void> _moonshineWorker(List<dynamic> args) async {
 
   await initBindingsAsync();
 
-  // Moonshine v2: encoder + merged decoder (no preprocessor file in the
-  // quantized bundle, no separate cached/uncached decoders).
   final config = OfflineRecognizerConfig(
     model: OfflineModelConfig(
-      moonshine: OfflineMoonshineModelConfig(
-        encoder: '$bundlePath/encoder_model.ort',
-        mergedDecoder: '$bundlePath/decoder_model_merged.ort',
+      whisper: OfflineWhisperModelConfig(
+        encoder: '$bundlePath/small-encoder.int8.onnx',
+        decoder: '$bundlePath/small-decoder.int8.onnx',
+        language: SttConfig.language,
+        task: SttConfig.task,
       ),
-      tokens: '$bundlePath/tokens.txt',
-      numThreads: 4,
+      tokens: '$bundlePath/small-tokens.txt',
+      numThreads: SttConfig.numThreads,
       provider: 'cpu',
       debug: false,
     ),
@@ -249,12 +252,17 @@ Future<void> _moonshineWorker(List<dynamic> args) async {
   final vadConfig = VadModelConfig(
     sileroVad: SileroVadModelConfig(
       model: '$bundlePath/$kSileroVadFileName',
-      threshold: 0.5,
-      minSilenceDuration: 0.5,
-      minSpeechDuration: 0.3,
-      windowSize: 512,
+      // A higher confidence boundary prevents room noise and pendant taps
+      // from being sent to Whisper as speech.
+      threshold: SttConfig.vadThreshold,
+      // Keep a short but meaningful trailing pause so final words are not
+      // clipped when someone speaks naturally.
+      minSilenceDuration: SttConfig.vadMinSilence,
+      minSpeechDuration: SttConfig.vadMinSpeech,
+      maxSpeechDuration: SttConfig.vadMaxSpeech,
+      windowSize: SttConfig.vadWindowSize,
     ),
-    sampleRate: 16000,
+    sampleRate: SttConfig.sampleRate,
     debug: false,
     numThreads: 1,
   );
@@ -264,52 +272,73 @@ Future<void> _moonshineWorker(List<dynamic> args) async {
 
   try {
     recognizer = OfflineRecognizer(config);
-    vad = VoiceActivityDetector(config: vadConfig, bufferSizeInSeconds: 30.0);
+    vad = VoiceActivityDetector(
+      config: vadConfig,
+      bufferSizeInSeconds: SttConfig.vadMaxSpeech,
+    );
   } catch (e) {
     replyPort.send(['error', 'init failed: $e']);
     return;
   }
 
+  // Incoming BLE chunks are not sample-aligned to the Silero window, so
+  // audio is coalesced here and handed to the VAD in exact window-size
+  // chunks.
+  final window = SttConfig.vadWindowSize;
+  final pending = <double>[];
+  final sampleRate = SttConfig.sampleRate;
+
   await for (final msg in commands) {
     if (msg is List) {
       final cmd = msg[0] as String;
       if (cmd == 'shutdown') {
-        vad?.free();
+        vad.free();
         recognizer.free();
         break;
       } else if (cmd == 'reset') {
         vad.clear();
+        pending.clear();
       } else if (cmd == 'audio') {
         final samples = msg[1] as Float32List;
-        vad.acceptWaveform(samples);
+        pending.addAll(samples);
 
-        while (!vad.isEmpty()) {
-          final segment = vad.front();
-          vad.pop();
-
-          // Guard 1: ignore very short blips (door slams, mic taps).
-          if (segment.samples.length < 16000 * 0.4) continue;
-
-          final seg = Float32List.fromList(segment.samples);
-
-          // Guard 2: ignore near-silent segments that slipped past VAD.
-          var sum = 0.0;
-          for (final v in seg) {
-            sum += v * v;
+        while (pending.length >= window) {
+          final chunk = Float32List(window);
+          for (var i = 0; i < window; i++) {
+            chunk[i] = pending[i];
           }
-          if (seg.isEmpty || sum / seg.length < 0.0002) continue;
+          pending.removeRange(0, window);
+          vad.acceptWaveform(chunk);
 
-          final stream = recognizer.createStream();
-          stream.acceptWaveform(samples: seg, sampleRate: 16000);
-          recognizer.decode(stream);
+          while (!vad.isEmpty()) {
+            final segment = vad.front();
+            vad.pop();
 
-          final result = recognizer.getResult(stream);
-          final text = result.text.trim();
-          stream.free();
+            // Guard 1: ignore very short blips (door slams, mic taps).
+            if (segment.samples.length < sampleRate * 0.4) continue;
 
-          // Guard 3: drop hallucinated filler phrases.
-          if (text.isEmpty || _isJunk(text)) continue;
-          replyPort.send(['final', text]);
+            final seg = Float32List.fromList(segment.samples);
+
+            // Guard 2: ignore near-silent segments that slipped past VAD.
+            var sum = 0.0;
+            for (final v in seg) {
+              sum += v * v;
+            }
+            if (seg.isEmpty || sum / seg.length < 0.0002) continue;
+
+            final stream = recognizer.createStream();
+            stream.acceptWaveform(samples: seg, sampleRate: sampleRate);
+            recognizer.decode(stream);
+
+            final result = recognizer.getResult(stream);
+            final text = result.text.trim();
+            stream.free();
+
+            // Guard 3: drop hallucinated filler phrases.
+            if (text.isEmpty || _isJunk(text)) continue;
+            replyPort.send(['partial', text]);
+            replyPort.send(['final', text]);
+          }
         }
       }
     }

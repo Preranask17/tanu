@@ -85,4 +85,7 @@ app.*.map.json
 /android/app/release
 *.tar.bz2
 ref.txt
-restore_points/ 
+restore_points/
+build_in_c.ps1
+
+.env

@@ -19,9 +19,13 @@ final pendantProvider = Provider<AudioSource>((ref) {
   return source;
 });
 
-final pendantStatusProvider = StreamProvider<PendantStatus>(
-  (ref) => ref.watch(pendantProvider).statusStream,
-);
+final pendantStatusProvider = StreamProvider<PendantStatus>((ref) async* {
+  final source = ref.watch(pendantProvider);
+  // Do not make the UI wait for the next BLE event when the source already
+  // knows its current state (common after reconnecting an existing device).
+  yield source.currentStatus;
+  yield* source.statusStream;
+});
 
 /// Live audio-path stats for debugging on a real pendant.
 final pendantStatsProvider = Provider<ValueNotifier<PendantStats>>(
@@ -60,6 +64,16 @@ final stopScanProvider = Provider<Future<void> Function()>((ref) {
 final connectToDeviceProvider = Provider<Future<void> Function(String)>((ref) {
   final source = ref.watch(pendantProvider);
   return (remoteId) => source.connectToDevice(remoteId);
+});
+
+/// Disconnect the currently connected pendant.
+final pendantDisconnectProvider = Provider<void Function()>((ref) {
+  final source = ref.watch(pendantProvider);
+  return () {
+    source.disconnect().catchError(
+      (e) => debugPrint('[tanu] disconnect failed: '),
+    );
+  };
 });
 
 /// Forget the stored pendant device.

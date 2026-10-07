@@ -116,7 +116,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       _fgNotice = '';
       unawaited(FlutterForegroundTask.stopService());
     } else if (active) {
-      final notice = 'Listening…';
+      final notice = 'Listening...';
       if (notice != _fgNotice) {
         _fgNotice = notice;
         unawaited(
@@ -131,14 +131,14 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       if (await FlutterForegroundTask.isRunningService) {
         await FlutterForegroundTask.updateService(
           notificationTitle: 'Tanu',
-          notificationText: 'Listening…',
+          notificationText: 'Listening...',
         );
       } else {
         await FlutterForegroundTask.startService(
           serviceId: 1010,
           serviceTypes: const [ForegroundServiceTypes.connectedDevice],
           notificationTitle: 'Tanu',
-          notificationText: 'Listening…',
+          notificationText: 'Listening...',
           callback: _fgTaskCallback,
         );
       }
