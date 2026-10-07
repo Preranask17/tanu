@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/settings_provider.dart';
-import '../services/auth_service.dart';
 
 /// A cinematic, editorial onboarding screen replacing the generic iOS feature list.
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -19,8 +16,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   late final Animation<double> _fadeTitle;
   late final Animation<double> _fadeSubtitle;
   late final Animation<double> _fadeButton;
-  
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -45,13 +40,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     );
     
     _anim.forward();
-
-    // Listen to Supabase auth state changes to detect when browser login finishes
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      if (data.session != null && mounted) {
-        ref.read(settingsProvider.notifier).completeOnboarding();
-      }
-    });
   }
 
   @override
@@ -79,7 +67,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   FadeTransition(
                     opacity: _fadeTitle,
                     child: Text(
-                      'Your memories, secured.',
+                      'Your memories, distilled.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.displayLarge?.copyWith(
                             fontSize: 42,
@@ -91,10 +79,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   FadeTransition(
                     opacity: _fadeSubtitle,
                     child: Text(
-                      'To securely save your transcripts and sync your memories, we need permission to access your Google Drive and Calendar.\n\nAbsolute privacy: no data is ever sent to our servers. It stays exclusively in your personal accounts.',
+                      'Never lose what was said.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         height: 1.5,
                         color: const Color(0xFF888888),
                       ),
@@ -104,76 +92,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                   FadeTransition(
                     opacity: _fadeButton,
                     child: SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
+                      width: 200,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
                           backgroundColor: isDark ? Colors.white : Colors.black,
                           foregroundColor: isDark ? Colors.black : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        onPressed: _isLoading
-                            ? null
-                            : () async {
-                                setState(() => _isLoading = true);
-                                try {
-                                  await AuthService.signInWithGoogle();
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to sign in: $e')),
-                                    );
-                                  }
-                                } finally {
-                                  if (mounted) {
-                                    setState(() => _isLoading = false);
-                                  }
-                                }
-                              },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4.0),
-                                child: Image.asset('assets/images/google_logo.png'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Sign in with Google',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        onPressed: () {
+                          ref
+                              .read(settingsProvider.notifier)
+                              .completeOnboarding();
+                        },
+                        child: const Text(
+                          'Begin',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FadeTransition(
-                    opacity: _fadeButton,
-                    child: TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              ref.read(settingsProvider.notifier).completeOnboarding();
-                            },
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF888888),
-                      ),
-                      child: const Text('Skip for now'),
                     ),
                   ),
                 ],

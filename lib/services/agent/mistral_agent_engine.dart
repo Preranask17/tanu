@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -19,14 +18,14 @@ class MistralAgentEngine implements AgentEngine {
   MistralAgentEngine({
     required this.apiKey,
     required this.model,
+    this.endpoint = const String.fromEnvironment('TANU_MISTRAL_ENDPOINT'),
     this.systemPrompt,
   });
 
   final String apiKey;
   final String model;
+  final String endpoint;
   final String? systemPrompt;
-
-  String get endpoint => dotenv.env['MISTRAL_ENDPOINT'] ?? '';
 
   static const String _defaultEndpoint =
       'https://api.mistral.ai/v1/chat/completions';
