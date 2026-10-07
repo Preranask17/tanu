@@ -85,3 +85,4 @@ app.*.map.json
 /android/app/release
 *.tar.bz2
 ref.txt
+restore_points/ 

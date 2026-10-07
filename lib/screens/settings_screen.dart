@@ -11,6 +11,7 @@ import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
+import '../widgets/page_header.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -35,22 +36,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 100,
-            floating: true,
-            pinned: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Settings',
-                style: Theme.of(context).textTheme.displayMedium,
-              ),
-              titlePadding: const EdgeInsets.only(left: 24, bottom: 16),
-            ),
+          // Consistent page header (logo top-left, heading below).
+          // Sections below are untouched and fully functional.
+          const SliverToBoxAdapter(
+            child: PageHeader(title: 'Settings'),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -101,7 +94,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _DeveloperConsole(capture: capture, stats: stats),
                   ],
 
-                  const SizedBox(height: 60),
+                  // Bottom cushion: clears the floating nav dock (64 tall,
+                  // offset safeArea + 16) on every screen size, so the last
+                  // card scrolls fully into view and stays tappable.
+                  SizedBox(
+                    height: MediaQuery.paddingOf(context).bottom + 112,
+                  ),
                 ],
               ),
             ),

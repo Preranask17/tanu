@@ -11,9 +11,11 @@ import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../screens/chat_screen.dart';
 import '../providers/stt_model_provider.dart';
+import '../widgets/ai_presence_orb.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
+import '../widgets/page_header.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -134,44 +136,45 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                 parent: BouncingScrollPhysics(),
               ),
               slivers: [
-                SliverAppBar(
-                  expandedHeight: 160,
-                  floating: true,
-                  pinned: true,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: Text(
-                      'Capture',
-                      style: Theme.of(context).textTheme.displayMedium,
-                    ),
-                    titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                // Consistent page header: logo top-left, status top-right,
+                // heading below. UI only: reads existing status, opens the
+                // existing picker.
+                SliverToBoxAdapter(
+                  child: PageHeader(
+                    title: 'Capture',
+                    actions: [
+                      if (status.isConnected &&
+                          status.batteryPercent != null)
+                        _BatteryPill(
+                          percent: status.batteryPercent!,
+                        ),
+                      _PendantButton(
+                        status: status,
+                        onTap: _openDevicePicker,
+                      ),
+                    ],
                   ),
-                  actions: [
-                    _PendantStatusIndicator(
-                      status: status,
-                      onConnect: _openDevicePicker,
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 16, bottom: bottomInset),
+                    padding: EdgeInsets.only(top: 8, bottom: bottomInset),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (conversation.active != null ||
-                            conversation.isListening ||
-                            conversation.liveTranscript.isNotEmpty)
-                          _LiveCaptureCard(
-                            status: status,
-                            conversation: conversation,
-                          ),
-                        if (!status.isConnected && conversation.active == null)
-                          _ConnectionCard(onConnect: _openDevicePicker),
+                        // Calm AI presence. Pure visual: only reads the
+                        // already-watched mic level / listening flag.
+                        AiPresenceOrb(
+                          level: conversation.micLevel,
+                          listening: conversation.isListening,
+                        ),
+                        // Live transcription: always visible (placeholder when
+                        // idle), capped height with internal scrolling.
+                        _LiveCaptureCard(
+                          status: status,
+                          conversation: conversation,
+                        ),
                         if (conversation.active == null &&
-                            conversation.conversations.isEmpty &&
-                            status.isConnected)
+                            conversation.conversations.isEmpty)
                           _EmptyState(connected: status.isConnected)
                         else ...[
                           const SizedBox(height: 32),
@@ -187,7 +190,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                           for (final (i, session) in recent.indexed)
                             Padding(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
+                                horizontal: 20,
                                 vertical: 4,
                               ),
                               child: ConversationTile(
@@ -215,56 +218,112 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _PendantStatusIndicator extends StatelessWidget {
-  const _PendantStatusIndicator({
+/// Compact top-left pendant status button. Presentation only: reads the
+/// existing [PendantStatus] and opens the existing device picker sheet.
+/// All BLE/scan logic lives elsewhere and is untouched.
+class _PendantButton extends StatelessWidget {
+  const _PendantButton({
     required this.status,
-    required this.onConnect,
+    required this.onTap,
   });
+
   final PendantStatus status;
-  final VoidCallback onConnect;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final connected = status.isConnected;
+    final reconnecting = status.state == PendantState.reconnecting;
 
-    final Widget leading;
-    if (!connected) {
-      leading = const Icon(
-        Icons.bluetooth,
-        size: 20,
-        color: Color(0xFF888888),
-      );
-    } else if (status.state == PendantState.reconnecting) {
-      leading = const Icon(
-        Icons.sync,
-        size: 20,
-        color: Colors.orange,
-      );
+    final IconData icon;
+    final Color iconColor;
+    if (connected) {
+      icon = Icons.bluetooth_connected;
+      iconColor = const Color(0xFF4CAF50);
+    } else if (reconnecting) {
+      icon = Icons.sync;
+      iconColor = Colors.orange;
     } else {
-      leading = const Icon(
-        Icons.bluetooth_connected,
-        size: 20,
-        color: Colors.green,
-      );
+      icon = Icons.bluetooth;
+      iconColor = const Color(0xFF888888);
     }
 
-    return TextButton(
-      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
-      onPressed: onConnect,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: connected
+                ? (isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFE5E5E5))
+                : Colors.red.withValues(alpha: 0.45),
+            width: 1,
+          ),
+          boxShadow: [
+            if (!connected)
+              BoxShadow(
+                color: Colors.red.withValues(alpha: 0.30),
+                blurRadius: 14,
+                spreadRadius: 1,
+              )
+            else
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Icon(icon, size: 20, color: iconColor),
+      ),
+    );
+  }
+}
+
+/// Compact top-right battery pill. Display only: the value comes straight
+/// from the existing pendant status, no battery logic here.
+class _BatteryPill extends StatelessWidget {
+  const _BatteryPill({required this.percent});
+
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+          width: 1,
+        ),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          leading,
-          if (connected && status.batteryPercent != null) ...[
-            const SizedBox(width: 6),
-            Text(
-              '${status.batteryPercent}%',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF888888),
-              ),
+          const Icon(Icons.battery_std, size: 18, color: Color(0xFF888888)),
+          const SizedBox(width: 6),
+          Text(
+            '$percent%',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF888888),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -281,10 +340,14 @@ class _LiveCaptureCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final words = conversation.liveTranscript.trim();
     final active = conversation.active;
+    // The one existing capture flag: STT session live or not. Nothing else
+    // drives this badge, and nothing here writes any backend state.
+    final capturing = conversation.isListening;
     final label = switch (conversation.sttEvent) {
       'stt unavailable' => 'Transcription unavailable',
-      'Model missing. Download in Settings.' => 'Model missing. Download in Settings.',
-      _ => conversation.isListening ? 'Listeningâ€¦' : 'Capturingâ€¦',
+      'Model missing. Download in Settings.' =>
+        'Model missing. Download in Settings.',
+      _ => capturing ? 'Capturing...' : 'Ready',
     };
 
     final preview = words.isNotEmpty
@@ -292,11 +355,12 @@ class _LiveCaptureCard extends ConsumerWidget {
         : (active != null && active.segments.isNotEmpty
               ? active.segments.last.text.trim()
               : '');
-    
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final listening = conversation.isListening;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -312,10 +376,14 @@ class _LiveCaptureCard extends ConsumerWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-            borderRadius: BorderRadius.circular(12),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : const Color(0xFFE5E5E5),
               width: 1,
             ),
           ),
@@ -329,12 +397,33 @@ class _LiveCaptureCard extends ConsumerWidget {
                     level: conversation.micLevel,
                   ),
                   const SizedBox(width: 12),
+                  // Status badge: fades between Capturing... (pulsing accent
+                  // dot) and muted Ready as the existing capture flag flips.
                   Expanded(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Row(
+                        key: ValueKey<bool>(capturing),
+                        children: [
+                          if (capturing) ...[
+                            _BlinkDot(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: capturing
+                                    ? null
+                                    : const Color(0xFF888888),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -372,24 +461,98 @@ class _LiveCaptureCard extends ConsumerWidget {
                   ),
                 ),
               ],
-              if (preview.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  preview,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontStyle: words.isNotEmpty
-                        ? FontStyle.italic
-                        : FontStyle.normal,
-                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.8),
-                    fontSize: 17,
-                    height: 1.3,
-                  ),
+              const SizedBox(height: 16),
+              // Capped transcript area: placeholder when idle, internal
+              // scroll when the stream grows long.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: SingleChildScrollView(
+                  child: preview.isNotEmpty
+                      ? Text(
+                          preview,
+                          style: TextStyle(
+                            fontStyle: words.isNotEmpty
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withValues(alpha: 0.85),
+                            fontSize: 16,
+                            height: 1.4,
+                          ),
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                listening
+                                    ? 'Listening…'
+                                    : 'Transcription will appear here…',
+                                style: const TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xFF888888),
+                                  fontSize: 15,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            if (listening) ...[
+                              const SizedBox(width: 8),
+                              _BlinkDot(
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ],
+                          ],
+                        ),
                 ),
-              ],
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subtle blinking cursor dot shown while transcription is live.
+class _BlinkDot extends StatefulWidget {
+  const _BlinkDot({this.color = const Color(0xFFE5484D)});
+
+  final Color color;
+
+  @override
+  State<_BlinkDot> createState() => _BlinkDotState();
+}
+
+class _BlinkDotState extends State<_BlinkDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _blink;
+
+  @override
+  void initState() {
+    super.initState();
+    _blink = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.25).animate(_blink),
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.color,
         ),
       ),
     );
@@ -465,71 +628,6 @@ class _EqualizerState extends State<_Equalizer>
   }
 }
 
-class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard({required this.onConnect});
-
-  final VoidCallback onConnect;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.bluetooth,
-              color: Color(0xFF888888),
-              size: 28,
-            ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'No pendant yet',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Connect your pendant to start talking.',
-                    style: TextStyle(
-                      color: Color(0xFF888888),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ElevatedButton(
-              onPressed: onConnect,
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              ),
-              child: const Text('Scan'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.title,
@@ -580,27 +678,32 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Center(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.mic_off,
-              color: Color(0xFF888888),
-              size: 48,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              connected
-                  ? 'Listeningâ€¦ speak to capture a memory.'
-                  : 'Nothing here yet.\nConnect your pendant and say something.',
+            const Text(
+              'No memories recorded yet. TANU is listening...',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
                 color: Color(0xFF888888),
                 height: 1.5,
-                fontSize: 16,
+                fontSize: 15,
               ),
             ),
+            if (!connected) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Connect your pendant to capture moments.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ],
         ),
       ),
