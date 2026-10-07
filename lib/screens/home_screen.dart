@@ -29,7 +29,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  /// Auto-downloads the Moonshine STT model on first launch, or upgrades
+  /// Auto-downloads the Whisper Small STT model on first launch, or upgrades
   /// from a retired model if one exists.
   Future<void> _ensureSttModel() async {
     final notifier = ref.read(sttModelProvider.notifier);

@@ -17,10 +17,10 @@ import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
 
-import '../services/stt/moonshine_stt_engine.dart';
+import '../services/stt/whisper_small_engine.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = MoonshineSttEngine();
+  final engine = WhisperSmallEngine();
 
   ref.onDispose(() => engine.dispose());
   return engine;
