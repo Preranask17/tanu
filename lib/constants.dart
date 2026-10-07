@@ -16,16 +16,11 @@ const String kPendantName = 'Omi';
 
 /// ---- Whisper Small (multilingual) on-device bundle ---------------------
 /// Multilingual speech recognition (English + Kannada/Tamil/Telugu/Malayalam
-/// and 90+ more), 375 MB total. The three int8 files are streamed straight
-/// to disk from the Hugging Face mirror with range-resume — never as one
-/// archive: the GitHub `.tar.bz2` is 610 MB and unpacks to ~1.3 GB in RAM,
-/// which Android kills mid-extract. Files land in
+/// and 90+ more), ~375 MB download. `sherpa_onnx` ships the runtime; this is
+/// just int8 weights + tokens. Extracts into
 /// `appSupport/<kWhisperSmallDirName>/`.
-const String kWhisperSmallFilesBaseUrl =
-    'https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/main';
-
-/// Legacy GitHub bundle archive name (610 MB). Kept only so downloads can
-/// purge the leftover archive and `.part` from older builds.
+const String kWhisperSmallTarUrl =
+    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2';
 const String kWhisperSmallTarFileName = 'sherpa-onnx-whisper-small.tar.bz2';
 const String kWhisperSmallDirName = 'sherpa-onnx-whisper-small';
 
@@ -34,13 +29,12 @@ const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
 const String kSileroVadFileName = 'silero_vad.onnx';
 
-/// Files the Whisper Small recognizer loads from the model directory, with
-/// their exact byte sizes (used for progress totals and integrity checks).
+/// Files the Whisper Small recognizer loads from the model directory.
 /// `silero_vad.onnx` is fetched separately via [kSileroVadUrl].
 const List<({String name, int bytes})> kWhisperSmallBundleFiles = [
-  (name: 'small-encoder.int8.onnx', bytes: 112442483),
-  (name: 'small-decoder.int8.onnx', bytes: 262226114),
-  (name: 'small-tokens.txt', bytes: 816730),
+  (name: 'small-encoder.int8.onnx', bytes: 0),
+  (name: 'small-decoder.int8.onnx', bytes: 0),
+  (name: 'small-tokens.txt', bytes: 0),
 ];
 
 
@@ -96,10 +90,3 @@ const String kPostHogHost = String.fromEnvironment(
   'POSTHOG_HOST',
   defaultValue: 'https://us.i.posthog.com',
 );
-
-/// ---- Gemini (agent brain) -------------------------------------------------
-/// Cloud agent used for memory processing and in-memory chat.
-const String kGeminiApiKey = 'AQ.Ab8RN6I6DDNkDuCzbZcKYkTbdqBVXTm5Ny2KCK7oO8dCTVtICQ';
-const String kGeminiModel = 'gemini-3.5-flash';
-const String kGeminiEndpoint =
-    'https://generativelanguage.googleapis.com/v1beta/models/$kGeminiModel:generateContent';
