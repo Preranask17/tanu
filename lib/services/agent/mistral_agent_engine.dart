@@ -28,6 +28,9 @@ class MistralAgentEngine implements AgentEngine {
 
   String get endpoint => dotenv.env['MISTRAL_ENDPOINT'] ?? '';
 
+  static const String _defaultEndpoint =
+      'https://api.mistral.ai/v1/chat/completions';
+
   @override
   Future<String> prompt(String transcript, {List<ChatMessage>? history}) async {
     if (apiKey.isEmpty) {
