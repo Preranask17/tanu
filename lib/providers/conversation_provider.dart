@@ -571,9 +571,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
-    // AI processing temporarily disabled
-    return;
-
     final processor = ref.read(memoryProcessorProvider);
     final result = await processor.process(text);
 
@@ -584,6 +581,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
       conversations[idx] = conversations[idx].copyWith(
         title: result.title,
         summary: result.summary,
+        cleanedTranscript: result.cleanedTranscript.isEmpty
+            ? null
+            : result.cleanedTranscript,
       );
       state = state.copyWith(conversations: conversations);
       _persist();

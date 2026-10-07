@@ -82,6 +82,7 @@ class ConversationSession {
     this.status = ConversationStatus.inProgress,
     this.segments = const [],
     this.summary,
+    this.cleanedTranscript,
     this.isDeleted = false,
     this.isPinned = false,
   });
@@ -93,6 +94,7 @@ class ConversationSession {
   final ConversationStatus status;
   final List<TranscriptSegment> segments;
   final String? summary;
+  final String? cleanedTranscript;
   final bool isDeleted;
   final bool isPinned;
 
@@ -106,6 +108,7 @@ class ConversationSession {
     ConversationStatus? status,
     List<TranscriptSegment>? segments,
     String? summary,
+    String? cleanedTranscript,
     bool? isDeleted,
     bool? isPinned,
   }) {
@@ -117,6 +120,7 @@ class ConversationSession {
       status: status ?? this.status,
       segments: segments ?? this.segments,
       summary: summary ?? this.summary,
+      cleanedTranscript: cleanedTranscript ?? this.cleanedTranscript,
       isDeleted: isDeleted ?? this.isDeleted,
       isPinned: isPinned ?? this.isPinned,
     );
@@ -129,6 +133,7 @@ class ConversationSession {
     'status': status.name,
     'segments': segments.map((s) => s.toJson()).toList(),
     'summary': summary,
+    'cleanedTranscript': cleanedTranscript,
     'isDeleted': isDeleted,
     'isPinned': isPinned,
   };
@@ -151,6 +156,7 @@ class ConversationSession {
       status: status ?? ConversationStatus.completed,
       segments: segments,
       summary: json['summary'] as String?,
+      cleanedTranscript: json['cleanedTranscript'] as String?,
       isDeleted: json['isDeleted'] as bool? ?? false,
       isPinned: json['isPinned'] as bool? ?? false,
     );
