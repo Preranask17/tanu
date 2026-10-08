@@ -396,6 +396,84 @@ class ConversationNotifier extends Notifier<ConversationState> {
       sttEvent: '',
     );
     _resetIdleTimer();
+    _evaluateEndOfConversation(trimmed, segments.length);
+  }
+
+  // --- End-of-conversation detection -------------------------------------
+
+  Timer? _softEndTimer;
+  DateTime? _lastEndCloseAt;
+
+  /// Strong closers — the whole utterance wraps up, close right away.
+  static final RegExp _strongEndPattern = RegExp(
+    r'^(?:okay|ok|alright|well|so)?\s*(?:thank you|thanks(?: a lot| so much| everyone| all)?|'
+    r'got it[.,]? thanks|bye+|goodbye|see (?:you|ya)(?: later| all)?|farewell|take care|'
+    r'talk (?:later|soon)|catch you later|'
+    r"that's (?:all|it)(?: for (?:today|now))?|"
+    r"that's enough(?: for (?:today|now))?|we'?re (?:done|finished|wrapped up)|"
+    "i'?m done(?: now| here)?|(?:let'?s|we can|let us) (?:call it a day|wrap (?:it )?up|finish up|end here)|"
+    r'end of (?:meeting|discussion|conversation)|meeting adjourned|'
+    "let'?s end here|"
+    r'perfect[.,]? (?:thanks|thank you)|great[.,]? thanks|sounds good[.,]? (?:thanks|thank you)|'
+    r'agreed[.,]? (?:thanks|thank you)|'
+    "i think that'?s (?:it|all|everything)|"
+    r'no (?:more )?questions(?:[.,]? ?(?:\w+ \w+)?)?|any other business|'
+    r"i'?ll let you go|i appreciate (?:your time|it)|have a (?:good|great) (?:day|one)|"
+    r'thanks everybody|thank you everyone)\b[.!\s]*$',
+    caseSensitive: false,
+  );
+
+  /// Softer closers — only close after ~20 s of no new speech.
+  static final RegExp _softEndPattern = RegExp(
+    r'^(?:great|okay|ok|right|well|so|alright|cool|nice|perfect|understood|sure|fine|'
+    r'works for me|that works|sounds good|no problem|no worries|all right|'
+    r'yeah|yes|maybe|hmm|uh|mm)[.!?…\s]*$',
+    caseSensitive: false,
+  );
+
+  /// Meeting-style closers — treated as strong once a session has some meat.
+  static final RegExp _businessEndPattern = RegExp(
+    r"(?:minutes after|we'?ll pick up (?:this|next week|tomorrow)|"
+    r"let'?s continue (?:this|next time)|follow up (?:on )?this (?:later|next week)|"
+    r'circling back (?:on this )?(?:tomorrow|later)|schedule another (?:meeting|call)|'
+    r'get back to (?:you|this))\b',
+    caseSensitive: false,
+  );
+
+  void _evaluateEndOfConversation(String utterance, int segmentCount) {
+    // Cancel any pending soft-close: new speech means the conversation goes on.
+    _softEndTimer?.cancel();
+    _softEndTimer = null;
+
+    final last = _lastEndCloseAt;
+    if (last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 2)) {
+      return;
+    }
+
+    final cleaned =
+        utterance.replaceAll(RegExp(r'[.!?…,"\s]+$'), '').trim();
+
+    if (_strongEndPattern.hasMatch(cleaned) ||
+        (segmentCount >= 2 && _businessEndPattern.hasMatch(cleaned))) {
+      _softEndTimer?.cancel();
+      _closeFromEndPhrase('end_phrase');
+      return;
+    }
+
+    if (_softEndPattern.hasMatch(cleaned)) {
+      _softEndTimer = Timer(const Duration(seconds: 20), () {
+        if (_continuousStarted && !_micTestActive && state.active != null) {
+          _closeFromEndPhrase('end_phrase_soft');
+        }
+      });
+    }
+  }
+
+  void _closeFromEndPhrase(String reason) {
+    _lastEndCloseAt = DateTime.now();
+    state = state.copyWith(sttEvent: '— conversation ended —');
+    unawaited(stopListening(reason));
   }
 
   ConversationSession _withTitle(
@@ -739,7 +817,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
           _dequeueRetry(id);
           try {
             final indexer = await ref.read(memoryIndexerProvider.future);
-            await indexer.indexSession(conversations[idx]);
+            unawaited(indexer.indexSession(conversations[idx]));
           } catch (_) {}
           ref.read(analyticsProvider).capture('memory retry succeeded');
         } else {

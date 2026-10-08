@@ -19,23 +19,46 @@ class RagService {
   final VectorStore _store;
   final GeminiAgentEngine _engine;
 
-  Future<RagAnswer> answer(String question, {String? sessionId}) async {
-    final queryVector = await _embeddings.embedQuery(question);
-    final matches = _store.query(queryVector, kRagTopK, sessionId: sessionId);
+  /// Bounded LRU of recent query embeddings: query text + time.
+  final Map<String, ({List<double> vector, DateTime at})> _queryCache = {};
 
-    if (matches.isEmpty) {
+  Future<RagAnswer> answer(String question, {String? sessionId}) async {
+    final cached = _queryCache[question];
+    final List<double> queryVector;
+    if (cached != null &&
+        DateTime.now().difference(cached.at).inSeconds <
+            kRagQueryCacheTtlSeconds) {
+      queryVector = cached.vector;
+    } else {
+      queryVector = await _embeddings.embedQuery(question);
+      _queryCache[question] = (vector: queryVector, at: DateTime.now());
+      if (_queryCache.length > 10) {
+        _queryCache.remove(_queryCache.keys.first);
+      }
+    }
+
+    final topK = sessionId == null ? kRagTopK : kRagTopKSession;
+    final matches = _store.query(queryVector, topK, sessionId: sessionId);
+
+    if (matches.isEmpty || matches.first.distance > kRagMinDistance) {
       return RagAnswer(
         answer: 'I could not find anything about that in your memories yet.',
         sources: const [],
       );
     }
 
-    final context = matches
-        .map((m) => '[memory ${m.chunk.sessionId} @ ${m.chunk.startMs}ms]\n${m.chunk.text}')
-        .join('\n\n');
+    final contextBuffer = StringBuffer();
+    for (final m in matches) {
+      final header = m.chunk.title.isNotEmpty
+          ? m.chunk.title
+          : m.chunk.sessionId;
+      final slice = '[memory $header @ ${m.chunk.startMs}ms]\n${m.chunk.text}\n\n';
+      if (contextBuffer.length + slice.length > kRagContextMaxChars) break;
+      contextBuffer.write(slice);
+    }
 
     final reply = await _engine.prompt(
-      'Context from the user\'s memories:\n$context\n\nQuestion: $question',
+      'Context from the user\'s memories:\n$contextBuffer\nQuestion: $question',
       history: [
         const ChatMessage(
           role: 'system',

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../abstractions/agent_engine.dart';
 import '../../constants.dart';
+import '../rag/rate_limiter.dart';
 import 'mistral_agent_engine.dart' show AgentException;
 
 /// Agent backed by Google's Gemini generateContent API.
@@ -20,6 +21,10 @@ class GeminiAgentEngine implements AgentEngine {
   final String model;
   final String endpoint;
   final String? systemPrompt;
+
+  static final _limiter = RateLimiter(
+    Duration(milliseconds: kGeminiMinGapChatMs),
+  );
 
   @override
   Future<String> prompt(String transcript, {List<ChatMessage>? history}) async {
@@ -65,16 +70,33 @@ class GeminiAgentEngine implements AgentEngine {
     });
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('$endpoint?key=$apiKey'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: body,
-          )
-          .timeout(const Duration(seconds: 45));
+      final response = await _limiter.run(() async {
+        var r = await http
+            .post(
+              Uri.parse('$endpoint?key=$apiKey'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: body,
+            )
+            .timeout(const Duration(seconds: 45));
+        if (r.statusCode == 429) {
+          final wait = retryDelayFromBody(r.body) ?? const Duration(seconds: 5);
+          await Future.delayed(wait);
+          r = await http
+              .post(
+                Uri.parse('$endpoint?key=$apiKey'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                body: body,
+              )
+              .timeout(const Duration(seconds: 45));
+        }
+        return r;
+      });
 
       if (response.statusCode != 200) {
         throw AgentException(

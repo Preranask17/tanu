@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../constants.dart';
+import 'rate_limiter.dart';
 
 /// Embeds text with Gemini's embedding API for the RAG pipeline.
 class EmbeddingService {
@@ -13,6 +14,7 @@ class EmbeddingService {
 
   final String apiKey;
   final String model;
+  final _limiter = RateLimiter(Duration(milliseconds: kGeminiMinGapEmbedMs));
 
   static String get _batchEndpoint =>
       'https://generativelanguage.googleapis.com/v1beta/models/$kGeminiEmbeddingModel:batchEmbedContents';
@@ -44,13 +46,28 @@ class EmbeddingService {
           .toList(),
     });
 
-    final response = await http
-        .post(
-          Uri.parse('$_batchEndpoint?key=$apiKey'),
-          headers: {'Content-Type': 'application/json'},
-          body: body,
-        )
-        .timeout(const Duration(seconds: 45));
+    final response = await _limiter.run(() async {
+      var r = await http
+          .post(
+            Uri.parse('$_batchEndpoint?key=$apiKey'),
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 45));
+      // One graceful retry on 429 using Gemini's retryDelay.
+      if (r.statusCode == 429) {
+        final wait = retryDelayFromBody(r.body) ?? const Duration(seconds: 5);
+        await Future.delayed(wait);
+        r = await http
+            .post(
+              Uri.parse('$_batchEndpoint?key=$apiKey'),
+              headers: {'Content-Type': 'application/json'},
+              body: body,
+            )
+            .timeout(const Duration(seconds: 45));
+      }
+      return r;
+    });
 
     if (response.statusCode != 200) {
       throw Exception('Embedding API returned ${response.statusCode}: ${response.body}');

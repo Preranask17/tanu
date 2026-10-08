@@ -17,31 +17,48 @@ class MemoryIndexer {
 
     final cleaned = session.cleanedTranscript?.trim();
     if (cleaned != null && cleaned.isNotEmpty) {
-      var start = 0;
-      var index = 0;
-      while (start < cleaned.length) {
-        var end = start + kRagChunkMaxChars;
-        if (end < cleaned.length) {
-          final newline = cleaned.lastIndexOf('\n', end);
-          final period = cleaned.lastIndexOf('. ', end);
-          final cut = newline > start ? newline : (period > start ? period + 1 : -1);
-          if (cut > start) end = cut;
-        } else {
-          end = cleaned.length;
+      final sentences = cleaned.split(RegExp(r'(?<=[.!?\n])\s+'));
+      final buffer = StringBuffer();
+      String? previousTail;
+      int index = 0;
+
+      for (final sentence in sentences) {
+        if (buffer.length + sentence.length > kRagChunkMaxChars &&
+            buffer.isNotEmpty) {
+          final text = buffer.toString().trim();
+          if (text.length >= kRagMinSliceChars) {
+            chunks.add(MemoryChunk(
+              id: '${session.id}:$index',
+              sessionId: session.id,
+              text: text,
+              startMs: 0,
+          title: session.title,
+            ));
+            index++;
+            previousTail = text.length > kRagChunkOverlapChars
+                ? text.substring(text.length - kRagChunkOverlapChars)
+                : text;
+          }
+          buffer.clear();
+          if (previousTail != null) {
+            buffer.write(previousTail);
+            buffer.write(' ');
+          }
         }
+        buffer.write(sentence);
+        buffer.write(' ');
+      }
+      final tail = buffer.toString().trim();
+      if (tail.length >= kRagMinSliceChars) {
         chunks.add(MemoryChunk(
           id: '${session.id}:$index',
           sessionId: session.id,
-          text: cleaned.substring(start, end).trim(),
+          text: tail,
           startMs: 0,
+          title: session.title,
         ));
-        index++;
-        start = end;
-        while (start < cleaned.length && cleaned[start] == '\n') {
-          start++;
-        }
       }
-      return chunks.where((c) => c.text.isNotEmpty).toList();
+      return chunks;
     }
 
     var group = <TranscriptSegment>[];
@@ -54,6 +71,7 @@ class MemoryIndexer {
           sessionId: session.id,
           text: text,
           startMs: group.first.startMs,
+          title: session.title,
         ));
       }
       group = [];
@@ -76,9 +94,24 @@ class MemoryIndexer {
   Future<int> indexSession(ConversationSession session) async {
     final chunks = chunkSession(session);
     if (chunks.isEmpty) return 0;
-    final vectors = await _embeddings.embedDocuments(chunks.map((c) => c.text).toList());
-    _store.upsertChunks(chunks, vectors);
-    return chunks.length;
+
+    // Skip unchanged sessions that already have chunks indexed.
+    if (_store.hasSession(session.id)) {
+      return 0;
+    }
+
+    var embedded = 0;
+    for (var i = 0; i < chunks.length; i += kRagEmbedBatchSize) {
+      final batch = chunks.sublist(
+        i,
+        (i + kRagEmbedBatchSize).clamp(0, chunks.length),
+      );
+      final vectors = await _embeddings
+          .embedDocuments(batch.map((c) => c.text).toList());
+      _store.upsertChunks(batch, vectors);
+      embedded += batch.length;
+    }
+    return embedded;
   }
 
   /// Backfill sessions missing from the store, capped per call so the UI
