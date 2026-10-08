@@ -74,6 +74,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
       // Retry any memories whose AI processing failed previously.
       unawaited(_drainRetryQueue());
+      // One-time demo memories so RAG is usable on a fresh install.
+      unawaited(seedDemoMemories());
     });
     return ConversationState(
       active: loaded.active,
@@ -861,6 +863,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
   }
 
   Future<void> seedDemoMemories() async {
+    final box = Hive.box(Boxes.conversation);
+    if (box.get('demoSeeded') == true) return;
+    box.put('demoSeeded', true);
     final now = DateTime.now();
     final demos = <ConversationSession>[
       ConversationSession(
