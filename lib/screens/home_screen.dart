@@ -6,6 +6,7 @@ import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
+import 'ask_screen.dart';
 import '../widgets/aura_orb.dart';
 import '../widgets/home_chat_bar.dart';
 import '../widgets/page_layout.dart';
@@ -121,7 +122,16 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                     title: const TanuPageTitle('Capture'),
                     titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
                   ),
-                  actions: const [SizedBox(width: 8)],
+                  actions: [
+                    IconButton(
+                      tooltip: 'Ask Tanu',
+                      icon: const Icon(Icons.search_rounded),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const AskScreen()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                 ),
                 SliverToBoxAdapter(
                   child: SafeArea(

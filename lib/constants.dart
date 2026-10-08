@@ -103,3 +103,9 @@ const String kGeminiApiKey = 'AQ.Ab8RN6I6DDNkDuCzbZcKYkTbdqBVXTm5Ny2KCK7oO8dCTVt
 const String kGeminiModel = 'gemini-3.5-flash';
 const String kGeminiEndpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/$kGeminiModel:generateContent';
+
+/// Gemini embeddings used by the RAG pipeline.
+const String kGeminiEmbeddingModel = 'gemini-embedding-001';
+const int kEmbeddingDims = 768;
+const int kRagChunkMaxChars = 1000;
+const int kRagTopK = 6;

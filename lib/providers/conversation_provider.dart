@@ -16,6 +16,7 @@ import 'agent_provider.dart';
 import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
+import 'rag_provider.dart';
 
 import '../services/stt/whisper_small_engine.dart';
 
@@ -601,6 +602,20 @@ class ConversationNotifier extends Notifier<ConversationState> {
           );
         }
       }
+    }
+
+    // Index the session chunks for RAG retrieval (best effort).
+    if (idx != -1) {
+      try {
+        final indexer = await ref.read(memoryIndexerProvider.future);
+        await indexer.indexSession(session.copyWith(
+          title: result.title,
+          summary: result.summary,
+          cleanedTranscript: result.cleanedTranscript.isEmpty
+              ? null
+              : result.cleanedTranscript,
+        ));
+      } catch (_) {}
     }
 
     ref

@@ -94,7 +94,21 @@ class GeminiAgentEngine implements AgentEngine {
       if (parts == null || parts.isEmpty) {
         throw AgentException('Gemini returned empty content');
       }
-      return ((parts.first as Map<String, dynamic>)['text'] as String?)?.trim() ?? '';
+      String? text;
+      for (final p in parts) {
+        final m = p as Map<String, dynamic>;
+        if (m['thought'] == true) continue;
+        final t = m['text'] as String?;
+        if (t != null && t.trim().isNotEmpty) {
+          text = t;
+          break;
+        }
+      }
+      text ??= ((parts.first as Map<String, dynamic>)['text'] as String?);
+      if (text == null || text.trim().isEmpty) {
+        throw AgentException('Gemini returned no text');
+      }
+      return text.trim();
     } on AgentException {
       rethrow;
     } catch (e) {
@@ -177,8 +191,14 @@ No commentary, no markdown fences.
   }
 
   MemoryResult _parse(String raw) {
-    final start = raw.indexOf('{');
-    final end = raw.lastIndexOf('}');
+    // Strip markdown fences Gemini sometimes adds despite instructions.
+    var cleaned = raw.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replaceFirst(RegExp(r'^```[a-zA-Z]*\n?'), '');
+      cleaned = cleaned.replaceFirst(RegExp(r'```$'), '');
+    }
+    final start = cleaned.indexOf('{');
+    final end = cleaned.lastIndexOf('}');
     if (start == -1 || end == -1) {
       return const MemoryResult(
         title: 'Memory',
@@ -186,7 +206,7 @@ No commentary, no markdown fences.
         commitments: [],
       );
     }
-    final jsonStr = raw.substring(start, end + 1);
+    final jsonStr = cleaned.substring(start, end + 1);
 
     try {
       final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
