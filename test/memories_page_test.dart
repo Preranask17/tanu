@@ -34,10 +34,10 @@ void main() {
     expect(find.byType(TanuWordmark), findsOneWidget);
     expect(find.text('Memories'), findsOneWidget);
     expect(find.byIcon(Icons.delete_outline), findsWidgets);
-    // RAG search pill.
+    // RAG search pill: magnifier + field only, no mic affordance.
     expect(find.byType(TextField), findsOneWidget);
     expect(find.text('Ask or search memories...'), findsOneWidget);
-    expect(find.byIcon(Icons.mic_none), findsWidgets);
+    expect(find.byIcon(Icons.mic_none), findsNothing);
     // No RAG card before a question is submitted.
     expect(find.textContaining('memories found'), findsNothing);
     expect(find.textContaining('Recalling memories'), findsNothing);

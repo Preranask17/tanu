@@ -261,27 +261,6 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                             ),
                           ),
                         ),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          if (_query.text.trim().isNotEmpty) {
-                            _askRag();
-                          } else {
-                            ref
-                                .read(conversationProvider.notifier)
-                                .microphoneTest();
-                          }
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.only(left: 8),
-                          child: Icon(
-                            Icons.mic_none,
-                            size: 20,
-                            color: Color(0xFF888888),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),

@@ -173,27 +173,17 @@ class _ConversationTileState extends State<ConversationTile> {
               height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _getAvatarGradients(session.id),
-                ),
+                color: isDark
+                    ? const Color(0xFF2A2A2A)
+                    : const Color(0xFFE5E5E5),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _getAvatarGradients(session.id).last.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
               child: Text(
                 title.isEmpty ? 'M' : title.characters.first.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF666666),
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  shadows: [Shadow(color: Colors.black26, blurRadius: 2, offset: Offset(0, 1))],
                 ),
               ),
             ),
@@ -374,19 +364,4 @@ class _ConversationTileState extends State<ConversationTile> {
     );
   }
 
-  List<Color> _getAvatarGradients(String id) {
-    // Deterministically pick a beautiful gradient based on the session ID
-    final palettes = [
-      [const Color(0xFFFF9A9E), const Color(0xFFFECFEF)],
-      [const Color(0xFFa18cd1), const Color(0xFFfbc2eb)],
-      [const Color(0xFF84fab0), const Color(0xFF8fd3f4)],
-      [const Color(0xFFfccb90), const Color(0xFFd57eeb)],
-      [const Color(0xFFe0c3fc), const Color(0xFF8ec5fc)],
-      [const Color(0xFF4facfe), const Color(0xFF00f2fe)],
-      [const Color(0xFF43e97b), const Color(0xFF38f9d7)],
-      [const Color(0xFFfa709a), const Color(0xFFfee140)],
-    ];
-    final hash = id.hashCode.abs();
-    return palettes[hash % palettes.length];
-  }
 }
