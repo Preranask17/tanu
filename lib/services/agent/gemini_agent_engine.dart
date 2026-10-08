@@ -61,6 +61,7 @@ class GeminiAgentEngine implements AgentEngine {
       'generationConfig': {
         'temperature': 0.6,
         'maxOutputTokens': 1024,
+        'responseMimeType': 'application/json',
       },
     });
 
@@ -84,23 +85,38 @@ class GeminiAgentEngine implements AgentEngine {
       }
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final candidates = decoded['candidates'] as List<dynamic>?;
-      if (candidates == null || candidates.isEmpty) {
-        throw AgentException('Gemini returned no candidates');
-      }
-      final content =
-          (candidates.first as Map<String, dynamic>)['content'] as Map<String, dynamic>;
-      final parts = content['parts'] as List<dynamic>?;
-      if (parts == null || parts.isEmpty) {
-        throw AgentException('Gemini returned empty content');
-      }
-      return ((parts.first as Map<String, dynamic>)['text'] as String?)?.trim() ?? '';
+      return extractGeminiAnswerText(decoded);
     } on AgentException {
       rethrow;
     } catch (e) {
       throw AgentException('Network error calling Gemini: $e');
     }
   }
+}
+
+/// Picks the answer text out of a generateContent response: the first
+/// NON-thought text part. Thinking models lead with thought parts
+/// ({'thought': true}); reading parts.first blindly parses thinking prose
+/// as JSON and fails every memory. Pure, unit-tested.
+String extractGeminiAnswerText(Map<String, dynamic> decoded) {
+  final candidates = decoded['candidates'] as List<dynamic>?;
+  if (candidates == null || candidates.isEmpty) {
+    throw AgentException('Gemini returned no candidates');
+  }
+  final content =
+      (candidates.first as Map<String, dynamic>)['content']
+          as Map<String, dynamic>;
+  final parts = content['parts'] as List<dynamic>?;
+  if (parts == null || parts.isEmpty) {
+    throw AgentException('Gemini returned empty content');
+  }
+  for (final part in parts) {
+    final map = part as Map<String, dynamic>;
+    if (map['thought'] == true) continue;
+    final text = (map['text'] as String?)?.trim() ?? '';
+    if (text.isNotEmpty) return text;
+  }
+  throw AgentException('Gemini returned no answer text');
 }
 
 /// Typed result of commitment extraction.
