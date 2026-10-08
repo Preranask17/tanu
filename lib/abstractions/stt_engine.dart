@@ -64,6 +64,13 @@ abstract class ContinuousSttEngine extends SttEngine {
   /// avoid clobbering it when a memory reply arrives mid-speech).
   bool get hasActiveUtterance;
 
+  /// Force-decode whatever audio the recognizer still holds (open VAD
+  /// segment, coalesced partial windows) and emit it as usual partial/final
+  /// messages. Used before finalizing a memory on disconnect so trailing
+  /// speech is never silently dropped. Default is a no-op; engines with a
+  /// worker isolate override it.
+  Future<void> flushUtterance() async {}
+
   /// Short human label for the caption engine shown in Settings / inventory.
   String get modelLabel;
 }

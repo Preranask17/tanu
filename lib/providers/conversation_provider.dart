@@ -114,13 +114,30 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   /// --- Session lifecycle ------------------------------------------------
 
+  /// Brief-drop grace: disconnects shorter than this keep appending to
+  /// the same memory instead of fragmenting it. Broadcast streams survive
+  /// the drop, so grace is just waiting — engine, VAD and subscriptions
+  /// stay live throughout.
+  static const Duration _disconnectGrace = Duration(seconds: 3);
+  Timer? _disconnectGraceTimer;
+
   void _syncContinuous(PendantStatus? status) {
     final connected = status?.isConnected ?? false;
     if (connected && !_micTestActive && !_continuousStarted && !_userPaused) {
-      unawaited(_startContinuous());
+      _disconnectGraceTimer?.cancel();
+      _disconnectGraceTimer = null;
+      unawaited(_startContinuous(resumeExisting: state.active != null));
     } else if (!connected && _continuousStarted) {
       _userPaused = false;
-      unawaited(_stopContinuous());
+      if (state.active == null) {
+        unawaited(_stopContinuous());
+        return;
+      }
+      _disconnectGraceTimer?.cancel();
+      _disconnectGraceTimer = Timer(_disconnectGrace, () {
+        _disconnectGraceTimer = null;
+        if (_continuousStarted) unawaited(_stopContinuous());
+      });
     }
   }
 
@@ -200,6 +217,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
   /// [resumeListening] (or a fresh connect after disconnect clears the pause).
   Future<void> pauseListening() async {
     _userPaused = true;
+    _disconnectGraceTimer?.cancel();
+    _disconnectGraceTimer = null;
     if (!_continuousStarted) {
       state = state.copyWith(
         isListening: false,
@@ -272,6 +291,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _idleTimer?.cancel();
     _idleTimer = null;
     _clock = Stopwatch();
+    _lockLiveTranscript();
     if (_continuousStarted) {
       // Keep listening: open the next memory so speech continues seamlessly.
       final now = DateTime.now();
@@ -288,8 +308,56 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _persist(urgent: true);
   }
 
+  /// Merges the visible partial into the active session as a locked
+  /// segment when it never got its final (disconnect/close raced the VAD).
+  /// Truly-empty sessions (never a word) still drop at close, correctly.
+  /// Pure core ([lockLiveTail]) is unit-tested; this only applies it.
+  static List<TranscriptSegment> lockLiveTail({
+    required List<TranscriptSegment> segments,
+    required String liveTranscript,
+    required String sessionId,
+    required int nowMs,
+  }) {
+    final tail = liveTranscript.trim();
+    if (tail.isEmpty) return segments;
+    final open = segments.isNotEmpty && segments.last.endMs == null;
+    final out = List<TranscriptSegment>.of(segments);
+    if (open) {
+      final last = segments.last;
+      out[segments.length - 1] = last.copyWith(text: tail, endMs: nowMs);
+    } else {
+      out.add(
+        TranscriptSegment(
+          id: '$sessionId-${segments.length}',
+          text: tail,
+          timestamp: DateTime.now(),
+          startMs: nowMs,
+          endMs: nowMs,
+        ),
+      );
+    }
+    return out;
+  }
+
+  void _lockLiveTranscript() {
+    final session = state.active;
+    if (session == null || state.liveTranscript.trim().isEmpty) return;
+    final segments = lockLiveTail(
+      segments: session.segments,
+      liveTranscript: state.liveTranscript,
+      sessionId: session.id,
+      nowMs: _clock.elapsedMilliseconds,
+    );
+    state = state.copyWith(
+      active: _withTitle(session, segments),
+      liveTranscript: '',
+    );
+  }
+
   Future<void> _stopContinuous() async {
     if (!_continuousStarted) return;
+    _disconnectGraceTimer?.cancel();
+    _disconnectGraceTimer = null;
     _continuousStarted = false;
     _buttonSub?.cancel();
     _buttonSub = null;
@@ -301,8 +369,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _idleTimer = null;
 
     final engine = ref.read(sttEngineProvider);
+    // Salvage trailing speech first: force-decode the open VAD segment and
+    // coalesced windows so the tail lands in this memory instead of dying
+    // with the worker. Finals arrive through the usual callbacks first.
+    await engine.flushUtterance();
     await engine.stopContinuous();
 
+    _lockLiveTranscript();
     final session = state.active;
     if (session != null && session.segments.isNotEmpty) {
       final finished = session.copyWith(
@@ -430,8 +503,6 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _resetIdleTimer();
     _evaluateEndOfConversation(trimmed, segments.length);
   }
-
-  // --- End-of-conversation detection -------------------------------------
 
   Timer? _softEndTimer;
   DateTime? _lastEndCloseAt;

@@ -139,6 +139,12 @@ class SenseVoiceSttEngine implements ContinuousSttEngine {
   }
 
   @override
+
+  @override
+  Future<void> flushUtterance() async {
+    // No worker-side audio held: nothing to salvage.
+  }
+
   Future<void> stop() async {
     await stopContinuous();
   }

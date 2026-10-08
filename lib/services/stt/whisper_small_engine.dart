@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart';
+import 'stt_worker_utils.dart';
 
 import '../../abstractions/stt_engine.dart';
 import '../../config/stt_config.dart';
@@ -37,6 +38,7 @@ class WhisperSmallEngine implements ContinuousSttEngine {
 
   SendPort? _workerPort;
   Isolate? _isolate;
+  Completer<void>? _flushAck;
 
   StreamSubscription<Uint8List>? _micSub;
 
@@ -71,6 +73,23 @@ class WhisperSmallEngine implements ContinuousSttEngine {
     }
   }
 
+  @override
+  Future<void> flushUtterance() async {
+    final port = _workerPort;
+    if (port == null) return;
+    final ack = Completer<void>();
+    _flushAck = ack;
+    port.send(['flush']);
+    try {
+      await ack.future.timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Worker never acked (shutting down / model missing): whatever finals
+      // already arrived are merged by the provider; nothing more to salvage.
+    } finally {
+      if (identical(_flushAck, ack)) _flushAck = null;
+    }
+  }
+
   Future<bool> _ensureWorker() async {
     if (_workerPort != null) return true;
     final bundlePath = await _bundlePath();
@@ -85,6 +104,10 @@ class WhisperSmallEngine implements ContinuousSttEngine {
       } else if (msg is List && msg[0] == 'error') {
         _log('[tanu] whisper worker error: ${msg[1]}');
         if (!completer.isCompleted) completer.complete(null);
+      } else if (msg is List && msg[0] == 'flushed') {
+        _flushAck?.complete();
+      } else if (msg is List && msg[0] == 'timing') {
+        _log('[tanu] decode ${(msg[1] as num).toStringAsFixed(1)}s audio in ${msg[2]}ms');
       } else if (msg is List && msg[0] == 'partial') {
         final text = msg[1] as String;
         if (_continuousActive && text.isNotEmpty) {
@@ -288,6 +311,70 @@ Future<void> _whisperWorker(List<dynamic> args) async {
   final pending = <double>[];
   final sampleRate = SttConfig.sampleRate;
 
+  // Drains full VAD windows, then decodes every popped segment in bounded
+  // ~10 s pieces (synchronous decodes would otherwise stall live partials
+  // for seconds on long monologues). When [flushTrailing] is set, pending
+  // audio is first padded with silence so the open VAD segment endpoint-closes
+  // instead of evaporating.
+  void drainWindows({bool flushTrailing = false}) {
+    final v = vad;
+    final r = recognizer;
+    if (v == null || r == null) return;
+    if (flushTrailing) {
+      final remainder = pending.length % window;
+      if (remainder != 0) {
+        pending.addAll(List.filled(window - remainder, 0.0));
+      }
+      // Trailing silence forces the open segment to endpoint-close.
+      pending.addAll(List.filled((sampleRate * 0.6).round(), 0.0));
+    }
+    while (pending.length >= window) {
+      final chunk = Float32List(window);
+      for (var i = 0; i < window; i++) {
+        chunk[i] = pending[i];
+      }
+      pending.removeRange(0, window);
+      v.acceptWaveform(chunk);
+
+      while (!v.isEmpty()) {
+        final segment = v.front();
+        v.pop();
+
+        // Guard 1: ignore very short blips (door slams, mic taps).
+        if (segment.samples.length < sampleRate * 0.4) continue;
+
+        for (final seg in splitDecodeWindows(segment.samples, sampleRate * 10)) {
+          // Guard 2: ignore near-silent pieces that slipped past VAD.
+          var sum = 0.0;
+          for (final sample in seg) {
+            sum += sample * sample;
+          }
+          if (seg.isEmpty || sum / seg.length < 0.0002) continue;
+
+          final stream = r.createStream();
+          stream.acceptWaveform(samples: seg, sampleRate: sampleRate);
+          final decodeWatch = Stopwatch()..start();
+          r.decode(stream);
+          decodeWatch.stop();
+          replyPort.send([
+            'timing',
+            seg.length / sampleRate,
+            decodeWatch.elapsedMilliseconds,
+          ]);
+
+          final result = r.getResult(stream);
+          final text = result.text.trim();
+          stream.free();
+
+          // Guard 3: drop hallucinated filler phrases.
+          if (text.isEmpty || _isJunk(text)) continue;
+          replyPort.send(['partial', text]);
+          replyPort.send(['final', text]);
+        }
+      }
+    }
+  }
+
   await for (final msg in commands) {
     if (msg is List) {
       final cmd = msg[0] as String;
@@ -298,60 +385,13 @@ Future<void> _whisperWorker(List<dynamic> args) async {
       } else if (cmd == 'reset') {
         vad.clear();
         pending.clear();
+      } else if (cmd == 'flush') {
+        drainWindows(flushTrailing: true);
+        replyPort.send(['flushed']);
       } else if (cmd == 'audio') {
         final samples = msg[1] as Float32List;
         pending.addAll(samples);
-
-        while (pending.length >= window) {
-          final chunk = Float32List(window);
-          for (var i = 0; i < window; i++) {
-            chunk[i] = pending[i];
-          }
-          pending.removeRange(0, window);
-          vad.acceptWaveform(chunk);
-
-          while (!vad.isEmpty()) {
-            final segment = vad.front();
-            vad.pop();
-
-            // Guard 1: ignore very short blips (door slams, mic taps).
-            if (segment.samples.length < sampleRate * 0.4) continue;
-
-            // Long segments decode synchronously and would stall live
-            // partials for seconds, so split anything over ~10 s into
-            // back-to-back decode windows. Same guards apply per window;
-            // the provider still groups the pieces into one memory.
-            final all = segment.samples;
-            var offset = 0;
-            while (offset < all.length) {
-              final end = (offset + sampleRate * 10 < all.length)
-                  ? offset + sampleRate * 10
-                  : all.length;
-              final seg = Float32List.fromList(all.sublist(offset, end));
-              offset = end;
-
-              // Guard 2: ignore near-silent pieces that slipped past VAD.
-              var sum = 0.0;
-              for (final v in seg) {
-                sum += v * v;
-              }
-              if (seg.isEmpty || sum / seg.length < 0.0002) continue;
-
-              final stream = recognizer.createStream();
-              stream.acceptWaveform(samples: seg, sampleRate: sampleRate);
-              recognizer.decode(stream);
-
-              final result = recognizer.getResult(stream);
-              final text = result.text.trim();
-              stream.free();
-
-              // Guard 3: drop hallucinated filler phrases.
-              if (text.isEmpty || _isJunk(text)) continue;
-              replyPort.send(['partial', text]);
-              replyPort.send(['final', text]);
-            }
-          }
-        }
+        drainWindows();
       }
     }
   }

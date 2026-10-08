@@ -234,21 +234,25 @@ class _ConversationTileState extends State<ConversationTile> {
                   ),
                   const SizedBox(height: 6),
                   if (widget.isProcessing)
-                    const Row(
+                    Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SizedBox(
+                        const SizedBox(
                           width: 12,
                           height: 12,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Writing summary…',
-                          style: TextStyle(
-                            color: Color(0xFF888888),
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Writing summary…',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ),
                       ],
@@ -260,20 +264,24 @@ class _ConversationTileState extends State<ConversationTile> {
                         HapticFeedback.selectionClick();
                         widget.onRetry!();
                       },
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.refresh_rounded,
                             size: 14,
                             color: Color(0xFF888888),
                           ),
-                          SizedBox(width: 6),
-                          Text(
-                            'AI summary paused — tap to retry',
-                            style: TextStyle(
-                              color: Color(0xFF888888),
-                              fontSize: 12,
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'AI paused — tap to retry',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
@@ -293,11 +301,15 @@ class _ConversationTileState extends State<ConversationTile> {
                       ),
                       if (session.segmentCount > 0) ...[
                         const SizedBox(width: 8),
-                        Text(
-                          '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                            color: Color(0xFF888888),
-                            fontSize: 14,
+                        Flexible(
+                          child: Text(
+                            '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
