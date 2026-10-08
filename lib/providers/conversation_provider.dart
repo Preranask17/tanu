@@ -665,10 +665,11 @@ class ConversationNotifier extends Notifier<ConversationState> {
     }
   }
 
-  void _dequeueRetry(String sessionId) {
+  void _dequeueRetry(String sessionId, {bool keepAttemptCount = false}) {
     final box = Hive.box(Boxes.conversation);
     final queue = _retryQueue()..remove(sessionId);
     box.put('memoryRetryQueue', queue);
+    if (keepAttemptCount) return;
     final raw = box.get('memoryRetryAttempts');
     final attempts = Map<String, dynamic>.from(raw is Map ? raw : {});
     attempts.remove(sessionId);
@@ -683,6 +684,20 @@ class ConversationNotifier extends Notifier<ConversationState> {
   }
 
   Future<void> _drainRetryQueue() async {
+    // Rescue sessions left in a failed state by older builds (pre-queue).
+    for (final s in state.conversations) {
+      final summary = s.summary ?? '';
+      final looksFailed = summary.startsWith('Could not parse') ||
+          summary.startsWith('Failed to process memory');
+      final looksUnprocessed = summary.isEmpty &&
+          s.cleanedTranscript == null &&
+          s.transcriptText.trim().isNotEmpty;
+      if ((looksFailed || looksUnprocessed) &&
+          _retryAttemptCount(s.id) < _maxRetryAttempts) {
+        _enqueueForRetry(s.id);
+      }
+    }
+
     final queue = _retryQueue();
     if (queue.isEmpty) return;
 
@@ -722,7 +737,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         map[id] = attempts;
         box.put('memoryRetryAttempts', map);
         if (attempts >= _maxRetryAttempts) {
-          _dequeueRetry(id);
+          _dequeueRetry(id, keepAttemptCount: true);
           ref.read(analyticsProvider).capture('memory retry gave up');
         }
       }
