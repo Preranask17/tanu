@@ -93,15 +93,16 @@ class _Kicker extends StatelessWidget {
 
 /// Page headline.
 class _Headline extends StatelessWidget {
-  const _Headline(this.text);
+  const _Headline(this.text, {this.align = TextAlign.center});
 
   final String text;
+  final TextAlign align;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
-      textAlign: TextAlign.center,
+      textAlign: align,
       style: const TextStyle(
         fontSize: 30,
         fontWeight: FontWeight.w800,
@@ -114,15 +115,16 @@ class _Headline extends StatelessWidget {
 
 /// Supporting line under the headline.
 class _Subline extends StatelessWidget {
-  const _Subline(this.text);
+  const _Subline(this.text, {this.align = TextAlign.center});
 
   final String text;
+  final TextAlign align;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
-      textAlign: TextAlign.center,
+      textAlign: align,
       style: const TextStyle(
         fontSize: 15,
         height: 1.5,
@@ -320,26 +322,79 @@ class _ListenPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _Entrance(
           delay: Duration.zero,
-          child: const _StoryIcon(Icons.bluetooth_connected_rounded),
-        ),
-        const SizedBox(height: 32),
-        _Entrance(
-          delay: const Duration(milliseconds: 200),
           child: const _Kicker('The pendant'),
         ),
         const SizedBox(height: 12),
         _Entrance(
-          delay: const Duration(milliseconds: 300),
-          child: const _Headline('It hears\nyour day.'),
+          delay: const Duration(milliseconds: 150),
+          child: const _Headline(
+            'It hears\nyour day.',
+            align: TextAlign.left,
+          ),
         ),
         const SizedBox(height: 12),
         _Entrance(
-          delay: const Duration(milliseconds: 420),
+          delay: const Duration(milliseconds: 280),
           child: const _Subline(
-            'A tiny wearable on you.\nIt streams the moments — meetings,\nideas, promises — to your phone.',
+            'A tiny wearable on you.\nMeetings, ideas, promises —\nstreamed to your phone.',
+            align: TextAlign.left,
+          ),
+        ),
+        const SizedBox(height: 28),
+        _Entrance(
+          delay: const Duration(milliseconds: 420),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.bluetooth_connected,
+                  size: 22,
+                  color: Color(0xFF4CAF50),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Pendant linked',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Listening for your thoughts…',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFBBBBBB),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.battery_std,
+                  size: 20,
+                  color: Color(0xFF888888),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -357,9 +412,56 @@ class _TranscribePage extends StatelessWidget {
       children: [
         _Entrance(
           delay: Duration.zero,
-          child: const _StoryIcon(Icons.graphic_eq_rounded),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    ...List.generate(
+                      4,
+                      (i) => Container(
+                        width: 3.5,
+                        height: 10 + (i % 3) * 7.0,
+                        margin: const EdgeInsets.only(right: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB9A7F2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'LIVE TRANSCRIPT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.6,
+                        color: Color(0xFF888888),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _MockLine('Let’s lock Friday for the launch…', 1.0, true),
+                const SizedBox(height: 8),
+                _MockLine('Ramesh owns the final report.', 0.82, false),
+                const SizedBox(height: 8),
+                _MockLine('Design sync moved to Thursday.', 0.66, false),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
         _Entrance(
           delay: const Duration(milliseconds: 200),
           child: const _Kicker('Speech to text'),
@@ -373,10 +475,35 @@ class _TranscribePage extends StatelessWidget {
         _Entrance(
           delay: const Duration(milliseconds: 420),
           child: const _Subline(
-            'Conversations become timestamped\ntranscripts as you speak —\nin Hindi, Kannada, Tamil and more.',
+            'Timestamped transcripts as you speak —\nin Hindi, Kannada, Tamil and more.',
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MockLine extends StatelessWidget {
+  const _MockLine(this.text, this.widthFactor, this.live);
+
+  final String text;
+  final double widthFactor;
+  final bool live;
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: widthFactor,
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 14,
+          fontStyle: live ? FontStyle.italic : FontStyle.normal,
+          color: live ? Colors.white : const Color(0xFFBBBBBB),
+        ),
+      ),
     );
   }
 }
@@ -391,23 +518,89 @@ class _RecallPage extends StatelessWidget {
       children: [
         _Entrance(
           delay: Duration.zero,
-          child: const _StoryIcon(Icons.auto_awesome_rounded),
-        ),
-        const SizedBox(height: 32),
-        _Entrance(
-          delay: const Duration(milliseconds: 200),
-          child: const _Kicker('Recall'),
-        ),
-        const SizedBox(height: 12),
-        _Entrance(
-          delay: const Duration(milliseconds: 300),
           child: const _Headline('Ask anything.\nGet answers.'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        _Entrance(
+          delay: const Duration(milliseconds: 150),
+          child: const _Kicker('Recall'),
+        ),
+        const SizedBox(height: 20),
+        _Entrance(
+          delay: const Duration(milliseconds: 280),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3E2E7E),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'What did we decide Friday?',
+                style: TextStyle(fontSize: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
         _Entrance(
           delay: const Duration(milliseconds: 420),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                ),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Launch is Friday — from “Project sync”.',
+                    style: TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 12,
+                        color: Color(0xFFB9A7F2),
+                      ),
+                      SizedBox(width: 5),
+                      Text(
+                        '1 memory found',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFB9A7F2),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _Entrance(
+          delay: const Duration(milliseconds: 540),
           child: const _Subline(
-            '“What did we decide on Friday?”\nTanu finds it in your memories\nwith clear, sourced replies.',
+            'Grounded in your saved moments,\nwith the source attached.',
           ),
         ),
       ],
@@ -427,24 +620,104 @@ class _PrivateReadyPage extends StatelessWidget {
           delay: Duration.zero,
           child: const _StoryIcon(Icons.lock_rounded),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
         _Entrance(
-          delay: const Duration(milliseconds: 200),
+          delay: const Duration(milliseconds: 150),
           child: const _Kicker('Absolute privacy'),
         ),
         const SizedBox(height: 12),
         _Entrance(
-          delay: const Duration(milliseconds: 300),
+          delay: const Duration(milliseconds: 250),
           child: const _Headline('Yours. Only\nyours.'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 24),
         _Entrance(
-          delay: const Duration(milliseconds: 420),
-          child: const _Subline(
-            'Everything lives on this device.\nNo feeds, no strangers,\nno compromises.',
+          delay: const Duration(milliseconds: 380),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _PrivacyRow(
+                icon: Icons.mic_off_outlined,
+                title: 'On-device transcription',
+                subtitle: 'Audio never leaves your phone.',
+              ),
+              SizedBox(height: 10),
+              _PrivacyRow(
+                icon: Icons.visibility_off_outlined,
+                title: 'No feeds, no strangers',
+                subtitle: 'Nothing to scroll, no one watching.',
+              ),
+              SizedBox(height: 10),
+              _PrivacyRow(
+                icon: Icons.delete_outline_rounded,
+                title: 'Delete anytime',
+                subtitle: 'Your memories, your call.',
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PrivacyRow extends StatelessWidget {
+  const _PrivacyRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: const Color(0xFF4CAF50)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFBBBBBB),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.check_circle,
+            size: 20,
+            color: Color(0xFF4CAF50),
+          ),
+        ],
+      ),
     );
   }
 }

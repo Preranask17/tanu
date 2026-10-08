@@ -150,6 +150,9 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                         AiPresenceOrb(
                           level: conversation.micLevel,
                           listening: conversation.isListening,
+                          transcribing: conversation.liveTranscript
+                              .trim()
+                              .isNotEmpty,
                         ),
                         _LiveCaptureStrip(
                           conversation: conversation,
