@@ -305,7 +305,12 @@ No commentary, no markdown fences.
     }
   }
 
-  MemoryResult _parse(String raw) {
+  MemoryResult _parse(String raw) => parseMemoryResult(raw);
+
+  /// Parses a structuring response into a [MemoryResult]. Fenced or bare
+  /// JSON both parse (first `{` to last `}`); anything else is a failure
+  /// marker the retry queue keys off. Pure, unit-tested.
+  static MemoryResult parseMemoryResult(String raw) {
     final start = raw.indexOf('{');
     final end = raw.lastIndexOf('}');
     if (start == -1 || end == -1) {

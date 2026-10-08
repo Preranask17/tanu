@@ -12,7 +12,8 @@ class MemoryIndexer {
 
   /// Split a session into chunks: prefers the cleaned transcript, falls back
   /// to timestamped segments. Chunks are <= [kRagChunkMaxChars].
-  List<MemoryChunk> chunkSession(ConversationSession session) {
+  /// Static and pure (never touches embeddings/store) so it is unit-tested.
+  static List<MemoryChunk> chunkStatic(ConversationSession session) {
     final chunks = <MemoryChunk>[];
 
     final cleaned = session.cleanedTranscript?.trim();
@@ -90,6 +91,10 @@ class MemoryIndexer {
     flush();
     return chunks;
   }
+
+  /// Instance delegate for the pure static chunker.
+  List<MemoryChunk> chunkSession(ConversationSession session) =>
+      chunkStatic(session);
 
   Future<int> indexSession(ConversationSession session) async {
     final chunks = chunkSession(session);
