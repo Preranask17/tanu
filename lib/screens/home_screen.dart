@@ -1,5 +1,5 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/audio_source.dart';
@@ -7,9 +7,10 @@ import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
 import 'ask_screen.dart';
-import '../widgets/aura_orb.dart';
+import '../widgets/ai_presence_orb.dart';
+import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
-import '../widgets/page_layout.dart';
+import '../widgets/page_header.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -87,17 +88,25 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  void _openDevicePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DevicePickerSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final status =
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
 
-    // The VoicePill is part of the page now, so only reserve room for the
-    // mobile navigation dock at the bottom.
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
     final bottomPadding =
-        MediaQuery.paddingOf(context).bottom + (isDesktop ? 24 : 96);
+        MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
+    final bottomInset = bottomPadding + 62 + 16;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -112,48 +121,47 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                 parent: BouncingScrollPhysics(),
               ),
               slivers: [
-                SliverAppBar(
-                  expandedHeight: 140,
-                  floating: true,
-                  pinned: true,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  flexibleSpace: FlexibleSpaceBar(
-                    centerTitle: false,
-                    title: const TanuPageTitle('Capture'),
-                    titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
-                  ),
-                  actions: [
-                    IconButton(
-                      tooltip: 'Ask Tanu',
-                      icon: const Icon(Icons.search_rounded),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const AskScreen()),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ),
                 SliverToBoxAdapter(
-                  child: SafeArea(
-                    top: false,
-                    bottom: false,
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: bottomPadding + 100),
-                      child: TanuPageRail(
-                        top: 8,
-                        bottom: 0,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Center(child: _ConnectionCard(status: status)),
-                            const SizedBox(height: 64),
-                            _CaptureHero(
-                              micLevel: conversation.micLevel,
-                              isConnected: status.isConnected,
-                            ),
-                          ],
+                  child: PageHeader(
+                    title: 'Capture',
+                    actions: [
+                      _HeaderCircleButton(
+                        icon: Icons.search_rounded,
+                        tooltip: 'Ask Tanu',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AskScreen(),
+                          ),
                         ),
                       ),
+                      if (status.isConnected &&
+                          status.batteryPercent != null)
+                        _BatteryPill(
+                          percent: status.batteryPercent!,
+                        ),
+                      _PendantButton(
+                        status: status,
+                        onTap: _openDevicePicker,
+                      ),
+                    ],
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 8, bottom: bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AiPresenceOrb(
+                          level: conversation.micLevel,
+                          listening: conversation.isListening,
+                        ),
+                        _CaptureHero(
+                          micLevel: conversation.micLevel,
+                          isConnected: status.isConnected,
+                          deviceName: status.deviceName,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -161,18 +169,10 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           Positioned(
+            left: 16,
+            right: 16,
             bottom: bottomPadding,
-            left: 0,
-            right: 0,
-            child: const SafeArea(
-              top: false,
-              bottom: false,
-              child: TanuPageRail(
-                top: 0,
-                bottom: 0,
-                child: HomeChatBar(),
-              ),
-            ),
+            child: const Center(child: HomeChatBar()),
           ),
         ],
       ),
@@ -180,64 +180,150 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard({required this.status});
+/// 44px circle header action in the pendant-button language.
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final button = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
+        ),
+        child: Icon(icon, size: 20, color: const Color(0xFF888888)),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// Pendant status button from the shared header language: opens the existing
+/// device picker. All BLE logic lives elsewhere and is untouched.
+class _PendantButton extends StatelessWidget {
+  const _PendantButton({
+    required this.status,
+    required this.onTap,
+  });
 
   final PendantStatus status;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final connected = status.isConnected;
-    final accent = connected ? Colors.green : const Color(0xFF888888);
+    final reconnecting = status.state == PendantState.reconnecting;
+
+    final IconData icon;
+    final Color iconColor;
+    if (connected) {
+      icon = Icons.bluetooth_connected;
+      iconColor = const Color(0xFF4CAF50);
+    } else if (reconnecting) {
+      icon = Icons.sync;
+      iconColor = Colors.orange;
+    } else {
+      icon = Icons.bluetooth;
+      iconColor = const Color(0xFF888888);
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: connected
+                ? (isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFE5E5E5))
+                : Colors.red.withValues(alpha: 0.45),
+            width: 1,
+          ),
+          boxShadow: [
+            if (!connected)
+              BoxShadow(
+                color: Colors.red.withValues(alpha: 0.30),
+                blurRadius: 14,
+                spreadRadius: 1,
+              )
+            else
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Icon(icon, size: 20, color: iconColor),
+      ),
+    );
+  }
+}
+
+/// Battery pill from the shared header language. Display only.
+class _BatteryPill extends StatelessWidget {
+  const _BatteryPill({required this.percent});
+
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? const Color(0xFF252525) : const Color(0xFFE5E5E5),
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+          width: 1,
         ),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              connected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-              size: 17,
-              color: accent,
+          const Icon(Icons.battery_std, size: 18, color: Color(0xFF888888)),
+          const SizedBox(width: 6),
+          Text(
+            '$percent%',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF888888),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              switch (status.state) {
-                PendantState.connected => status.deviceName ?? 'Connected',
-                PendantState.reconnecting => 'Reconnecting...',
-                PendantState.scanning => 'Looking for pendant...',
-                PendantState.connecting => 'Connecting...',
-                PendantState.disconnected => 'Not connected',
-              },
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: accent,
-              ),
-            ),
-          ),
-          if (status.batteryPercent != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                '${status.batteryPercent}%',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-            ),
         ],
       ),
     );
@@ -245,10 +331,15 @@ class _ConnectionCard extends StatelessWidget {
 }
 
 class _CaptureHero extends StatelessWidget {
-  const _CaptureHero({required this.micLevel, required this.isConnected});
+  const _CaptureHero({
+    required this.micLevel,
+    required this.isConnected,
+    required this.deviceName,
+  });
 
   final double micLevel;
   final bool isConnected;
+  final String? deviceName;
 
   @override
   Widget build(BuildContext context) {
@@ -272,10 +363,16 @@ class _CaptureHero extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
         ),
-        const SizedBox(height: 28),
-        Center(
-          child: AuraOrb(micLevel: micLevel, isConnected: isConnected),
-        ),
+        if (isConnected && deviceName != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            deviceName!,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: const Color(0xFF888888),
+            ),
+          ),
+        ],
       ],
     );
   }

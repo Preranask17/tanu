@@ -102,9 +102,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
       unawaited(seedDemoMemories());
     });
     ref.onDispose(() {
+      // Cancel only: reading state here trips Riverpod's dispose guard.
+      // Unflushed AI-summary updates are self-healing (retry-queue sweep
+      // re-enqueues unprocessed sessions on next launch); closes, deletes
+      // and pins already persist urgently.
       _persistTimer?.cancel();
       _persistTimer = null;
-      _writePersist();
+      _persistDirty = false;
     });
     return ConversationState(
       active: loaded.active,

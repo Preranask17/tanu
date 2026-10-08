@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/rag_provider.dart';
 import '../widgets/conversation_tile.dart';
+import '../widgets/page_header.dart';
+import 'chat_screen.dart';
 import 'trash_screen.dart';
-import '../widgets/page_layout.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
@@ -19,7 +24,14 @@ class ConversationsScreen extends ConsumerStatefulWidget {
 class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _query = TextEditingController();
-  bool _searching = false;
+
+  /// Structured RAG reply for the submitted question. Same pipeline calls as
+  /// the Ask screen (backfill + rag.answer) — no new backend, new UI only.
+  String? _ragAnswer;
+  List<String> _ragSourceIds = const [];
+  bool _ragBusy = false;
+  String? _ragError;
+  bool _backfilled = false;
 
   @override
   void dispose() {
@@ -28,9 +40,56 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     super.dispose();
   }
 
-  void toggleSearch() {
-    setState(() => _searching = !_searching);
-    if (!_searching) _query.clear();
+  Future<void> _askRag() async {
+    final question = _query.text.trim();
+    if (question.isEmpty || _ragBusy) return;
+    setState(() {
+      _ragBusy = true;
+      _ragError = null;
+      _ragAnswer = null;
+      _ragSourceIds = const [];
+    });
+    try {
+      final indexer = await ref.read(memoryIndexerProvider.future);
+      if (!_backfilled) {
+        _backfilled = true;
+        // Fire-and-forget: don't block the answer on backfill.
+        unawaited(
+          indexer.backfill(ref.read(conversationProvider).conversations),
+        );
+      }
+      final rag = await ref.read(ragServiceProvider.future);
+      final result = await rag.answer(question);
+      if (!mounted) return;
+      final seen = <String>{};
+      final ordered = <String>[];
+      for (final source in result.sources) {
+        if (seen.add(source.chunk.sessionId)) {
+          ordered.add(source.chunk.sessionId);
+        }
+      }
+      setState(() {
+        _ragAnswer = result.answer;
+        _ragSourceIds = ordered;
+        _ragBusy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ragError = '$e';
+        _ragBusy = false;
+      });
+    }
+  }
+
+  void _clearSearch() {
+    _query.clear();
+    setState(() {
+      _ragAnswer = null;
+      _ragSourceIds = const [];
+      _ragError = null;
+      _ragBusy = false;
+    });
   }
 
   void scrollToTop() {
@@ -122,122 +181,122 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            SliverAppBar(
-              expandedHeight: 140,
-              floating: true,
-              pinned: true,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: false,
-                title: const TanuPageTitle('Memories'),
-                titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Positioned(
-                      top: -50,
-                      right: -50,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Theme.of(
-                            context,
-                          ).primaryColor.withValues(alpha: 0.15),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -80,
-                      left: -50,
-                      child: Container(
-                        width: 250,
-                        height: 250,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.blueAccent.withValues(alpha: 0.08),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    onPressed: () {
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Memories',
+                actions: [
+                  _HeaderCircleButton(
+                    icon: Icons.delete_outline,
+                    tooltip: 'Trash',
+                    onTap: () {
+                      HapticFeedback.selectionClick();
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const TrashScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const TrashScreen(),
+                        ),
                       );
                     },
-                    icon: const Icon(Icons.delete_outline),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    onPressed: toggleSearch,
-                    icon: Icon(_searching ? Icons.close : Icons.search),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-            if (_searching)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-                  child: TextField(
-                    controller: _query,
-                    autofocus: true,
-                    style: const TextStyle(fontSize: 16),
-                    decoration: InputDecoration(
-                      hintText: 'Search memories...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: query.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded),
-                              onPressed: () {
-                                _query.clear();
-                                setState(() {});
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: isDark
-                          ? const Color(0xFF161618)
-                          : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(100), // Pill shape
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF2A2A2C)
-                              : const Color(0xFFE9ECEF),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(100),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF2A2A2C)
-                              : const Color(0xFFE9ECEF),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(100),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).primaryColor,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                child: Container(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : const Color(0xFFF2F2F7),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : const Color(0xFFE5E5E5),
+                      width: 1.0,
                     ),
-                    onChanged: (_) => setState(() {}),
                   ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.search,
+                        size: 20,
+                        color: Color(0xFF888888),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _query,
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: (_) => _askRag(),
+                          decoration: const InputDecoration(
+                            hintText: 'Ask or search memories...',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 15,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
+                            fontSize: 15,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      if (query.isNotEmpty)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _clearSearch,
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.clear,
+                              size: 18,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                        ),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          if (_query.text.trim().isNotEmpty) {
+                            _askRag();
+                          } else {
+                            ref
+                                .read(conversationProvider.notifier)
+                                .microphoneTest();
+                          }
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(
+                            Icons.mic_none,
+                            size: 20,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_ragBusy || _ragAnswer != null || _ragError != null)
+              SliverToBoxAdapter(
+                child: _RagAnswerCard(
+                  busy: _ragBusy,
+                  answer: _ragAnswer,
+                  error: _ragError,
+                  sourceIds: _ragSourceIds,
+                  sessions: sessions,
+                  onRetry: _askRag,
+                  onClear: _clearSearch,
                 ),
               ),
             if (sessions.isEmpty)
@@ -248,9 +307,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             else
               SliverPadding(
                 padding: EdgeInsets.only(
-                  top: _searching ? 4 : 12,
-                  left: 24,
-                  right: 24,
+                  top: 12,
+                  left: 20,
+                  right: 20,
                   bottom: bottomInset,
                 ),
                 sliver: visible.isEmpty && query.isNotEmpty
@@ -301,6 +360,256 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 44px circle header action in the pendant-button language.
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final button = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
+        ),
+        child: Icon(icon, size: 20, color: const Color(0xFF888888)),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// Structured RAG reply card: the submitted question answered from saved
+/// memories (same pipeline as the Ask screen), with the source memories as
+/// tappable chips. Display only: every lookup below reads already-loaded
+/// sessions, nothing new is fetched or stored.
+class _RagAnswerCard extends StatelessWidget {
+  const _RagAnswerCard({
+    required this.busy,
+    required this.answer,
+    required this.error,
+    required this.sourceIds,
+    required this.sessions,
+    required this.onRetry,
+    required this.onClear,
+  });
+
+  final bool busy;
+  final String? answer;
+  final String? error;
+  final List<String> sourceIds;
+  final List<ConversationSession> sessions;
+  final VoidCallback onRetry;
+  final VoidCallback onClear;
+
+  String _sourceTitle(String id) {
+    for (final s in sessions) {
+      if (s.id == id) {
+        final title = s.title.trim();
+        return title.isEmpty ? 'Untitled memory' : title;
+      }
+    }
+    return 'Memory';
+  }
+
+  ConversationSession? _sourceSession(String id) {
+    for (final s in sessions) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(top: 12, bottom: 4, left: 20, right: 20),
+      padding: const EdgeInsets.all(18),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFE5E5E5),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 14,
+                color: Theme.of(context).primaryColor,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  busy
+                      ? 'Recalling memories…'
+                      : error != null
+                          ? 'Could not recall'
+                          : sourceIds.length == 1
+                              ? '1 memory found'
+                              : '${sourceIds.length} memories found',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF888888),
+                  ),
+                ),
+              ),
+              if (busy)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClear,
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Color(0xFF888888),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (busy)
+            const Text(
+              'Searching your saved memories for relevant moments…',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF888888),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            )
+          else if (error != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'The recall failed. Your memories are untouched.',
+                  style: TextStyle(fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Try again'),
+                ),
+              ],
+            )
+          else if (answer != null)
+            Text(
+              answer!,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+          if (!busy && error == null && sourceIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final id in sourceIds)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      final target = _sourceSession(id);
+                      if (target == null) return;
+                      HapticFeedback.selectionClick();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          fullscreenDialog: true,
+                          builder: (_) => SessionDetailPage(session: target),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .primaryColor
+                            .withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 13,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              _sourceTitle(id),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
