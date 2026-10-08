@@ -12,25 +12,34 @@ import '../../abstractions/stt_engine.dart';
 import '../../config/stt_config.dart';
 import '../../constants.dart';
 
-/// Whisper Small (multilingual) on-device engine.
+/// Indic-language on-device engine ("core" STT for Indian languages).
 ///
-/// Decodes English plus South Indian languages (Kannada, Tamil, Telugu,
-/// Malayalam) entirely offline via sherpa-onnx. Hallucinations ("thank you",
-/// "bye", "um", ...) come almost entirely from decoding near-silence, so the
-/// transcript stays live AND honest through three guards:
-/// 1. VAD gating — only Silero-confirmed speech segments are ever decoded;
-///    silence is never sent to the recognizer.
-/// 2. Segment guards — segments under 0.4 s or with near-zero energy are
-///    dropped before decode.
-/// 3. Junk-phrase filter — decoded text matching known hallucination
-///    patterns is dropped (mirrors the provider filter as defense in depth).
+/// Decodes one explicit Indic language (Hindi, Kannada, Tamil, Telugu,
+/// Malayalam, Bengali, Marathi, Gujarati — see [SttConfig.indicLanguages])
+/// entirely offline via the SAME shared sherpa-onnx stack as Whisper Small:
+/// the same 375 MB multilingual bundle already on disk, the same shared
+/// Silero VAD download, the same VAD tuning. No extra model download, no
+/// extra storage, no new native dependency.
+///
+/// The only deliberate difference from [WhisperSmallEngine] is the explicit
+/// `language` hint passed to the recognizer instead of auto-detect: with a
+/// fixed language the model skips detection (faster first-final) and stops
+/// mis-decoding one language as another. The three anti-hallucination
+/// guards are identical: VAD-gated decode, 0.4 s + energy segment guards,
+/// junk-phrase filter.
+///
 /// Main isolate converts PCM16 -> Float32 + mic level and forwards audio;
-/// the worker isolate owns `OfflineRecognizer` + `VoiceActivityDetector` so
-/// a Whisper decode never blocks audio capture.
-class WhisperSmallEngine implements ContinuousSttEngine {
-  WhisperSmallEngine() {
+/// the worker isolate owns `OfflineRecognizer` + `VoiceActivityDetector`.
+class IndicSttEngine implements ContinuousSttEngine {
+  IndicSttEngine({required this.languageCode, required this.languageLabel}) {
     _warmingUp.value = true;
   }
+
+  /// Whisper language id, e.g. `hi`. Must be in [SttConfig.indicLanguages].
+  final String languageCode;
+
+  /// Human name shown in Settings / chips, e.g. `Hindi`.
+  final String languageLabel;
 
   final ValueNotifier<bool> _warmingUp = ValueNotifier(true);
   bool _continuousActive = false;
@@ -54,7 +63,7 @@ class WhisperSmallEngine implements ContinuousSttEngine {
   bool get hasActiveUtterance => _hasActiveUtterance;
 
   @override
-  String get modelLabel => kOfflineModelLabel;
+  String get modelLabel => 'Whisper Small · $languageLabel';
 
   static Future<String> _bundlePath() async {
     final support = await getApplicationSupportDirectory();
@@ -95,14 +104,18 @@ class WhisperSmallEngine implements ContinuousSttEngine {
     final bundlePath = await _bundlePath();
 
     final p = ReceivePort();
-    _isolate = await Isolate.spawn(_whisperWorker, [bundlePath, p.sendPort]);
+    _isolate = await Isolate.spawn(_indicWorker, [
+      bundlePath,
+      languageCode,
+      p.sendPort,
+    ]);
 
     final completer = Completer<SendPort?>();
     p.listen((msg) {
       if (msg is List && msg[0] == 'ready') {
         completer.complete(msg[1] as SendPort);
       } else if (msg is List && msg[0] == 'error') {
-        _log('[tanu] whisper worker error: ${msg[1]}');
+        _log('[tanu] indic worker error: ${msg[1]}');
         if (!completer.isCompleted) completer.complete(null);
       } else if (msg is List && msg[0] == 'flushed') {
         _flushAck?.complete();
@@ -143,7 +156,7 @@ class WhisperSmallEngine implements ContinuousSttEngine {
     _continuousActive = true;
     _hasActiveUtterance = false;
 
-    _onEventCb?.call('Starting Offline Model...');
+    _onEventCb?.call('Starting $languageLabel model...');
     final ready = await _ensureWorker();
     if (!ready || !_continuousActive) {
       _warmingUp.value = false;
@@ -151,7 +164,7 @@ class WhisperSmallEngine implements ContinuousSttEngine {
     }
 
     _warmingUp.value = false;
-    _onEventCb?.call('Offline Model Listening');
+    _onEventCb?.call('$languageLabel Listening');
 
     _workerPort?.send(['reset']);
 
@@ -206,7 +219,7 @@ class WhisperSmallEngine implements ContinuousSttEngine {
     final bd = ByteData.sublistView(pcm16);
     final count = pcm16.length ~/ 2;
     final out = Float32List(count);
-    for (int i = 0; i < count; i++) {
+    for (var i = 0; i < count; i++) {
       out[i] = bd.getInt16(i * 2, Endian.little) / 32768.0;
     }
     return out;
@@ -224,8 +237,10 @@ class WhisperSmallEngine implements ContinuousSttEngine {
   void _log(String m) => debugPrint(m);
 }
 
-/// Known model hallucinations: fluent phrases emitted for noise/silence
-/// instead of empty output. Dropped here AND in the conversation provider.
+/// Same hallucination contract as the Whisper engine: fluent phrases emitted
+/// for noise/silence instead of empty output. Dropped here AND in the
+/// conversation provider. Shared verbatim so both engines stay honest the
+/// same way regardless of language.
 bool _isJunk(String text) {
   final t = text.trim().toLowerCase().replaceAll(RegExp(r'[.!?,]+$'), '');
   if (t.isEmpty || t.length < 2) return true;
@@ -248,9 +263,10 @@ bool _isJunk(String text) {
   return junk.contains(t);
 }
 
-Future<void> _whisperWorker(List<dynamic> args) async {
+Future<void> _indicWorker(List<dynamic> args) async {
   final bundlePath = args[0] as String;
-  final replyPort = args[1] as SendPort;
+  final language = args[1] as String;
+  final replyPort = args[2] as SendPort;
 
   final commands = ReceivePort();
   replyPort.send(['ready', commands.sendPort]);
@@ -262,7 +278,8 @@ Future<void> _whisperWorker(List<dynamic> args) async {
       whisper: OfflineWhisperModelConfig(
         encoder: '$bundlePath/small-encoder.int8.onnx',
         decoder: '$bundlePath/small-decoder.int8.onnx',
-        language: SttConfig.language,
+        // Explicit language (never auto-detect): the Indic core contract.
+        language: language,
         task: SttConfig.task,
       ),
       tokens: '$bundlePath/small-tokens.txt',
@@ -272,14 +289,11 @@ Future<void> _whisperWorker(List<dynamic> args) async {
     ),
   );
 
+  // Shared Silero VAD with the same tuning as every other engine.
   final vadConfig = VadModelConfig(
     sileroVad: SileroVadModelConfig(
       model: '$bundlePath/$kSileroVadFileName',
-      // A higher confidence boundary prevents room noise and pendant taps
-      // from being sent to Whisper as speech.
       threshold: SttConfig.vadThreshold,
-      // Keep a short but meaningful trailing pause so final words are not
-      // clipped when someone speaks naturally.
       minSilenceDuration: SttConfig.vadMinSilence,
       minSpeechDuration: SttConfig.vadMinSpeech,
       maxSpeechDuration: SttConfig.vadMaxSpeech,

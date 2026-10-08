@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../constants.dart';
+import '../config/stt_config.dart';
 import '../abstractions/audio_source.dart';
 import '../abstractions/stt_engine.dart';
 import '../models/conversation.dart';
@@ -16,13 +17,38 @@ import 'agent_provider.dart';
 import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
+import 'rag_provider.dart';
+import 'proactive_provider.dart';
 
+import '../config/conversation_end_phrases.dart';
 import '../services/stt/whisper_small_engine.dart';
+import '../services/stt/indic_stt_engine.dart';
+import 'settings_provider.dart';
 
+/// The swap point for the recognizer core. Default is Whisper Small with
+/// language auto-detect; when the user picks an explicit Indic language in
+/// Settings, the same on-device bundle is driven through [IndicSttEngine]
+/// with a fixed language hint instead. Only the language selection is
+/// watched, so unrelated settings changes never restart the engine.
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = WhisperSmallEngine();
+  final code = ref.watch(
+    settingsProvider.select((s) => s.sttLanguageCode),
+  );
+  final ContinuousSttEngine engine;
+  final label = code.isEmpty ? null : SttConfig.indicLabelFor(code);
+  if (label == null) {
+    engine = WhisperSmallEngine();
+  } else {
+    engine = IndicSttEngine(languageCode: code, languageLabel: label);
+  }
 
-  ref.onDispose(() => engine.dispose());
+  ref.onDispose(() {
+    if (engine case WhisperSmallEngine e) {
+      e.dispose();
+    } else if (engine case IndicSttEngine e) {
+      e.dispose();
+    }
+  });
   return engine;
 });
 
@@ -70,6 +96,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
         ref.read(pendantStatusProvider).value ??
             ref.read(pendantProvider).currentStatus,
       );
+      // Retry any memories whose AI processing failed previously.
+      unawaited(_drainRetryQueue());
+      // One-time demo memories so RAG is usable on a fresh install.
+      unawaited(seedDemoMemories());
+    });
+    ref.onDispose(() {
+      _persistTimer?.cancel();
+      _persistTimer = null;
+      _writePersist();
     });
     return ConversationState(
       active: loaded.active,
@@ -79,13 +114,30 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   /// --- Session lifecycle ------------------------------------------------
 
+  /// Brief-drop grace: disconnects shorter than this keep appending to
+  /// the same memory instead of fragmenting it. Broadcast streams survive
+  /// the drop, so grace is just waiting — engine, VAD and subscriptions
+  /// stay live throughout.
+  static const Duration _disconnectGrace = Duration(seconds: 3);
+  Timer? _disconnectGraceTimer;
+
   void _syncContinuous(PendantStatus? status) {
     final connected = status?.isConnected ?? false;
     if (connected && !_micTestActive && !_continuousStarted && !_userPaused) {
-      unawaited(_startContinuous());
+      _disconnectGraceTimer?.cancel();
+      _disconnectGraceTimer = null;
+      unawaited(_startContinuous(resumeExisting: state.active != null));
     } else if (!connected && _continuousStarted) {
       _userPaused = false;
-      unawaited(_stopContinuous());
+      if (state.active == null) {
+        unawaited(_stopContinuous());
+        return;
+      }
+      _disconnectGraceTimer?.cancel();
+      _disconnectGraceTimer = Timer(_disconnectGrace, () {
+        _disconnectGraceTimer = null;
+        if (_continuousStarted) unawaited(_stopContinuous());
+      });
     }
   }
 
@@ -165,6 +217,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
   /// [resumeListening] (or a fresh connect after disconnect clears the pause).
   Future<void> pauseListening() async {
     _userPaused = true;
+    _disconnectGraceTimer?.cancel();
+    _disconnectGraceTimer = null;
     if (!_continuousStarted) {
       state = state.copyWith(
         isListening: false,
@@ -237,6 +291,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _idleTimer?.cancel();
     _idleTimer = null;
     _clock = Stopwatch();
+    _lockLiveTranscript();
     if (_continuousStarted) {
       // Keep listening: open the next memory so speech continues seamlessly.
       final now = DateTime.now();
@@ -250,11 +305,59 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
       _clock = Stopwatch()..start();
     }
-    _persist();
+    _persist(urgent: true);
+  }
+
+  /// Merges the visible partial into the active session as a locked
+  /// segment when it never got its final (disconnect/close raced the VAD).
+  /// Truly-empty sessions (never a word) still drop at close, correctly.
+  /// Pure core ([lockLiveTail]) is unit-tested; this only applies it.
+  static List<TranscriptSegment> lockLiveTail({
+    required List<TranscriptSegment> segments,
+    required String liveTranscript,
+    required String sessionId,
+    required int nowMs,
+  }) {
+    final tail = liveTranscript.trim();
+    if (tail.isEmpty) return segments;
+    final open = segments.isNotEmpty && segments.last.endMs == null;
+    final out = List<TranscriptSegment>.of(segments);
+    if (open) {
+      final last = segments.last;
+      out[segments.length - 1] = last.copyWith(text: tail, endMs: nowMs);
+    } else {
+      out.add(
+        TranscriptSegment(
+          id: '$sessionId-${segments.length}',
+          text: tail,
+          timestamp: DateTime.now(),
+          startMs: nowMs,
+          endMs: nowMs,
+        ),
+      );
+    }
+    return out;
+  }
+
+  void _lockLiveTranscript() {
+    final session = state.active;
+    if (session == null || state.liveTranscript.trim().isEmpty) return;
+    final segments = lockLiveTail(
+      segments: session.segments,
+      liveTranscript: state.liveTranscript,
+      sessionId: session.id,
+      nowMs: _clock.elapsedMilliseconds,
+    );
+    state = state.copyWith(
+      active: _withTitle(session, segments),
+      liveTranscript: '',
+    );
   }
 
   Future<void> _stopContinuous() async {
     if (!_continuousStarted) return;
+    _disconnectGraceTimer?.cancel();
+    _disconnectGraceTimer = null;
     _continuousStarted = false;
     _buttonSub?.cancel();
     _buttonSub = null;
@@ -266,8 +369,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _idleTimer = null;
 
     final engine = ref.read(sttEngineProvider);
+    // Salvage trailing speech first: force-decode the open VAD segment and
+    // coalesced windows so the tail lands in this memory instead of dying
+    // with the worker. Finals arrive through the usual callbacks first.
+    await engine.flushUtterance();
     await engine.stopContinuous();
 
+    _lockLiveTranscript();
     final session = state.active;
     if (session != null && session.segments.isNotEmpty) {
       final finished = session.copyWith(
@@ -293,7 +401,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         micLevel: 0,
       );
     }
-    _persist();
+    _persist(urgent: true);
   }
 
   void _bumpReceiving() {
@@ -393,6 +501,79 @@ class ConversationNotifier extends Notifier<ConversationState> {
       sttEvent: '',
     );
     _resetIdleTimer();
+    _evaluateEndOfConversation(trimmed, segments.length);
+  }
+
+  Timer? _softEndTimer;
+  DateTime? _lastEndCloseAt;
+
+  // --- End-of-conversation detection -------------------------------------
+  // Segmentation, not stopping: a detected closing splits the current memory
+  // and the next topic starts fresh. Tables live in
+  // [ConversationEndPhrases] (English patterns moved there verbatim);
+  // meeting-style closers below stay English-only by design.
+
+  /// Active end-phrase language: explicit Indic code from Settings, else `en`
+  /// (today's exact behavior). Unknown codes fall back to English so a stale
+  /// value can never disable segmentation.
+  String get _endPhraseCode {
+    final code = ref.read(settingsProvider).sttLanguageCode;
+    if (code.isEmpty) return 'en';
+    return ConversationEndPhrases.strong.containsKey(code) ? code : 'en';
+  }
+
+  /// Meeting-style closers — treated as strong once a session has some meat.
+  static final RegExp _businessEndPattern = RegExp(
+    r"(?:minutes after|we'?ll pick up (?:this|next week|tomorrow)|"
+    r"let'?s continue (?:this|next time)|follow up (?:on )?this (?:later|next week)|"
+    r'circling back (?:on this )?(?:tomorrow|later)|schedule another (?:meeting|call)|'
+    r'get back to (?:you|this))\b',
+    caseSensitive: false,
+  );
+
+  void _evaluateEndOfConversation(String utterance, int segmentCount) {
+    // Cancel any pending soft-close: new speech means the conversation goes on.
+    _softEndTimer?.cancel();
+    _softEndTimer = null;
+
+    final last = _lastEndCloseAt;
+    if (last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 2)) {
+      return;
+    }
+
+    final code = _endPhraseCode;
+    final strong = ConversationEndPhrases.strongPattern(code);
+    final soft = ConversationEndPhrases.softPattern(code);
+
+    final cleaned =
+        utterance.replaceAll(RegExp(r'[.!?…।॥,"\s]+$'), '').trim();
+
+    if ((strong != null && strong.hasMatch(cleaned)) ||
+        ConversationEndPhrases.endsWithStrongCloser(utterance, code) ||
+        (segmentCount >= 2 && _businessEndPattern.hasMatch(cleaned))) {
+      _softEndTimer?.cancel();
+      _closeFromEndPhrase('end_phrase');
+      return;
+    }
+
+    if (soft != null && soft.hasMatch(cleaned)) {
+      _softEndTimer = Timer(const Duration(seconds: 20), () {
+        if (_continuousStarted && !_micTestActive && state.active != null) {
+          _closeFromEndPhrase('end_phrase_soft');
+        }
+      });
+    }
+  }
+
+  /// Segmenting close: the finished memory lands in history AND listening
+  /// keeps flowing into a brand-new session, so the next topic starts fresh
+  /// instead of extending the closed memory — or silencing the app. Manual
+  /// stops still pause via [stopListening]; this path never pauses.
+  void _closeFromEndPhrase(String reason) {
+    _lastEndCloseAt = DateTime.now();
+    state = state.copyWith(sttEvent: '— conversation ended —');
+    forceEndSession(reason);
   }
 
   ConversationSession _withTitle(
@@ -571,8 +752,30 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
+    // The just-finished memory jumps the queue: stale retries drain AFTER it
+    // so the newest summary never waits behind yesterday's failures.
+    if (!state.processingIds.contains(session.id)) {
+      state = state.copyWith(
+        processingIds: {...state.processingIds, session.id},
+      );
+    }
+
     final processor = ref.read(memoryProcessorProvider);
     final result = await processor.process(text);
+
+    if (result.error != null) {
+      state = state.copyWith(
+        processingIds: state.processingIds.difference({session.id}),
+      );
+      _enqueueForRetry(session.id);
+      ref.read(analyticsProvider).capture(
+        'memory retry queued',
+        properties: {'error': result.error!.length > 100 ? result.error!.substring(0, 100) : result.error!},
+      );
+      return;
+    }
+
+    _dequeueRetry(session.id);
 
     // Update the session in state with the new AI summary and title
     final idx = state.conversations.indexWhere((c) => c.id == session.id);
@@ -585,8 +788,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
             ? null
             : result.cleanedTranscript,
       );
-      state = state.copyWith(conversations: conversations);
+      state = state.copyWith(
+        conversations: conversations,
+        processingIds: state.processingIds.difference({session.id}),
+      );
       _persist();
+    } else {
+      state = state.copyWith(
+        processingIds: state.processingIds.difference({session.id}),
+      );
     }
 
     // Push any extracted commitments to the commitments provider
@@ -603,6 +813,34 @@ class ConversationNotifier extends Notifier<ConversationState> {
       }
     }
 
+    // Index the session chunks for RAG retrieval (best effort, non-blocking).
+    if (idx != -1) {
+      unawaited(_indexSession(session.copyWith(
+        title: result.title,
+        summary: result.summary,
+        cleanedTranscript: result.cleanedTranscript.isEmpty
+            ? null
+            : result.cleanedTranscript,
+      )));
+    }
+
+    try {
+      final svc = await ref.read(proactiveServiceProvider.future);
+      final updated = idx != -1 && idx < state.conversations.length
+          ? state.conversations[idx]
+          : session;
+      final kind = await svc.maybeNotify(
+        session: updated,
+        result: result,
+      );
+      if (kind != null) {
+        ref.read(analyticsProvider).capture(
+          'proactive notified',
+          properties: {'kind': kind.name},
+        );
+      }
+    } catch (_) {}
+
     ref
         .read(analyticsProvider)
         .capture(
@@ -612,17 +850,256 @@ class ConversationNotifier extends Notifier<ConversationState> {
             'has_summary': result.summary.isNotEmpty,
           },
         );
+
+    // Stale retries drain after the fresh memory, never ahead of it.
+    unawaited(_drainRetryQueue());
+  }
+
+  /// Single-shot retry for one memory (tap-to-retry in the UI). No-op while
+  /// it is already processing or gone. Shares [_processMemoryAsync], so the
+  /// flag lifecycle, summary update and trailing drain all behave the same.
+  Future<void> retrySession(String id) async {
+    if (state.processingIds.contains(id)) return;
+    final idx = state.conversations.indexWhere((c) => c.id == id);
+    if (idx == -1) return;
+    await _processMemoryAsync(state.conversations[idx]);
+  }
+
+  /// True when [id] sits in the persisted AI retry queue (last attempt
+  /// failed or never ran). Synchronous Hive read, safe to call in build.
+  bool isQueuedForRetry(String id) {
+    try {
+      return _retryQueue().contains(id);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _indexSession(ConversationSession session) async {
+    try {
+      final indexer = await ref.read(memoryIndexerProvider.future);
+      await indexer.indexSession(session);
+    } catch (_) {}
+  }
+
+  // --- AI retry queue ------------------------------------------------------
+
+  static const int _maxRetryAttempts = 3;
+
+  List<String> _retryQueue() {
+    final box = Hive.box(Boxes.conversation);
+    final raw = box.get('memoryRetryQueue');
+    if (raw is List) return raw.cast<String>().toList();
+    return [];
+  }
+
+  void _enqueueForRetry(String sessionId) {
+    final box = Hive.box(Boxes.conversation);
+    final queue = _retryQueue();
+    if (!queue.contains(sessionId)) {
+      queue.add(sessionId);
+      box.put('memoryRetryQueue', queue);
+      // New state instance (no == override) so listeners rebuild into the
+      // failed/queued UI even though no session data changed.
+      state = state.copyWith();
+    }
+  }
+
+  void _dequeueRetry(String sessionId, {bool keepAttemptCount = false}) {
+    final box = Hive.box(Boxes.conversation);
+    final queue = _retryQueue()..remove(sessionId);
+    box.put('memoryRetryQueue', queue);
+    if (keepAttemptCount) return;
+    final raw = box.get('memoryRetryAttempts');
+    final attempts = Map<String, dynamic>.from(raw is Map ? raw : {});
+    attempts.remove(sessionId);
+    box.put('memoryRetryAttempts', attempts);
+  }
+
+  int _retryAttemptCount(String sessionId) {
+    final box = Hive.box(Boxes.conversation);
+    final raw = box.get('memoryRetryAttempts');
+    if (raw is Map) return (raw[sessionId] as int?) ?? 0;
+    return 0;
+  }
+
+  bool _draining = false;
+  static const int _maxDrainPerRun = 5;
+
+  Future<void> _drainRetryQueue() async {
+    if (_draining) return;
+    _draining = true;
+    try {
+      // Rescue sessions left in a failed state by older builds (pre-queue).
+      for (final s in state.conversations) {
+        final summary = s.summary ?? '';
+        final looksFailed = summary.startsWith('Could not parse') ||
+            summary.startsWith('Failed to process memory');
+        final looksUnprocessed = summary.isEmpty &&
+            s.cleanedTranscript == null &&
+            s.transcriptText.trim().isNotEmpty;
+        if ((looksFailed || looksUnprocessed) &&
+            _retryAttemptCount(s.id) < _maxRetryAttempts) {
+          _enqueueForRetry(s.id);
+        }
+      }
+
+      final queue = _retryQueue();
+      if (queue.isEmpty) return;
+
+      final processor = ref.read(memoryProcessorProvider);
+      var processedThisRun = 0;
+      for (final id in List<String>.of(queue)) {
+        if (processedThisRun >= _maxDrainPerRun) break;
+        processedThisRun++;
+        final idx = state.conversations.indexWhere((c) => c.id == id);
+        if (idx == -1) {
+          _dequeueRetry(id);
+          continue;
+        }
+
+        final session = state.conversations[idx];
+        final result = await processor.process(session.transcriptText);
+
+        if (result.error == null) {
+          final conversations = List<ConversationSession>.of(state.conversations);
+          conversations[idx] = session.copyWith(
+            title: result.title,
+            summary: result.summary,
+            cleanedTranscript: result.cleanedTranscript.isEmpty
+                ? null
+                : result.cleanedTranscript,
+          );
+          state = state.copyWith(conversations: conversations);
+          _persist();
+          _dequeueRetry(id);
+          try {
+            final indexer = await ref.read(memoryIndexerProvider.future);
+            unawaited(indexer.indexSession(conversations[idx]));
+          } catch (_) {}
+          ref.read(analyticsProvider).capture('memory retry succeeded');
+        try {
+          final svc = await ref.read(proactiveServiceProvider.future);
+          await svc.maybeNotify(session: conversations[idx], result: result);
+        } catch (_) {}
+        } else {
+          final attempts = _retryAttemptCount(id) + 1;
+          final box = Hive.box(Boxes.conversation);
+          final raw = box.get('memoryRetryAttempts');
+          final map = Map<String, dynamic>.from(raw is Map ? raw : {});
+          map[id] = attempts;
+          box.put('memoryRetryAttempts', map);
+          if (attempts >= _maxRetryAttempts) {
+            _dequeueRetry(id, keepAttemptCount: true);
+            ref.read(analyticsProvider).capture('memory retry gave up');
+          }
+        }
+      }
+    } finally {
+      _draining = false;
+    }
+  }
+
+  Future<void> seedDemoMemories() async {
+    final box = Hive.box(Boxes.conversation);
+    if (box.get('demoSeeded') == true) return;
+    box.put('demoSeeded', true);
+    final now = DateTime.now();
+    final demos = <ConversationSession>[
+      ConversationSession(
+        id: 'demo_project',
+        title: 'Project deadline discussion',
+        startedAt: now.subtract(const Duration(days: 2)),
+        finishedAt: now.subtract(const Duration(days: 2)).add(const Duration(hours: 1)),
+        status: ConversationStatus.completed,
+        summary: 'Team agreed the launch deadline is Friday and Ramesh owns the report.',
+        cleanedTranscript:
+            'Speaker 1: Let\'s lock the plan. The launch deadline is Friday.\n'
+            'Speaker 2: Agreed. I will send the final report to Ramesh by Thursday.\n'
+            'Speaker 1: Perfect. I will follow up with the design team tomorrow.',
+        segments: const [],
+      ),
+      ConversationSession(
+        id: 'demo_grocery',
+        title: 'Grocery run',
+        startedAt: now.subtract(const Duration(days: 1, hours: 5)),
+        finishedAt: now.subtract(const Duration(days: 1, hours: 4)),
+        status: ConversationStatus.completed,
+        summary: 'Picked up milk, eggs and bread from the market.',
+        cleanedTranscript:
+            'Speaker 1: I went to the market yesterday.\n'
+            'Speaker 1: Got milk, eggs, and fresh bread. Nothing else was needed.',
+        segments: const [],
+      ),
+      ConversationSession(
+        id: 'demo_gym',
+        title: 'Workout reminder',
+        startedAt: now.subtract(const Duration(hours: 20)),
+        finishedAt: now.subtract(const Duration(hours: 19, minutes: 30)),
+        status: ConversationStatus.completed,
+        summary: 'Decided to lift weights on Monday, Wednesday and Friday.',
+        cleanedTranscript:
+            'Speaker 1: I need to be consistent. I will work out every Monday, Wednesday and Friday.\n'
+            'Speaker 1: Also I promise to skip sugar this month.',
+        segments: const [],
+      ),
+    ];
+
+    state = state.copyWith(conversations: [...demos, ...state.conversations]);
+    _persist(urgent: true);
+
+    try {
+      final indexer = await ref.read(memoryIndexerProvider.future);
+      for (final demo in demos) {
+        await indexer.indexSession(demo);
+      }
+    } catch (_) {
+      // Embeddings unavailable — memories are still listed, just not embedded.
+    }
   }
 
   /// --- Persistence -------------------------------------------------------
 
-  void _persist() {
-    final box = Hive.box(Boxes.conversation);
-    box.put('sessions', state.conversations.map((c) => c.toJson()).toList());
-    if (state.active != null) {
-      box.put('activeSession', state.active!.toJson());
-    } else {
-      box.delete('activeSession');
+  Timer? _persistTimer;
+  bool _persistDirty = false;
+
+  /// Coalesced Hive write. Audio chunks are forwarded on this same isolate,
+  /// so a full-history JSON re-encode on every update would stall live
+  /// partials. Routine updates wait up to 2 s and merge; closes, deletes,
+  /// pins and seeds pass [urgent] to hit disk now.
+  void _persist({bool urgent = false}) {
+    if (urgent) {
+      _persistTimer?.cancel();
+      _persistTimer = null;
+      _persistDirty = false;
+      _writePersist();
+      return;
+    }
+    if (_persistTimer != null) {
+      _persistDirty = true;
+      return;
+    }
+    _writePersist();
+    _persistTimer = Timer(const Duration(seconds: 2), () {
+      _persistTimer = null;
+      if (_persistDirty) {
+        _persistDirty = false;
+        _writePersist();
+      }
+    });
+  }
+
+  void _writePersist() {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      box.put('sessions', state.conversations.map((c) => c.toJson()).toList());
+      if (state.active != null) {
+        box.put('activeSession', state.active!.toJson());
+      } else {
+        box.delete('activeSession');
+      }
+    } catch (e) {
+      debugPrint('[tanu] persist failed: $e');
     }
   }
 
@@ -743,7 +1220,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     // Soft delete
     conversations[idx] = conversations[idx].copyWith(isDeleted: true);
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void togglePin(String id) {
@@ -754,7 +1231,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       isPinned: !conversations[idx].isPinned,
     );
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void restoreSession(String id) {
@@ -763,7 +1240,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (idx < 0) return;
     conversations[idx] = conversations[idx].copyWith(isDeleted: false);
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void deleteSessionPermanently(String id) {
@@ -772,7 +1249,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (idx < 0) return;
     conversations.removeAt(idx);
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void emptyTrash() {
@@ -780,7 +1257,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       state.conversations,
     ).where((c) => !c.isDeleted).toList();
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void clear() {

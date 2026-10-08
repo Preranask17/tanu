@@ -14,6 +14,7 @@ class ConversationState {
     this.error,
     this.micLevel = 0,
     this.sttEvent = '',
+    this.processingIds = const {},
   });
 
   /// The session currently being recorded (null when idle).
@@ -41,6 +42,11 @@ class ConversationState {
   /// Last recognizer status/error surfaced verbatim, for diagnosing on-device.
   final String sttEvent;
 
+  /// Closed-session ids whose AI title/summary/commitments are still being
+  /// generated (transient, never persisted). Drives the "writing summary"
+  /// shimmer; ids that failed land in the persisted retry queue instead.
+  final Set<String> processingIds;
+
   ConversationState copyWith({
     ConversationSession? active,
     List<ConversationSession>? conversations,
@@ -50,6 +56,7 @@ class ConversationState {
     String? error,
     double? micLevel,
     String? sttEvent,
+    Set<String>? processingIds,
     bool clearError = false,
     bool clearActive = false,
   }) {
@@ -62,6 +69,7 @@ class ConversationState {
       error: clearError ? null : (error ?? this.error),
       micLevel: micLevel ?? this.micLevel,
       sttEvent: sttEvent ?? this.sttEvent,
+      processingIds: processingIds ?? this.processingIds,
     );
   }
 }

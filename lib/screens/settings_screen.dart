@@ -6,7 +6,9 @@ import '../providers/ble_provider.dart';
 import '../providers/commitment_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/dev_capture_provider.dart';
+import '../providers/proactive_provider.dart';
 import '../providers/settings_provider.dart';
+import '../config/stt_config.dart';
 import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
@@ -84,6 +86,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   const _SttModelDashboard(),
+                  const SizedBox(height: 16),
+                  const _SttLanguagePicker(),
 
                   const SizedBox(height: 36),
 
@@ -523,6 +527,83 @@ class _ThemePill extends StatelessWidget {
   }
 }
 
+/// Speech-language picker. Auto-detect (default Whisper engine) or one
+/// explicit Indic language (same on-device bundle driven through the Indic
+/// engine core with a fixed language hint). Pure selection UI: the engine
+/// factory rebuilds the recognizer when the persisted code changes.
+class _SttLanguagePicker extends ConsumerWidget {
+  const _SttLanguagePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final code = ref.watch(
+      settingsProvider.select((s) => s.sttLanguageCode),
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.translate_rounded,
+            size: 20,
+            color: Color(0xFF888888),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Speech language',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  'Same offline model, fixed hint',
+                  style: TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          DropdownButton<String>(
+            value: code.isEmpty ? '' : code,
+            underline: const SizedBox.shrink(),
+            onChanged: (next) {
+              if (next != null) {
+                ref.read(settingsProvider.notifier).setSttLanguageCode(next);
+              }
+            },
+            items: [
+              const DropdownMenuItem(
+                value: '',
+                child: Text('Auto-detect'),
+              ),
+              for (final lang in SttConfig.indicLanguages)
+                DropdownMenuItem(
+                  value: lang.code,
+                  child: Text(lang.label),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SttModelDashboard extends ConsumerWidget {
   const _SttModelDashboard();
 
@@ -553,6 +634,10 @@ class _SttModelDashboard extends ConsumerWidget {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Active recognizer core: identical to the bundle title by default,
+    // "Whisper Small · Hindi"-style only when an Indic language is fixed.
+    final engineLabel = ref.watch(sttEngineProvider).modelLabel;
+    final showEngineLabel = engineLabel != kOfflineModelLabel;
 
     return Container(
       width: double.infinity,
@@ -587,6 +672,14 @@ class _SttModelDashboard extends ConsumerWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (showEngineLabel)
+                      Text(
+                        engineLabel,
+                        style: const TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 12,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -836,6 +929,37 @@ class _DeveloperConsole extends ConsumerWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.notifications_outlined, size: 16),
+            label: const Text('SEND TEST NOTIFICATION'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF353535),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            onPressed: () async {
+              final ok = await ref
+                  .read(proactiveServiceProvider.future)
+                  .then((svc) => svc.showTestNotification())
+                  .catchError((_) => false);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Test notification sent — check the shade'
+                          : 'Test notification failed — check permission',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
     );
