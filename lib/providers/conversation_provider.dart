@@ -883,9 +883,19 @@ class ConversationNotifier extends Notifier<ConversationState> {
       final updated = idx != -1 && idx < state.conversations.length
           ? state.conversations[idx]
           : session;
+      final notifySettings = ref.read(settingsProvider);
       final kind = await svc.maybeNotify(
         session: updated,
         result: result,
+        enabled: notifySettings.notifyEnabled,
+      );
+      unawaited(
+        svc.maybeSendDigest(
+          sessions: state.conversations,
+          digestHour: notifySettings.digestHour,
+          enabled: notifySettings.notifyEnabled &&
+              notifySettings.digestEnabled,
+        ),
       );
       if (kind != null) {
         ref.read(analyticsProvider).capture(

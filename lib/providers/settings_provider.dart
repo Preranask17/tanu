@@ -14,6 +14,9 @@ class AppSettings {
     this.hasCompletedOnboarding = true,
     this.geminiApiKey = '',
     this.sttLanguageCode = '',
+    this.notifyEnabled = true,
+    this.digestEnabled = true,
+    this.digestHour = 8,
   });
 
   final String deviceName;
@@ -26,12 +29,25 @@ class AppSettings {
   /// [IndicSttEngine] with the same on-device bundle.
   final String sttLanguageCode;
 
+  /// Custom notification master switch. Off silences immediates AND digest.
+  final bool notifyEnabled;
+
+  /// Morning digest with the top stashed memories (digest candidates that
+  /// never fired immediately).
+  final bool digestEnabled;
+
+  /// Local hour the digest may first fire (default 8am).
+  final int digestHour;
+
   AppSettings copyWith({
     String? deviceName,
     ThemeMode? themeMode,
     bool? hasCompletedOnboarding,
     String? geminiApiKey,
     String? sttLanguageCode,
+    bool? notifyEnabled,
+    bool? digestEnabled,
+    int? digestHour,
   }) {
     return AppSettings(
       deviceName: deviceName ?? this.deviceName,
@@ -40,6 +56,9 @@ class AppSettings {
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       sttLanguageCode: sttLanguageCode ?? this.sttLanguageCode,
+      notifyEnabled: notifyEnabled ?? this.notifyEnabled,
+      digestEnabled: digestEnabled ?? this.digestEnabled,
+      digestHour: digestHour ?? this.digestHour,
     );
   }
 
@@ -49,6 +68,9 @@ class AppSettings {
     'hasCompletedOnboarding': hasCompletedOnboarding,
     'geminiApiKey': geminiApiKey,
     'sttLanguageCode': sttLanguageCode,
+    'notifyEnabled': notifyEnabled,
+    'digestEnabled': digestEnabled,
+    'digestHour': digestHour,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -58,6 +80,9 @@ class AppSettings {
     hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,
     geminiApiKey: json['geminiApiKey'] as String? ?? '',
     sttLanguageCode: json['sttLanguageCode'] as String? ?? '',
+    notifyEnabled: json['notifyEnabled'] as bool? ?? true,
+    digestEnabled: json['digestEnabled'] as bool? ?? true,
+    digestHour: (json['digestHour'] as int? ?? 8).clamp(0, 23),
   );
 }
 
@@ -106,6 +131,25 @@ class SettingsNotifier extends Notifier<AppSettings> {
   /// `''` = auto-detect (default Whisper engine). Any supported Indic code
   /// routes the recognizer through [IndicSttEngine]; unknown codes are
   /// ignored so a stale value can never break transcription.
+  void setNotificationsEnabled(bool enabled) {
+    if (enabled == state.notifyEnabled) return;
+    state = state.copyWith(notifyEnabled: enabled);
+    _save();
+  }
+
+  void setDigestEnabled(bool enabled) {
+    if (enabled == state.digestEnabled) return;
+    state = state.copyWith(digestEnabled: enabled);
+    _save();
+  }
+
+  void setDigestHour(int hour) {
+    final normalized = hour.clamp(0, 23);
+    if (normalized == state.digestHour) return;
+    state = state.copyWith(digestHour: normalized);
+    _save();
+  }
+
   void setSttLanguageCode(String code) {
     final normalized = code.trim();
     if (normalized.isNotEmpty && SttConfig.indicLabelFor(normalized) == null) {

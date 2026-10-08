@@ -5,6 +5,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import '../../models/transcript.dart';
 import '../agent/gemini_agent_engine.dart';
 import '../storage_service.dart';
+import 'importance_scorer.dart';
 
 enum ProactiveKind { commitment, highlight }
 
@@ -18,6 +19,10 @@ class ProactiveService {
 
   static const _channelId = 'tanu_insights';
   static const _channelName = 'Tanu insights';
+  static const _commitmentsChannelId = 'tanu_commitments';
+  static const _commitmentsChannelName = 'Tanu commitments';
+  static const _digestChannelId = 'tanu_digest';
+  static const _digestChannelName = 'Tanu digest';
 
   static Future<ProactiveService> init({
     required ValueChanged<String> onTap,
@@ -40,17 +45,33 @@ class ProactiveService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
-    await plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(
-          const AndroidNotificationChannel(
-            _channelId,
-            _channelName,
-            description: 'Insights from your memories',
-            importance: Importance.high,
-          ),
-        );
+    final androidPlugin =
+        plugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: 'Insights from your memories',
+        importance: Importance.high,
+      ),
+    );
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _commitmentsChannelId,
+        _commitmentsChannelName,
+        description: 'Commitments pulled from your conversations',
+        importance: Importance.high,
+      ),
+    );
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _digestChannelId,
+        _digestChannelName,
+        description: 'Your morning memory digest',
+        importance: Importance.defaultImportance,
+      ),
+    );
     return ProactiveService._(plugin, onTap);
   }
 
@@ -124,10 +145,106 @@ class ProactiveService {
     caseSensitive: false,
   );
 
+  /// Known people for novelty scoring, learned from past commitment
+  /// counterparties. Lowercased names only — never transcript content.
+  Set<String> _knownPeople() {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final raw = box.get('proactiveKnownPeople');
+      if (raw is List) {
+        return raw.whereType<String>().toSet();
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  void _learnPeople(Iterable<AgentCommitment> commitments) {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final known = _knownPeople();
+      var changed = false;
+      for (final c in commitments) {
+        final person = c.person?.trim().toLowerCase() ?? '';
+        if (person.isNotEmpty && known.add(person)) changed = true;
+      }
+      if (changed) {
+        final pruned = known.length > 200
+            ? known.skip(known.length - 200).toSet()
+            : known;
+        box.put('proactiveKnownPeople', pruned.toList());
+      }
+    } catch (_) {}
+  }
+
+  /// Persisted importance per memory (session id -> score), pruned to the
+  /// newest 100. Feeds the morning digest without re-reading transcripts.
+  void _recordScore(String sessionId, int score) {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final raw = box.get('proactiveScores');
+      final map = Map<String, dynamic>.from(raw is Map ? raw : {});
+      map[sessionId] = score;
+      while (map.length > 100) {
+        map.remove(map.keys.first);
+      }
+      box.put('proactiveScores', map);
+    } catch (_) {}
+  }
+
+  void _stashForDigest(String sessionId) {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final raw = box.get('proactiveDigestPending');
+      final pending = <String>[];
+      if (raw is List) pending.addAll(raw.whereType<String>());
+      if (!pending.contains(sessionId)) {
+        pending.add(sessionId);
+        while (pending.length > 20) {
+          pending.removeAt(0);
+        }
+        box.put('proactiveDigestPending', pending);
+      }
+    } catch (_) {}
+  }
+
   Future<ProactiveKind?> maybeNotify({
     required ConversationSession session,
     required MemoryResult result,
+    bool enabled = true,
   }) async {
+    if (!enabled) {
+      debugPrint('[tanu] proactive skipped: master switch off');
+      return null;
+    }
+    final scored = scoreMemoryImportance(
+      commitments: result.commitments,
+      summary: result.summary,
+      knownPeople: _knownPeople(),
+    );
+    _recordScore(session.id, scored.score);
+    _learnPeople(result.commitments);
+    debugPrint(
+      '[tanu] proactive score=${scored.score} reasons=${scored.reasons}',
+    );
+
+    if (scored.score < ImportanceThresholds.digest) {
+      debugPrint('[tanu] proactive skipped: below digest threshold');
+      return null;
+    }
+
+    if (inQuietHours(now: DateTime.now())) {
+      // Held, not dropped: quiet hours route everything to the digest.
+      _stashForDigest(session.id);
+      debugPrint('[tanu] proactive held for digest: quiet hours');
+      return null;
+    }
+
+    if (scored.score < ImportanceThresholds.immediate) {
+      _stashForDigest(session.id);
+      debugPrint('[tanu] proactive stashed for digest: below immediate');
+      return null;
+    }
+
     // Skip reasons are logged as booleans/counts only — never content.
     if (!_allowedNow()) {
       debugPrint('[tanu] proactive skipped: over cap or inside min gap');
@@ -165,6 +282,14 @@ class ProactiveService {
       return null;
     }
 
+    // Commitments get their own channel so they stand apart from
+    // generic insights in the shade and in channel settings.
+    final channelId = kind == ProactiveKind.commitment
+        ? _commitmentsChannelId
+        : _channelId;
+    final channelName = kind == ProactiveKind.commitment
+        ? _commitmentsChannelName
+        : _channelName;
     try {
       await _plugin.show(
         id: session.id.hashCode,
@@ -172,8 +297,8 @@ class ProactiveService {
         body: body,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
+            channelId,
+            channelName,
             importance: Importance.high,
             priority: Priority.high,
           ),
@@ -186,6 +311,80 @@ class ProactiveService {
     } catch (e) {
       debugPrint('[tanu] proactive notify failed: $e');
       return null;
+    }
+  }
+
+  /// Morning digest: up to 3 stashed memories as one summary notification.
+  /// Runs opportunistically (first memory processed after [digestHour] when
+  /// none was sent today). Returns true when anything showed. Content is the
+  /// same title/summary text the cards already carry — never logged.
+  Future<bool> maybeSendDigest({
+    required List<ConversationSession> sessions,
+    DateTime? now,
+    int digestHour = 8,
+    bool enabled = true,
+  }) async {
+    if (!enabled) return false;
+    final at = now ?? DateTime.now();
+    if (at.hour < digestHour) return false;
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final today = DateTime(at.year, at.month, at.day);
+      final sentRaw = box.get('proactiveDigestDay') as String?;
+      if (sentRaw != null && DateTime.tryParse(sentRaw) == today) {
+        return false;
+      }
+      final raw = box.get('proactiveDigestPending');
+      final pending = <String>[];
+      if (raw is List) pending.addAll(raw.whereType<String>());
+      if (pending.isEmpty) return false;
+
+      final scoresRaw = box.get('proactiveScores');
+      final scores = scoresRaw is Map
+          ? Map<String, dynamic>.from(scoresRaw)
+          : <String, dynamic>{};
+      pending.sort((a, b) =>
+          ((scores[b] as int?) ?? 0).compareTo((scores[a] as int?) ?? 0));
+      final top = pending.take(3).toList();
+      final byId = {for (final s in sessions) s.id: s};
+      final lines = <String>[];
+      for (final id in top) {
+        final target = byId[id];
+        if (target == null) continue;
+        final title = target.title.trim().isEmpty
+            ? 'Untitled memory'
+            : target.title.trim();
+        lines.add('\u2022 $title');
+      }
+      if (lines.isEmpty) {
+        box.put('proactiveDigestDay', today.toIso8601String());
+        box.put('proactiveDigestPending', <String>[]);
+        return false;
+      }
+      await _plugin.show(
+        id: -2,
+        title: 'Your morning memory digest',
+        body: lines.join('\n'),
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _digestChannelId,
+            _digestChannelName,
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: const DarwinNotificationDetails(),
+        ),
+        payload: top.first,
+      );
+      box.put('proactiveDigestDay', today.toIso8601String());
+      box.put(
+        'proactiveDigestPending',
+        pending.where((id) => !top.contains(id)).toList(),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[tanu] digest failed: $e');
+      return false;
     }
   }
 }
