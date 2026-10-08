@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tanu_app/services/agent/gemini_agent_engine.dart';
 import 'package:tanu_app/services/proactive/importance_scorer.dart';
+import 'package:tanu_app/services/proactive/proactive_service.dart';
 
 AgentCommitment commitment(
   String action, {
@@ -15,6 +16,8 @@ AgentCommitment commitment(
     );
 
 void main() {
+  immediateDecisionTests();
+
   group('scoreMemoryImportance', () {
     test('dated commitment to a new person scores immediate', () {
       final scored = scoreMemoryImportance(
@@ -90,6 +93,67 @@ void main() {
 
     test('boundary hours', () {
       expect(inQuietHours(now: at(22)), isTrue);
+    });
+  });
+}
+
+void immediateDecisionTests() {
+  group('shouldNotifyImmediately: every close pings', () {
+    test('consecutive important memories both notify (no caps)', () {
+      for (final id in ['m1', 'm2']) {
+        expect(
+          ProactiveService.shouldNotifyImmediately(
+            score: 85,
+            alreadyNotified: false,
+            quietNow: false,
+            enabled: true,
+          ),
+          isTrue,
+          reason: id,
+        );
+      }
+    });
+
+    test('reprocess never double-pings', () {
+      expect(
+        ProactiveService.shouldNotifyImmediately(
+          score: 100,
+          alreadyNotified: true,
+          quietNow: false,
+          enabled: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('quiet hours hold, master off and low scores stay silent', () {
+      expect(
+        ProactiveService.shouldNotifyImmediately(
+          score: 90,
+          alreadyNotified: false,
+          quietNow: true,
+          enabled: true,
+        ),
+        isFalse,
+      );
+      expect(
+        ProactiveService.shouldNotifyImmediately(
+          score: 90,
+          alreadyNotified: false,
+          quietNow: false,
+          enabled: false,
+        ),
+        isFalse,
+      );
+      expect(
+        ProactiveService.shouldNotifyImmediately(
+          score: 20,
+          alreadyNotified: false,
+          quietNow: false,
+          enabled: true,
+        ),
+        isFalse,
+      );
     });
   });
 }

@@ -103,41 +103,32 @@ class ProactiveService {
     }
   }
 
-  static const _maxPerDay = 3;
-  static const _minGap = Duration(hours: 1);
-
-  bool _allowedNow() {
-    final box = Hive.box(Boxes.conversation);
-    final today = DateTime.now();
-    final storedDay = DateTime.tryParse(box.get('proactiveDay') as String? ?? '');
-    final count = storedDay != null &&
-            storedDay.year == today.year &&
-            storedDay.month == today.month &&
-            storedDay.day == today.day
-        ? (box.get('proactiveCount') as int? ?? 0)
-        : 0;
-    if (count >= _maxPerDay) return false;
-    final lastMs = box.get('proactiveLastAt') as int?;
-    if (lastMs != null) {
-      final last = DateTime.fromMillisecondsSinceEpoch(lastMs);
-      if (today.difference(last) < _minGap) return false;
-    }
-    return true;
+  /// Session ids already pinged (Hive, capped). Retries, queue drains
+  /// and reprocessing re-run scoring freely — this set is what keeps every
+  /// memory to exactly one notification.
+  bool _wasNotified(String sessionId) {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final raw = box.get('proactiveNotified');
+      if (raw is List) return raw.whereType<String>().contains(sessionId);
+    } catch (_) {}
+    return false;
   }
 
-  void _recordFired() {
-    final box = Hive.box(Boxes.conversation);
-    final today = DateTime.now();
-    final storedDay =
-        DateTime.tryParse(box.get('proactiveDay') as String? ?? '');
-    final sameDay = storedDay != null &&
-        storedDay.year == today.year &&
-        storedDay.month == today.month &&
-        storedDay.day == today.day;
-    final count = sameDay ? (box.get('proactiveCount') as int? ?? 0) : 0;
-    box.put('proactiveDay', today.toIso8601String());
-    box.put('proactiveCount', count + 1);
-    box.put('proactiveLastAt', today.millisecondsSinceEpoch);
+  void _markNotified(String sessionId) {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      final raw = box.get('proactiveNotified');
+      final ids = <String>[];
+      if (raw is List) ids.addAll(raw.whereType<String>());
+      if (!ids.contains(sessionId)) {
+        ids.add(sessionId);
+        while (ids.length > 100) {
+          ids.removeAt(0);
+        }
+        box.put('proactiveNotified', ids);
+      }
+    } catch (_) {}
   }
 
   static final _decisionVerbs = RegExp(
@@ -207,6 +198,23 @@ class ProactiveService {
     } catch (_) {}
   }
 
+  /// Whether an already-scored memory pings right now. Every close with
+  /// important content notifies — no daily count, no minimum gap. Guards
+  /// that remain: master switch, already-notified (retries/drains must
+  /// never double-ping), quiet hours (held for digest), threshold.
+  static bool shouldNotifyImmediately({
+    required int score,
+    required bool alreadyNotified,
+    required bool quietNow,
+    required bool enabled,
+  }) {
+    if (!enabled) return false;
+    if (alreadyNotified) return false;
+    if (score < ImportanceThresholds.digest) return false;
+    if (quietNow) return false;
+    return true;
+  }
+
   Future<ProactiveKind?> maybeNotify({
     required ConversationSession session,
     required MemoryResult result,
@@ -232,22 +240,26 @@ class ProactiveService {
       return null;
     }
 
-    if (inQuietHours(now: DateTime.now())) {
-      // Held, not dropped: quiet hours route everything to the digest.
-      _stashForDigest(session.id);
-      debugPrint('[tanu] proactive held for digest: quiet hours');
-      return null;
-    }
-
-    if (scored.score < ImportanceThresholds.immediate) {
-      _stashForDigest(session.id);
-      debugPrint('[tanu] proactive stashed for digest: below immediate');
-      return null;
-    }
-
-    // Skip reasons are logged as booleans/counts only — never content.
-    if (!_allowedNow()) {
-      debugPrint('[tanu] proactive skipped: over cap or inside min gap');
+    // Every close with important content pings: no daily count, no gap.
+    // Retries and drains re-run scoring freely; the notified set below is
+    // what keeps each memory to exactly one ping.
+    final quietNow = inQuietHours(now: DateTime.now());
+    final alreadyNotified = _wasNotified(session.id);
+    if (!ProactiveService.shouldNotifyImmediately(
+      score: scored.score,
+      alreadyNotified: alreadyNotified,
+      quietNow: quietNow,
+      enabled: enabled,
+    )) {
+      if (!alreadyNotified && enabled) {
+        // Blocked only by quiet hours: held for the digest, never dropped.
+        _stashForDigest(session.id);
+        debugPrint('[tanu] proactive held for digest: quiet hours');
+      } else {
+        debugPrint(
+          '[tanu] proactive skipped: already notified or master off',
+        );
+      }
       return null;
     }
 
@@ -306,7 +318,7 @@ class ProactiveService {
         ),
         payload: session.id,
       );
-      _recordFired();
+      _markNotified(session.id);
       return kind;
     } catch (e) {
       debugPrint('[tanu] proactive notify failed: $e');
