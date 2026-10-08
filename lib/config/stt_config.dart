@@ -37,4 +37,30 @@ class SttConfig {
 
   /// PCM sample rate expected by both the VAD and the recognizer.
   static const int sampleRate = 16000;
+
+  /// Indic languages the on-device Whisper Small bundle decodes. The bundle
+  /// is multilingual, so each entry is served by the shared 375 MB download
+  /// with an explicit language hint (no auto-detect) — faster and more
+  /// accurate than language detection, and it keeps every language model
+  /// already on disk: no extra downloads, no extra storage.
+  /// (code: Whisper language id, label: Settings display name)
+  static const List<({String code, String label})> indicLanguages = [
+    (code: 'hi', label: 'Hindi'),
+    (code: 'kn', label: 'Kannada'),
+    (code: 'ta', label: 'Tamil'),
+    (code: 'te', label: 'Telugu'),
+    (code: 'ml', label: 'Malayalam'),
+    (code: 'bn', label: 'Bengali'),
+    (code: 'mr', label: 'Marathi'),
+    (code: 'gu', label: 'Gujarati'),
+  ];
+
+  /// Display label for a language [code], or null when the code is not a
+  /// supported Indic language (caller falls back to auto-detect).
+  static String? indicLabelFor(String code) {
+    for (final entry in indicLanguages) {
+      if (entry.code == code) return entry.label;
+    }
+    return null;
+  }
 }

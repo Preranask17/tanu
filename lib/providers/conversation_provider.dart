@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../constants.dart';
+import '../config/stt_config.dart';
 import '../abstractions/audio_source.dart';
 import '../abstractions/stt_engine.dart';
 import '../models/conversation.dart';
@@ -20,11 +21,33 @@ import 'rag_provider.dart';
 import 'proactive_provider.dart';
 
 import '../services/stt/whisper_small_engine.dart';
+import '../services/stt/indic_stt_engine.dart';
+import 'settings_provider.dart';
 
+/// The swap point for the recognizer core. Default is Whisper Small with
+/// language auto-detect; when the user picks an explicit Indic language in
+/// Settings, the same on-device bundle is driven through [IndicSttEngine]
+/// with a fixed language hint instead. Only the language selection is
+/// watched, so unrelated settings changes never restart the engine.
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
-  final engine = WhisperSmallEngine();
+  final code = ref.watch(
+    settingsProvider.select((s) => s.sttLanguageCode),
+  );
+  final ContinuousSttEngine engine;
+  final label = code.isEmpty ? null : SttConfig.indicLabelFor(code);
+  if (label == null) {
+    engine = WhisperSmallEngine();
+  } else {
+    engine = IndicSttEngine(languageCode: code, languageLabel: label);
+  }
 
-  ref.onDispose(() => engine.dispose());
+  ref.onDispose(() {
+    if (engine case WhisperSmallEngine e) {
+      e.dispose();
+    } else if (engine case IndicSttEngine e) {
+      e.dispose();
+    }
+  });
   return engine;
 });
 
