@@ -105,9 +105,14 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     final conversation = ref.watch(conversationProvider);
 
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
+    // While a conversation is happening the bottom bar and hero copy get
+    // out of the way: orb + live transcription only. The bar returns the
+    // moment capture is idle so a new session can always start.
+    final capturing = status.isConnected &&
+        (conversation.isListening || conversation.active != null);
     final bottomPadding =
         MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
-    final bottomInset = bottomPadding + 62 + 16;
+    final bottomInset = capturing ? bottomPadding + 24 : bottomPadding + 62 + 16;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -156,11 +161,12 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _CaptureHero(
-                          micLevel: conversation.micLevel,
-                          isConnected: status.isConnected,
-                          deviceName: status.deviceName,
-                        ),
+                        if (!capturing)
+                          _CaptureHero(
+                            micLevel: conversation.micLevel,
+                            isConnected: status.isConnected,
+                            deviceName: status.deviceName,
+                          ),
                       ],
                     ),
                   ),
@@ -168,12 +174,13 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
           ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: bottomPadding,
-            child: const Center(child: HomeChatBar()),
-          ),
+          if (!capturing)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: bottomPadding,
+              child: const Center(child: HomeChatBar()),
+            ),
         ],
       ),
     );

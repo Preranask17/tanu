@@ -36,7 +36,7 @@ void main() {
     expect(find.byIcon(Icons.delete_outline), findsWidgets);
     // RAG search pill: magnifier + field only, no mic affordance.
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Ask or search memories...'), findsOneWidget);
+    expect(find.text('Ask anything about your day…'), findsOneWidget);
     expect(find.byIcon(Icons.mic_none), findsNothing);
     // No RAG card before a question is submitted.
     expect(find.textContaining('memories found'), findsNothing);

@@ -201,63 +201,95 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.07)
-                        : const Color(0xFFF2F2F7),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.search,
-                        size: 20,
-                        color: Color(0xFF888888),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _query,
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: (_) => _askRag(),
-                          decoration: const InputDecoration(
-                            hintText: 'Ask or search memories...',
-                            hintStyle: TextStyle(
-                              color: Color(0xFF888888),
-                              fontSize: 15,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              vertical: 12,
-                            ),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _askRag(),
+                  child: Container(
+                    padding: const EdgeInsets.only(
+                      left: 8,
+                      right: 16,
+                      top: 8,
+                      bottom: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF161618)
+                          : const Color(0xFFFFFFFF),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.35 : 0.06,
                           ),
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black,
-                            fontSize: 15,
-                          ),
-                          onChanged: (_) => setState(() {}),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      if (query.isNotEmpty)
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _clearSearch,
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.clear,
-                              size: 18,
-                              color: Color(0xFF888888),
-                            ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Theme.of(context)
+                                .primaryColor
+                                .withValues(alpha: 0.12),
+                          ),
+                          child: Icon(
+                            Icons.search_rounded,
+                            size: 20,
+                            color: Theme.of(context).primaryColor,
                           ),
                         ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _query,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => _askRag(),
+                            decoration: const InputDecoration(
+                              hintText: 'Ask anything about your day…',
+                              hintStyle: TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 16,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                              fontSize: 16,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        if (query.isNotEmpty)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _clearSearch,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFF2F2F7),
+                              ),
+                              child: const Icon(
+                                Icons.clear_rounded,
+                                size: 16,
+                                color: Color(0xFF888888),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
