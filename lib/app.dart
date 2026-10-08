@@ -12,8 +12,9 @@ import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/onboarding_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/welcome/returning_startup_gate.dart';
+import 'screens/welcome/welcome_flow.dart';
 import 'theme.dart';
 
 import 'widgets/responsive_scaffold.dart';
@@ -30,6 +31,11 @@ class _TanuAppState extends ConsumerState<TanuApp> {
   String _fgNotice = '';
   final _homeKey = GlobalKey<HomeScreenState>();
   final _conversationsKey = GlobalKey<ConversationsScreenState>();
+
+  /// Whether this process ever showed first-run onboarding. After an
+  /// in-session Get Started we go straight to the app — the returning-user
+  /// startup movie must NOT replay.
+  bool _sawOnboarding = false;
 
   /// Tab index -> screen name. Indexed in step with the `BottomNavigationBarItem`
   /// list in [build] and with the `items` passed to `ResponsiveScaffold`.
@@ -179,9 +185,23 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: TanuTheme.getTheme(brightness),
-      home: !settings.hasCompletedOnboarding
-          ? const OnboardingScreen()
-          : ResponsiveScaffold(
+      home: Builder(
+        builder: (context) {
+          final completed = settings.hasCompletedOnboarding;
+          if (!completed) _sawOnboarding = true;
+          if (!completed) return const WelcomeFlow();
+          final scaffold = _mainScaffold(index);
+          // First launch after Get Started: go straight in. Returning cold
+          // starts get the formation movie once per process.
+          if (_sawOnboarding) return scaffold;
+          return ReturningStartupGate(child: scaffold);
+        },
+      ),
+    );
+  }
+
+  Widget _mainScaffold(int index) {
+    return ResponsiveScaffold(
               currentIndex: index,
               onTabTapped: (i) {
                 if (i == index) {
@@ -212,8 +232,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
                 ConversationsScreen(key: _conversationsKey),
                 const SettingsScreen(),
               ],
-            ),
-    );
+            );
   }
 }
 
