@@ -139,6 +139,7 @@ class MemoryResult {
     required this.summary,
     required this.commitments,
     this.cleanedTranscript = '',
+    this.error,
   });
 
   final String title;
@@ -147,6 +148,9 @@ class MemoryResult {
 
   /// The raw transcript rewritten into clean, speaker-labeled prose.
   final String cleanedTranscript;
+
+  /// Set when processing failed (network/parse) — caller should retry later.
+  final String? error;
 }
 
 /// Single-shot Gemini call that turns a raw transcript into a structured,
@@ -184,8 +188,9 @@ No commentary, no markdown fences.
     } catch (e) {
       return MemoryResult(
         title: 'Memory',
-        summary: 'Failed to process memory: $e',
+        summary: '',
         commitments: const [],
+        error: e.toString(),
       );
     }
   }
@@ -202,8 +207,9 @@ No commentary, no markdown fences.
     if (start == -1 || end == -1) {
       return const MemoryResult(
         title: 'Memory',
-        summary: 'Could not parse response',
+        summary: '',
         commitments: [],
+        error: 'Could not parse response',
       );
     }
     final jsonStr = cleaned.substring(start, end + 1);
@@ -232,8 +238,9 @@ No commentary, no markdown fences.
     } catch (_) {
       return const MemoryResult(
         title: 'Memory',
-        summary: 'Could not parse response',
+        summary: '',
         commitments: [],
+        error: 'Could not parse response',
       );
     }
   }
