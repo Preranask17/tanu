@@ -620,18 +620,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
       }
     }
 
-    // Index the session chunks for RAG retrieval (best effort).
+    // Index the session chunks for RAG retrieval (best effort, non-blocking).
     if (idx != -1) {
-      try {
-        final indexer = await ref.read(memoryIndexerProvider.future);
-        await indexer.indexSession(session.copyWith(
-          title: result.title,
-          summary: result.summary,
-          cleanedTranscript: result.cleanedTranscript.isEmpty
-              ? null
-              : result.cleanedTranscript,
-        ));
-      } catch (_) {}
+      unawaited(_indexSession(session.copyWith(
+        title: result.title,
+        summary: result.summary,
+        cleanedTranscript: result.cleanedTranscript.isEmpty
+            ? null
+            : result.cleanedTranscript,
+      )));
     }
 
     ref
@@ -643,6 +640,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
             'has_summary': result.summary.isNotEmpty,
           },
         );
+  }
+
+  Future<void> _indexSession(ConversationSession session) async {
+    try {
+      final indexer = await ref.read(memoryIndexerProvider.future);
+      await indexer.indexSession(session);
+    } catch (_) {}
   }
 
   // --- AI retry queue ------------------------------------------------------
@@ -683,64 +687,76 @@ class ConversationNotifier extends Notifier<ConversationState> {
     return 0;
   }
 
+  bool _draining = false;
+  static const int _maxDrainPerRun = 5;
+
   Future<void> _drainRetryQueue() async {
-    // Rescue sessions left in a failed state by older builds (pre-queue).
-    for (final s in state.conversations) {
-      final summary = s.summary ?? '';
-      final looksFailed = summary.startsWith('Could not parse') ||
-          summary.startsWith('Failed to process memory');
-      final looksUnprocessed = summary.isEmpty &&
-          s.cleanedTranscript == null &&
-          s.transcriptText.trim().isNotEmpty;
-      if ((looksFailed || looksUnprocessed) &&
-          _retryAttemptCount(s.id) < _maxRetryAttempts) {
-        _enqueueForRetry(s.id);
-      }
-    }
-
-    final queue = _retryQueue();
-    if (queue.isEmpty) return;
-
-    final processor = ref.read(memoryProcessorProvider);
-    for (final id in List<String>.of(queue)) {
-      final idx = state.conversations.indexWhere((c) => c.id == id);
-      if (idx == -1) {
-        _dequeueRetry(id);
-        continue;
-      }
-
-      final session = state.conversations[idx];
-      final result = await processor.process(session.transcriptText);
-
-      if (result.error == null) {
-        final conversations = List<ConversationSession>.of(state.conversations);
-        conversations[idx] = session.copyWith(
-          title: result.title,
-          summary: result.summary,
-          cleanedTranscript: result.cleanedTranscript.isEmpty
-              ? null
-              : result.cleanedTranscript,
-        );
-        state = state.copyWith(conversations: conversations);
-        _persist();
-        _dequeueRetry(id);
-        try {
-          final indexer = await ref.read(memoryIndexerProvider.future);
-          await indexer.indexSession(conversations[idx]);
-        } catch (_) {}
-        ref.read(analyticsProvider).capture('memory retry succeeded');
-      } else {
-        final attempts = _retryAttemptCount(id) + 1;
-        final box = Hive.box(Boxes.conversation);
-        final raw = box.get('memoryRetryAttempts');
-        final map = Map<String, dynamic>.from(raw is Map ? raw : {});
-        map[id] = attempts;
-        box.put('memoryRetryAttempts', map);
-        if (attempts >= _maxRetryAttempts) {
-          _dequeueRetry(id, keepAttemptCount: true);
-          ref.read(analyticsProvider).capture('memory retry gave up');
+    if (_draining) return;
+    _draining = true;
+    try {
+      // Rescue sessions left in a failed state by older builds (pre-queue).
+      for (final s in state.conversations) {
+        final summary = s.summary ?? '';
+        final looksFailed = summary.startsWith('Could not parse') ||
+            summary.startsWith('Failed to process memory');
+        final looksUnprocessed = summary.isEmpty &&
+            s.cleanedTranscript == null &&
+            s.transcriptText.trim().isNotEmpty;
+        if ((looksFailed || looksUnprocessed) &&
+            _retryAttemptCount(s.id) < _maxRetryAttempts) {
+          _enqueueForRetry(s.id);
         }
       }
+
+      final queue = _retryQueue();
+      if (queue.isEmpty) return;
+
+      final processor = ref.read(memoryProcessorProvider);
+      var processedThisRun = 0;
+      for (final id in List<String>.of(queue)) {
+        if (processedThisRun >= _maxDrainPerRun) break;
+        processedThisRun++;
+        final idx = state.conversations.indexWhere((c) => c.id == id);
+        if (idx == -1) {
+          _dequeueRetry(id);
+          continue;
+        }
+
+        final session = state.conversations[idx];
+        final result = await processor.process(session.transcriptText);
+
+        if (result.error == null) {
+          final conversations = List<ConversationSession>.of(state.conversations);
+          conversations[idx] = session.copyWith(
+            title: result.title,
+            summary: result.summary,
+            cleanedTranscript: result.cleanedTranscript.isEmpty
+                ? null
+                : result.cleanedTranscript,
+          );
+          state = state.copyWith(conversations: conversations);
+          _persist();
+          _dequeueRetry(id);
+          try {
+            final indexer = await ref.read(memoryIndexerProvider.future);
+            await indexer.indexSession(conversations[idx]);
+          } catch (_) {}
+          ref.read(analyticsProvider).capture('memory retry succeeded');
+        } else {
+          final attempts = _retryAttemptCount(id) + 1;
+          final box = Hive.box(Boxes.conversation);
+          final raw = box.get('memoryRetryAttempts');
+          final map = Map<String, dynamic>.from(raw is Map ? raw : {});
+          map[id] = attempts;
+          box.put('memoryRetryAttempts', map);
+          if (attempts >= _maxRetryAttempts) {
+            _dequeueRetry(id, keepAttemptCount: true);
+            ref.read(analyticsProvider).capture('memory retry gave up');
+          }
+        }
+      }
+    } finally {
+      _draining = false;
     }
   }
 

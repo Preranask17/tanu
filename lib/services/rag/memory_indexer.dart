@@ -81,12 +81,16 @@ class MemoryIndexer {
     return chunks.length;
   }
 
-  /// Backfill every session missing from the store. Cheap no-op when indexed.
-  Future<void> backfill(List<ConversationSession> sessions) async {
-    if (_store.chunkCount > 0) return;
+  /// Backfill sessions missing from the store, capped per call so the UI
+  /// stays responsive. Retries can call it again on later launches.
+  Future<void> backfill(List<ConversationSession> sessions, {int maxSessions = 5}) async {
+    var indexed = 0;
     for (final s in sessions) {
+      if (indexed >= maxSessions) return;
+      if (_store.hasSession(s.id)) continue;
       try {
-        await indexSession(s);
+        final n = await indexSession(s);
+        if (n > 0) indexed++;
       } catch (_) {
         // Skip sessions that fail (e.g. offline) — they can be retried later.
       }

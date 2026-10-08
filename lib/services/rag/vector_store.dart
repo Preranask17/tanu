@@ -123,6 +123,11 @@ class VectorStore {
     _db.execute('DELETE FROM chunks WHERE session_id = ?', [sessionId]);
   }
 
+  bool hasSession(String sessionId) {
+    final rs = _db.select('SELECT 1 FROM chunks WHERE session_id = ? LIMIT 1', [sessionId]);
+    return rs.isNotEmpty;
+  }
+
   int get chunkCount {
     final rs = _db.select('SELECT COUNT(*) AS n FROM chunks');
     return rs.first['n'] as int;

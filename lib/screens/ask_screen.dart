@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,7 +43,8 @@ class _AskScreenState extends ConsumerState<AskScreen> {
       final indexer = await ref.read(memoryIndexerProvider.future);
       if (!_backfilled) {
         _backfilled = true;
-        await indexer.backfill(ref.read(conversationProvider).conversations);
+        // Fire-and-forget: don't block the user's answer on backfill.
+        unawaited(indexer.backfill(ref.read(conversationProvider).conversations));
       }
       final rag = await ref.read(ragServiceProvider.future);
       final result = await rag.answer(text);
