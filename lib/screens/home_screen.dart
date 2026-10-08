@@ -7,6 +7,7 @@ import '../models/conversation.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
+import 'chat_screen.dart';
 import '../widgets/ai_presence_orb.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
@@ -145,11 +146,16 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                           level: conversation.micLevel,
                           listening: conversation.isListening,
                         ),
-                        const SizedBox(height: 4),
                         _LiveCaptureStrip(
                           conversation: conversation,
+                          onOpenTranscript: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              fullscreenDialog: true,
+                              builder: (_) => const ChatPage(),
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
                         _CaptureHero(
                           micLevel: conversation.micLevel,
                           isConnected: status.isConnected,
@@ -305,9 +311,13 @@ class _PendantButtonState extends State<_PendantButton>
 /// here while capturing, the last captured line stays visible when idle.
 /// Display only — capture controls live in the chat bar as before.
 class _LiveCaptureStrip extends StatelessWidget {
-  const _LiveCaptureStrip({required this.conversation});
+  const _LiveCaptureStrip({
+    required this.conversation,
+    required this.onOpenTranscript,
+  });
 
   final ConversationState conversation;
+  final VoidCallback onOpenTranscript;
 
   @override
   Widget build(BuildContext context) {
@@ -320,20 +330,27 @@ class _LiveCaptureStrip extends StatelessWidget {
               : '');
     final idle = preview.isEmpty;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 110),
-        child: SingleChildScrollView(
-          child: Text(
-            idle ? 'Transcription will appear here…' : preview,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontStyle: FontStyle.italic,
-              fontSize: 15,
-              height: 1.45,
-              color: idle
-                  ? const Color(0xFF888888)
-                  : Theme.of(context).textTheme.bodyLarge?.color,
+      padding: const EdgeInsets.only(top: 2, left: 32, right: 32),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onOpenTranscript();
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 110),
+          child: SingleChildScrollView(
+            child: Text(
+              idle ? 'Transcription will appear here…' : preview,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                fontSize: 15,
+                height: 1.45,
+                color: idle
+                    ? const Color(0xFF888888)
+                    : Theme.of(context).textTheme.bodyLarge?.color,
+              ),
             ),
           ),
         ),

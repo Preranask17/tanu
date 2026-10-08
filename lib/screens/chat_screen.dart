@@ -406,14 +406,8 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
               decoration: BoxDecoration(
                 color: isDark
                     ? const Color(0xFF1C1C1E)
-                    : const Color(0xFFFFFFFF),
+                    : const Color(0xFFF2F2F7),
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF2A2A2A)
-                      : const Color(0xFFE5E5E5),
-                  width: 1,
-                ),
                 boxShadow: [
                   BoxShadow(
                     color: Theme.of(context)

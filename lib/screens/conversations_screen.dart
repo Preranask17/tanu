@@ -204,20 +204,14 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 4,
+                    horizontal: 16,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.07)
                         : const Color(0xFFF2F2F7),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : const Color(0xFFE5E5E5),
-                      width: 1.0,
-                    ),
                   ),
                   child: Row(
                     children: [

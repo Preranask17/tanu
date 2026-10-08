@@ -14,6 +14,7 @@ import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/page_layout.dart';
+import '../widgets/pinned_header.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -36,16 +37,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: true,
-            pinned: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              title: const TanuPageTitle('Settings'),
-              titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
-            ),
+          const PinnedHeader(
+            title: 'Settings',
           ),
           SliverToBoxAdapter(
             child: TanuPageRail(
