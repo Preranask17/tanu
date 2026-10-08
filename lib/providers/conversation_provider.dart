@@ -97,10 +97,10 @@ class ConversationNotifier extends Notifier<ConversationState> {
         ref.read(pendantStatusProvider).value ??
             ref.read(pendantProvider).currentStatus,
       );
-      // Retry any memories whose AI processing failed previously.
-      unawaited(_drainRetryQueue());
-      // One-time demo memories so RAG is usable on a fresh install.
-      unawaited(seedDemoMemories());
+      // Serialized cold-start: seed -> retry drain -> vector-store prime.
+      // One ordered chain instead of three concurrent fire-and-forgets so
+      // the first answer never waits behind a backlog stampede.
+      unawaited(_bootTasks());
     });
     ref.onDispose(() {
       // Cancel only: reading state here trips Riverpod's dispose guard.
@@ -115,6 +115,24 @@ class ConversationNotifier extends Notifier<ConversationState> {
       active: loaded.active,
       conversations: loaded.completed,
     );
+  }
+
+  bool _bootStarted = false;
+
+  /// Ordered cold-start chain: demo seed, then retry drain, then vector
+  /// store prime. Never concurrent, runs once per provider lifetime.
+  Future<void> _bootTasks() async {
+    if (_bootStarted) return;
+    _bootStarted = true;
+    try {
+      await seedDemoMemories();
+    } catch (_) {}
+    try {
+      await _drainRetryQueue();
+    } catch (_) {}
+    try {
+      await ref.read(memoryIndexerProvider.future);
+    } catch (_) {}
   }
 
   /// --- Session lifecycle ------------------------------------------------
@@ -528,13 +546,32 @@ class ConversationNotifier extends Notifier<ConversationState> {
   }
 
   /// Meeting-style closers — treated as strong once a session has some meat.
+  /// Deliberately end-anchored (trailing punctuation stripped): the closer
+  /// must FINISH the utterance. Mid-sentence mentions ("let's continue this
+  /// next time we meet about X") must never split a memory.
   static final RegExp _businessEndPattern = RegExp(
-    r"(?:minutes after|we'?ll pick up (?:this|next week|tomorrow)|"
-    r"let'?s continue (?:this|next time)|follow up (?:on )?this (?:later|next week)|"
+    r"(?:minutes after|we(?:'?ll| will) pick up (?:this(?: tomorrow| next week)?|tomorrow|next week)|"
+    r"let'?s continue (?:this(?: next time)?|next time)|follow up (?:on )?this (?:later|next week)|"
     r'circling back (?:on this )?(?:tomorrow|later)|schedule another (?:meeting|call)|'
-    r'get back to (?:you|this))\b',
+    r'get back to (?:you|this))[.!?…,"\s]*$',
     caseSensitive: false,
   );
+
+  /// Arms the shared ~20 s silence-confirm timer. New speech cancels it
+  /// (handled at the top of [_evaluateEndOfConversation]).
+  void _armSoftCloseTimer() {
+    _softEndTimer?.cancel();
+    _softEndTimer = Timer(const Duration(seconds: 20), () {
+      if (_continuousStarted && !_micTestActive && state.active != null) {
+        _closeFromEndPhrase('end_phrase_soft');
+      }
+    });
+  }
+
+  /// End-anchored business-close decision: needs a session with some meat
+  /// AND the closer finishing the utterance. Pure, unit-tested.
+  static bool isBusinessCloseUtterance(String cleaned, int segmentCount) =>
+      segmentCount >= 2 && _businessEndPattern.hasMatch(cleaned);
 
   void _evaluateEndOfConversation(String utterance, int segmentCount) {
     // Cancel any pending soft-close: new speech means the conversation goes on.
@@ -555,19 +592,18 @@ class ConversationNotifier extends Notifier<ConversationState> {
         utterance.replaceAll(RegExp(r'[.!?…।॥,"\s]+$'), '').trim();
 
     if ((strong != null && strong.hasMatch(cleaned)) ||
-        ConversationEndPhrases.endsWithStrongCloser(utterance, code) ||
-        (segmentCount >= 2 && _businessEndPattern.hasMatch(cleaned))) {
+        ConversationEndPhrases.endsWithStrongCloser(utterance, code)) {
       _softEndTimer?.cancel();
       _closeFromEndPhrase('end_phrase');
       return;
     }
 
-    if (soft != null && soft.hasMatch(cleaned)) {
-      _softEndTimer = Timer(const Duration(seconds: 20), () {
-        if (_continuousStarted && !_micTestActive && state.active != null) {
-          _closeFromEndPhrase('end_phrase_soft');
-        }
-      });
+    // Business closers no longer close immediately: like soft closers they
+    // arm the silence timer (and still need a session with some meat).
+    final isBusinessClose =
+        isBusinessCloseUtterance(cleaned, segmentCount);
+    if ((soft != null && soft.hasMatch(cleaned)) || isBusinessClose) {
+      _armSoftCloseTimer();
     }
   }
 
@@ -762,7 +798,10 @@ class ConversationNotifier extends Notifier<ConversationState> {
         summary.startsWith('Failed to process memory');
   }
 
-  Future<void> _processMemoryAsync(ConversationSession session) async {
+  Future<void> _processMemoryAsync(
+    ConversationSession session, {
+    bool bypassCache = false,
+  }) async {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
@@ -775,7 +814,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     }
 
     final processor = ref.read(memoryProcessorProvider);
-    final result = await processor.process(text);
+    final result = await processor.process(text, bypassCache: bypassCache);
 
     if (_isFailedResult(result)) {
       state = state.copyWith(
@@ -844,9 +883,19 @@ class ConversationNotifier extends Notifier<ConversationState> {
       final updated = idx != -1 && idx < state.conversations.length
           ? state.conversations[idx]
           : session;
+      final notifySettings = ref.read(settingsProvider);
       final kind = await svc.maybeNotify(
         session: updated,
         result: result,
+        enabled: notifySettings.notifyEnabled,
+      );
+      unawaited(
+        svc.maybeSendDigest(
+          sessions: state.conversations,
+          digestHour: notifySettings.digestHour,
+          enabled: notifySettings.notifyEnabled &&
+              notifySettings.digestEnabled,
+        ),
       );
       if (kind != null) {
         ref.read(analyticsProvider).capture(
@@ -877,7 +926,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (state.processingIds.contains(id)) return;
     final idx = state.conversations.indexWhere((c) => c.id == id);
     if (idx == -1) return;
-    await _processMemoryAsync(state.conversations[idx]);
+    // Explicit user retry: bypass the result cache so a previously failed
+    // (and cached) parse gets a genuinely fresh attempt.
+    await _processMemoryAsync(state.conversations[idx], bypassCache: true);
   }
 
   /// True when [id] sits in the persisted AI retry queue (last attempt

@@ -6,6 +6,7 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
+import '../providers/rag_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
@@ -164,6 +165,39 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
     });
     _scrollToBottom();
 
+    // RAG first (session-scoped), one retry on transient failure, then
+    // direct-transcript fallback tagged so RAG outages are visible.
+    try {
+      final rag = await ref.read(ragServiceProvider.future);
+      try {
+        final result =
+            await rag.answer(text, sessionId: widget.session.id);
+        if (mounted && result.sources.isNotEmpty) {
+          setState(() {
+            _messages.add(ChatMessage(role: 'assistant', content: result.answer));
+            _isGenerating = false;
+          });
+          _scrollToBottom();
+          return;
+        }
+      } catch (_) {
+        // Single retry before falling back.
+        try {
+          final retry =
+              await rag.answer(text, sessionId: widget.session.id);
+          if (mounted && retry.sources.isNotEmpty) {
+            setState(() {
+              _messages.add(
+                  ChatMessage(role: 'assistant', content: retry.answer));
+              _isGenerating = false;
+            });
+            _scrollToBottom();
+            return;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
     final engine = ref.read(geminiEngineProvider);
     try {
       final reply = await engine.prompt(
@@ -181,7 +215,8 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
       );
       if (mounted) {
         setState(() {
-          _messages.add(ChatMessage(role: 'assistant', content: reply));
+          _messages.add(ChatMessage(
+              role: 'assistant', content: '$reply\n\n(direct context)'));
           _isGenerating = false;
         });
         _scrollToBottom();

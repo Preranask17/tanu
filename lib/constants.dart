@@ -118,3 +118,18 @@ const int kRagQueryCacheTtlSeconds = 300;
 const double kRagMinDistance = 0.6;
 const int kGeminiMinGapEmbedMs = 500;
 const int kGeminiMinGapChatMs = 2000;
+
+/// Chat-path retry policy: transient failures (429/5xx/timeout) only,
+/// this many retries max. Deterministic failures never retry.
+const int kGeminiChatMaxRetries = 2;
+
+/// Single-prompt token budget: transcripts longer than this are head/tail
+/// capped (see capPromptTranscript) instead of sent whole every attempt.
+const int kGeminiPromptMaxChars = 12000;
+const int kGeminiPromptHeadChars = 8000;
+const int kGeminiPromptTailChars = 4000;
+
+/// Structuring result cache: identical transcripts (queue re-runs,
+/// reprocessing) return without an API call. Memory-only, bounded.
+const int kGeminiResultCacheSize = 20;
+const int kGeminiResultCacheTtlMinutes = 60;

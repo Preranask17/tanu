@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/agent_engine.dart';
+import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/rag_provider.dart';
+import '../services/rag/vector_store.dart';
+import 'chat_screen.dart';
 
 /// Cross-memory Q&A over the RAG pipeline: ask anything about your saved
 /// memories and get an answer grounded in the actual transcript chunks.
@@ -20,6 +23,9 @@ class _AskScreenState extends ConsumerState<AskScreen> {
   final _controller = TextEditingController();
   final _scrollCtrl = ScrollController();
   final List<ChatMessage> _messages = [];
+
+  /// Assistant message index -> RAG chunks that grounded it.
+  final Map<int, List<ScoredChunk>> _answerSources = {};
   bool _busy = false;
   bool _backfilled = false;
 
@@ -50,14 +56,13 @@ class _AskScreenState extends ConsumerState<AskScreen> {
       final result = await rag.answer(text);
       if (mounted) {
         setState(() {
-          _messages.add(ChatMessage(
-            role: 'assistant',
-            content: result.sources.isEmpty
-                ? result.answer
-                : '${result.answer}\n\n(from ${result.sources.length} memory excerpts)',
-          ));
+          _messages.add(ChatMessage(role: 'assistant', content: result.answer));
+          if (result.sources.isNotEmpty) {
+            _answerSources[_messages.length - 1] = result.sources;
+          }
           _busy = false;
         });
+        _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {
@@ -67,6 +72,18 @@ class _AskScreenState extends ConsumerState<AskScreen> {
         });
       }
     }
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -93,10 +110,18 @@ class _AskScreenState extends ConsumerState<AskScreen> {
                     controller: _scrollCtrl,
                     padding: const EdgeInsets.all(16),
                     itemCount: _messages.length,
-                    itemBuilder: (context, i) => Align(
-                      alignment: _messages[i].role == 'user'
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
+                    itemBuilder: (context, i) {
+                      final sources = _answerSources[i];
+                      return Column(
+                        crossAxisAlignment:
+                            _messages[i].role == 'user'
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                        children: [
+                          Align(
+                            alignment: _messages[i].role == 'user'
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.symmetric(
@@ -114,7 +139,12 @@ class _AskScreenState extends ConsumerState<AskScreen> {
                         child: Text(_messages[i].content,
                             style: const TextStyle(fontSize: 15, height: 1.4)),
                       ),
-                    ),
+                          ),
+                          if (sources != null && sources.isNotEmpty)
+                            _SourceChips(sources: sources),
+                        ],
+                      );
+                    },
                   ),
           ),
           if (_busy)
@@ -154,5 +184,74 @@ class _AskScreenState extends ConsumerState<AskScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Per-source memory chips under an Ask answer. Tapping opens that memory.
+class _SourceChips extends ConsumerWidget {
+  const _SourceChips({required this.sources});
+
+  final List<ScoredChunk> sources;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // One chip per memory, in retrieval order.
+    final seen = <String>{};
+    final unique =
+        sources.where((s) => seen.add(s.chunk.sessionId)).toList();
+    final conversations = ref.watch(conversationProvider).conversations;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final s in unique)
+            ActionChip(
+              label: Text(
+                _labelFor(s, conversations),
+                style: const TextStyle(fontSize: 12),
+              ),
+              avatar: const Icon(Icons.history, size: 14),
+              onPressed: () {
+                ConversationSession? session;
+                try {
+                  session = conversations.firstWhere(
+                    (c) => c.id == s.chunk.sessionId,
+                  );
+                } catch (_) {
+                  session = null;
+                }
+                if (session != null && context.mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SessionDetailPage(session: session!),
+                    ),
+                  );
+                }
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _labelFor(
+    ScoredChunk s,
+    List<ConversationSession> conversations,
+  ) {
+    try {
+      final session =
+          conversations.firstWhere((c) => c.id == s.chunk.sessionId);
+      if (session.title.trim().isNotEmpty) {
+        final t = session.title.trim();
+        return t.length > 28 ? '${t.substring(0, 28)}…' : t;
+      }
+    } catch (_) {}
+    if (s.chunk.title.trim().isNotEmpty) {
+      final t = s.chunk.title.trim();
+      return t.length > 28 ? '${t.substring(0, 28)}…' : t;
+    }
+    return 'memory ${s.chunk.sessionId.length > 6 ? s.chunk.sessionId.substring(s.chunk.sessionId.length - 6) : s.chunk.sessionId}';
   }
 }

@@ -52,7 +52,11 @@ class RagService {
       final header = m.chunk.title.isNotEmpty
           ? m.chunk.title
           : m.chunk.sessionId;
-      final slice = '[memory $header @ ${m.chunk.startMs}ms]\n${m.chunk.text}\n\n';
+      // Cleaned-transcript chunks all carry startMs 0 — a meaningless
+      // offset. Only show the timestamp when it is real provenance.
+      final slice = m.chunk.startMs > 0
+          ? '[memory $header @ ${m.chunk.startMs}ms]\n${m.chunk.text}\n\n'
+          : '[memory $header]\n${m.chunk.text}\n\n';
       if (contextBuffer.length + slice.length > kRagContextMaxChars) break;
       contextBuffer.write(slice);
     }
