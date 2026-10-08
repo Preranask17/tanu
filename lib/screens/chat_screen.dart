@@ -300,10 +300,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            session.summary!,
-                            style: const TextStyle(height: 1.4, fontSize: 15),
-                          ),
+                          _SummaryBody(text: session.summary!),
                         ],
                       ),
                     ),
@@ -478,6 +475,67 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Structured summary: the AI paragraph rendered as clean bullet
+/// points (one per sentence). Pure presentation of the stored text —
+/// the summary itself is untouched.
+/// Splits a stored summary into bullet points (one per sentence).
+/// Pure text shaping, unit-tested; the summary itself is untouched.
+List<String> splitSummaryPoints(String text) {
+  return text
+      .split(RegExp(r'(?<=[.!?])\s+'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+}
+
+class _SummaryBody extends StatelessWidget {
+  const _SummaryBody({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = splitSummaryPoints(text);
+    if (points.length < 2) {
+      return Text(
+        text,
+        style: const TextStyle(height: 1.4, fontSize: 15),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < points.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  points[i],
+                  style: const TextStyle(height: 1.45, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

@@ -244,9 +244,10 @@ class _PendantButtonState extends State<_PendantButton>
       body = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE2E2E2);
       iconColor = Colors.orange;
     } else {
-      icon = Icons.bluetooth;
-      body = isDark ? const Color(0xFF1E1E1E) : const Color(0xFFD8D8D8);
-      iconColor = isDark ? const Color(0xFFBBBBBB) : const Color(0xFF666666);
+      // Same solid treatment as the connected state, in red.
+      icon = Icons.bluetooth_disabled;
+      body = const Color(0xFFC62828);
+      iconColor = Colors.white;
     }
 
     return GestureDetector(
