@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 
 import '../../abstractions/agent_engine.dart';
 import '../../constants.dart';
-import '../rag/rate_limiter.dart';
 import 'mistral_agent_engine.dart' show AgentException;
 
 /// Agent backed by Google's Gemini generateContent API.
@@ -21,10 +20,6 @@ class GeminiAgentEngine implements AgentEngine {
   final String model;
   final String endpoint;
   final String? systemPrompt;
-
-  static final _limiter = RateLimiter(
-    Duration(milliseconds: kGeminiMinGapChatMs),
-  );
 
   @override
   Future<String> prompt(String transcript, {List<ChatMessage>? history}) async {
@@ -70,33 +65,16 @@ class GeminiAgentEngine implements AgentEngine {
     });
 
     try {
-      final response = await _limiter.run(() async {
-        var r = await http
-            .post(
-              Uri.parse('$endpoint?key=$apiKey'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-              },
-              body: body,
-            )
-            .timeout(const Duration(seconds: 45));
-        if (r.statusCode == 429) {
-          final wait = retryDelayFromBody(r.body) ?? const Duration(seconds: 5);
-          await Future.delayed(wait);
-          r = await http
-              .post(
-                Uri.parse('$endpoint?key=$apiKey'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                },
-                body: body,
-              )
-              .timeout(const Duration(seconds: 45));
-        }
-        return r;
-      });
+      final response = await http
+          .post(
+            Uri.parse('$endpoint?key=$apiKey'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 45));
 
       if (response.statusCode != 200) {
         throw AgentException(
@@ -116,21 +94,7 @@ class GeminiAgentEngine implements AgentEngine {
       if (parts == null || parts.isEmpty) {
         throw AgentException('Gemini returned empty content');
       }
-      String? text;
-      for (final p in parts) {
-        final m = p as Map<String, dynamic>;
-        if (m['thought'] == true) continue;
-        final t = m['text'] as String?;
-        if (t != null && t.trim().isNotEmpty) {
-          text = t;
-          break;
-        }
-      }
-      text ??= ((parts.first as Map<String, dynamic>)['text'] as String?);
-      if (text == null || text.trim().isEmpty) {
-        throw AgentException('Gemini returned no text');
-      }
-      return text.trim();
+      return ((parts.first as Map<String, dynamic>)['text'] as String?)?.trim() ?? '';
     } on AgentException {
       rethrow;
     } catch (e) {
@@ -161,7 +125,6 @@ class MemoryResult {
     required this.summary,
     required this.commitments,
     this.cleanedTranscript = '',
-    this.error,
   });
 
   final String title;
@@ -170,9 +133,6 @@ class MemoryResult {
 
   /// The raw transcript rewritten into clean, speaker-labeled prose.
   final String cleanedTranscript;
-
-  /// Set when processing failed (network/parse) — caller should retry later.
-  final String? error;
 }
 
 /// Single-shot Gemini call that turns a raw transcript into a structured,
@@ -210,31 +170,23 @@ No commentary, no markdown fences.
     } catch (e) {
       return MemoryResult(
         title: 'Memory',
-        summary: '',
+        summary: 'Failed to process memory: $e',
         commitments: const [],
-        error: e.toString(),
       );
     }
   }
 
   MemoryResult _parse(String raw) {
-    // Strip markdown fences Gemini sometimes adds despite instructions.
-    var cleaned = raw.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replaceFirst(RegExp(r'^```[a-zA-Z]*\n?'), '');
-      cleaned = cleaned.replaceFirst(RegExp(r'```$'), '');
-    }
-    final start = cleaned.indexOf('{');
-    final end = cleaned.lastIndexOf('}');
+    final start = raw.indexOf('{');
+    final end = raw.lastIndexOf('}');
     if (start == -1 || end == -1) {
       return const MemoryResult(
         title: 'Memory',
-        summary: '',
+        summary: 'Could not parse response',
         commitments: [],
-        error: 'Could not parse response',
       );
     }
-    final jsonStr = cleaned.substring(start, end + 1);
+    final jsonStr = raw.substring(start, end + 1);
 
     try {
       final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -260,9 +212,8 @@ No commentary, no markdown fences.
     } catch (_) {
       return const MemoryResult(
         title: 'Memory',
-        summary: '',
+        summary: 'Could not parse response',
         commitments: [],
-        error: 'Could not parse response',
       );
     }
   }

@@ -14,6 +14,7 @@ import '../models/transcript.dart';
 import '../services/storage_service.dart';
 import '../services/simulator_pendant_source.dart';
 import 'agent_provider.dart';
+import '../services/agent/gemini_agent_engine.dart';
 import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
@@ -752,6 +753,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
     );
   }
 
+  /// Failure convention (matches the processor): a failed result carries
+  /// no parsed content — its summary is the failure marker itself. The
+  /// retry-queue rescue sweep keys off the same prefixes.
+  static bool _isFailedResult(MemoryResult result) {
+    final summary = result.summary;
+    return summary.startsWith('Could not parse') ||
+        summary.startsWith('Failed to process memory');
+  }
+
   Future<void> _processMemoryAsync(ConversationSession session) async {
     final text = session.transcriptText;
     if (text.isEmpty) return;
@@ -767,14 +777,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final processor = ref.read(memoryProcessorProvider);
     final result = await processor.process(text);
 
-    if (result.error != null) {
+    if (_isFailedResult(result)) {
       state = state.copyWith(
         processingIds: state.processingIds.difference({session.id}),
       );
       _enqueueForRetry(session.id);
       ref.read(analyticsProvider).capture(
         'memory retry queued',
-        properties: {'error': result.error!.length > 100 ? result.error!.substring(0, 100) : result.error!},
+        // Failure marker only (no transcript): same class as before.
+        properties: {'error': result.summary.length > 100 ? result.summary.substring(0, 100) : result.summary},
       );
       return;
     }
@@ -965,7 +976,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         final session = state.conversations[idx];
         final result = await processor.process(session.transcriptText);
 
-        if (result.error == null) {
+        if (!_isFailedResult(result)) {
           final conversations = List<ConversationSession>.of(state.conversations);
           conversations[idx] = session.copyWith(
             title: result.title,

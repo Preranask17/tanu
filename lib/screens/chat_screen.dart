@@ -6,7 +6,6 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
-import '../providers/rag_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
@@ -164,30 +163,6 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
       _isGenerating = true;
     });
     _scrollToBottom();
-
-    try {
-      final ragFuture = ref.read(ragServiceProvider.future);
-      final rag = await ragFuture;
-      final result = await rag.answer(
-        text,
-        sessionId: widget.session.id,
-      );
-      if (mounted) {
-        setState(() {
-          _messages.add(ChatMessage(
-            role: 'assistant',
-            content: result.sources.isEmpty
-                ? result.answer
-                : '${result.answer}\n\n(from ${result.sources.length} excerpts in this memory)',
-          ));
-          _isGenerating = false;
-        });
-        _scrollToBottom();
-      }
-      return;
-    } catch (_) {
-      // Fall through to direct context chat on any RAG failure.
-    }
 
     final engine = ref.read(geminiEngineProvider);
     try {
@@ -735,8 +710,8 @@ class _LivePartialRow extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Theme.of(context).primaryColor.withOpacity(0.5),
-                          Theme.of(context).primaryColor.withOpacity(0.0),
+                          Theme.of(context).primaryColor.withValues(alpha: 0.5),
+                          Theme.of(context).primaryColor.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -827,8 +802,8 @@ class _SegmentGroupRow extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Theme.of(context).primaryColor.withOpacity(0.5),
-                            Theme.of(context).primaryColor.withOpacity(0.1),
+                            Theme.of(context).primaryColor.withValues(alpha: 0.5),
+                            Theme.of(context).primaryColor.withValues(alpha: 0.1),
                           ],
                         ),
                       ),
@@ -860,7 +835,7 @@ class _SegmentGroupRow extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha: 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

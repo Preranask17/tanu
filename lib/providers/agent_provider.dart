@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../constants.dart';
 import '../services/agent/gemini_agent_engine.dart';
 import '../services/agent/local_agent_engine.dart';
-import '../constants.dart';
 import 'settings_provider.dart';
 
 /// Provides a configured LocalHeuristicAgentEngine (offline fallback).
