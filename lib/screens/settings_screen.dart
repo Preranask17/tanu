@@ -116,6 +116,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 16),
                     _DeveloperConsole(capture: capture, stats: stats),
                   ],
+                  // Clearance above the floating dock so the last section
+                  // scrolls fully into view on every screen size.
+                  SizedBox(
+                    height: MediaQuery.paddingOf(context).bottom + 112,
+                  ),
                 ],
               ),
             ),
