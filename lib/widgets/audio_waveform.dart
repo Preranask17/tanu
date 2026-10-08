@@ -77,7 +77,7 @@ class _WavePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
       
     final glowPaint = Paint()
-      ..color = color.withOpacity(0.3)
+      ..color = color.withValues(alpha: 0.3)
       ..strokeWidth = 6
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke

@@ -11,7 +11,8 @@ import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
-import '../widgets/page_layout.dart';
+import '../widgets/device_status_controls.dart';
+import '../widgets/page_header.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +23,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _developerOpen = false;
+
+  void _openDevicePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DevicePickerSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,19 +44,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: true,
-            pinned: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              title: const TanuPageTitle('Settings'),
-              titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
+          // Consistent page header (logo top-left, status top-right,
+          // heading below). Sections below are untouched and functional.
+          SliverToBoxAdapter(
+            child: PageHeader(
+              title: 'Settings',
+              actions: [
+                DeviceStatusActions(
+                  status: status,
+                  onBluetoothTap: _openDevicePicker,
+                ),
+              ],
             ),
           ),
           SliverToBoxAdapter(
-            child: TanuPageRail(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -119,6 +132,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 16),
                     _DeveloperConsole(capture: capture, stats: stats),
                   ],
+
+                  // Bottom cushion: clears the floating nav dock (64 tall,
+                  // offset safeArea + 16) on every screen size, so the last
+                  // card scrolls fully into view and stays tappable.
+                  SizedBox(
+                    height: MediaQuery.paddingOf(context).bottom + 112,
+                  ),
                 ],
               ),
             ),
@@ -263,52 +283,13 @@ class _PendantDashboard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isConnected
-                            ? Icons.bluetooth_connected
-                            : Icons.bluetooth_disabled,
-                        color: accent,
-                      ),
+                  child: Text(
+                    isConnected ? 'Tanu is\nConnected' : 'Tanu is\nOffline',
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      height: 1.1,
+                      fontSize: 32,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isConnected
-                                ? 'Pendant connected'
-                                : 'Pendant offline',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            isConnected
-                                ? (status.deviceName ?? 'Tanu pendant')
-                                : 'Connect a pendant to start capturing',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
               ),
               if (isConnected && status.batteryPercent != null)
                 _BatteryBadge(percent: status.batteryPercent!),

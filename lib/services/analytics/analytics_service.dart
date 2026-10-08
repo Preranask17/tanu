@@ -98,6 +98,10 @@ class AnalyticsService {
       debugPrint('[tanu] analytics: no POSTHOG_TOKEN, staying inert');
       return;
     }
+    if (kIsWeb) {
+      debugPrint('[tanu] analytics: skipped on web');
+      return;
+    }
     if (Platform.environment['FLUTTER_TEST'] == 'true') {
       debugPrint('[tanu] analytics: skipped in tests');
       return;

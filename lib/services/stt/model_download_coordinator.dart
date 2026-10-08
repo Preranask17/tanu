@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -20,14 +23,9 @@ class ModelDownloadProgress {
 /// Single owner of the on-device Whisper Small bundle download.
 ///
 /// Single-flight: concurrent callers await the same in-flight download.
-/// The three int8 files (and the VAD model) stream concurrently and
-/// directly into `appSupport/<kWhisperSmallDirName>/` — with range-resume
-/// across launches — then the bundle is verified file-by-file.
-///
-/// There is deliberately no archive step: the GitHub `.tar.bz2` is 610 MB
-/// and unpacks to ~1.3 GB, so decoding it in-process exceeded the Android
-/// app heap and the phones sat there forever. Streaming keeps memory flat
-/// at a few socket buffers and moves the exact 375 MB the model needs.
+/// Downloads the `.tar.bz2` with range-resume, verifies the BZip2 CRC while
+/// extracting into `appSupport/<kWhisperSmallDirName>/`, then fetches the
+/// shared-needs Silero VAD model into the same directory.
 final class ModelDownloadCoordinator {
   ModelDownloadCoordinator._();
 
@@ -58,15 +56,15 @@ final class ModelDownloadCoordinator {
   /// Returns the verified `small-tokens.txt` inside the model directory,
   /// or `null` if the bundle could not be obtained.
   static Future<File?> ensure({void Function(String)? onEvent}) {
-    final task = _singleton._tasks[kWhisperSmallDirName];
+    final task = _singleton._tasks[kWhisperSmallTarFileName];
     if (task != null) {
       onEvent?.call('downloading models… (already running)');
       return task.done;
     }
     final started = _ActiveTask(onEvent);
-    _singleton._tasks[kWhisperSmallDirName] = started;
+    _singleton._tasks[kWhisperSmallTarFileName] = started;
     started.done.whenComplete(() {
-      _singleton._tasks.remove(kWhisperSmallDirName);
+      _singleton._tasks.remove(kWhisperSmallTarFileName);
       _completions.add(started.ok);
     });
     started.done.ignore();
@@ -74,11 +72,9 @@ final class ModelDownloadCoordinator {
   }
 }
 
+/// Retries a range-request resume that the server answered with a plain 200
+/// (scrapping the partial) instead of throwing away the download.
 const int _maxDownloadAttempts = 3;
-
-/// Progress is only pushed to the UI every half-megabyte so a 375 MB
-/// transfer does not schedule thousands of no-op rebuilds.
-const int _progressGranularity = 512 * 1024;
 
 final class _ActiveTask {
   _ActiveTask(this.onEvent);
@@ -88,20 +84,10 @@ final class _ActiveTask {
   late final Future<File?> done = _run();
   bool ok = false;
 
-  int _lastEmitted = 0;
-
-  /// Shared byte counter across every concurrent stream; only mutated on
-  /// this isolate's event loop, then emitted as one progress number.
-  int _received = 0;
-  int _total = 0;
-
   Future<File?> _run() async {
     try {
       final found = await _find();
-      if (found != null) {
-        ok = true;
-        return found;
-      }
+      if (found != null) return found;
     } catch (e) {
       final msg = 'model download failed: $e';
       onEvent?.call(msg);
@@ -111,7 +97,7 @@ final class _ActiveTask {
 
     for (var attempt = 1; attempt <= _maxDownloadAttempts; attempt++) {
       try {
-        final file = await _downloadFiles();
+        final file = await _downloadAndExtract();
         if (file != null) {
           ok = true;
           return file;
@@ -145,244 +131,71 @@ final class _ActiveTask {
   Future<File?> _find() async {
     final dir = await _modelDir();
     if (dir == null) return null;
-    await _purgeLegacyArchive(Directory(dir).parent);
-
-    if (!_modelFilesPresent(dir)) {
-      // A half-written extraction from an older build can't be trusted:
-      // drop it so the fresh download lands in a clean directory. Partial
-      // `.part` files live outside the model dir and survive this purge.
-      try {
-        final stale = Directory(dir);
-        if (stale.existsSync()) await stale.delete(recursive: true);
-      } catch (e) {
-        debugPrint('[tanu] could not purge stale model dir: $e');
-      }
-      return null;
-    }
-
-    // The weights are good; only the VAD may be missing from an earlier
-    // partial run. Fetch it without forcing a 375 MB re-download.
-    try {
-      await _ensureVad(dir);
-    } catch (e) {
-      debugPrint('[tanu] vad fetch after find failed: $e');
-    }
     if (_verified(dir)) return File('$dir/small-tokens.txt');
+    // A half-written extraction can't be trusted: drop it so the fresh
+    // download lands in a clean directory.
+    try {
+      final stale = Directory(dir);
+      if (stale.existsSync()) await stale.delete(recursive: true);
+    } catch (e) {
+      debugPrint('[tanu] could not purge stale model dir: $e');
+    }
     return null;
   }
 
-  bool _sizeOk(int actual, int expected) =>
-      expected > 0 ? actual >= expected : actual > 0;
-
-  /// True when every weight file is present at (at least) its expected
-  /// size. Anything smaller is a truncated leftover and gets purged.
-  bool _modelFilesPresent(String dir) {
+  /// True when every expected bundle member is present on disk and non-empty.
+  /// The authoritative integrity guard is BZip2's own `verify: true` stream
+  /// CRC (any truncated/corrupt archive fails in the decoder before a single
+  /// file lands). Existence + non-empty is the stable contract the
+  /// recognizer needs (all files must be loadable).
+  bool _verified(String dir) {
     for (final f in kWhisperSmallBundleFiles) {
       final file = File('$dir/${f.name}');
-      if (!file.existsSync() || !_sizeOk(file.lengthSync(), f.bytes)) {
-        return false;
-      }
+      if (!file.existsSync() || file.lengthSync() == 0) return false;
     }
-    return true;
-  }
-
-  /// True when every expected bundle member is present on disk and the
-  /// right size, including the VAD model. Files only ever reach their final
-  /// name after a byte-exact transfer (or after a known-good extraction),
-  /// so "present + sized" is the stable contract the recognizer needs.
-  bool _verified(String dir) {
-    if (!_modelFilesPresent(dir)) return false;
     final vad = File('$dir/$kSileroVadFileName');
     if (!vad.existsSync() || vad.lengthSync() == 0) return false;
     return true;
   }
 
-  String _fileUrl(String name) => '$kWhisperSmallFilesBaseUrl/$name';
-
-  Future<File?> _downloadFiles() async {
+  Future<File?> _downloadAndExtract() async {
     final dir = await _modelDir();
     if (dir == null) return null;
     final support = Directory(dir).parent;
+    final archiveFile = File('${support.path}/$kWhisperSmallTarFileName');
+    final part = File('${support.path}/$kWhisperSmallTarFileName.part');
     await support.create(recursive: true);
-    await _purgeLegacyArchive(support);
-    final out = Directory(dir);
-    if (!out.existsSync()) await out.create(recursive: true);
 
-    // Seed progress from whatever is already on disk (finished files and
-    // resumable prefixes) so the bar starts where the last session left off.
-    _total = kWhisperSmallBundleFiles.fold<int>(
-      0,
-      (sum, f) => sum + f.bytes,
-    );
-    _received = 0;
-    _lastEmitted = 0;
-    for (final f in kWhisperSmallBundleFiles) {
-      _received += _settledBytes(dir, support, f);
-    }
-    _emit(force: true);
-
-    // The three weight files and the VAD model transfer concurrently, so
-    // wall time tracks the largest file (the 262 MB decoder) instead of
-    // the 375 MB sum. Errors are collected first and rethrown after every
-    // stream settles — finished files stay on disk and the retry loop
-    // resumes only the survivors.
-    Object? firstError;
-    StackTrace? firstStack;
-    Future<void> guard(Future<void> Function() run) async {
+    if (!archiveFile.existsSync()) {
+      await _transfer(part);
+      // The download is complete and verified: commit it, then extract.
       try {
-        await run();
-      } catch (e, s) {
-        firstError ??= e;
-        firstStack ??= s;
+        await part.rename(archiveFile.path);
+      } catch (e) {
+        await _cleanupDownload(archiveFile, part, dir);
+        rethrow;
       }
+    } else {
+      // Archive already exists (likely from a hot restart during extraction).
+      // Emit a 100% progress event so the UI jumps straight to "Extracting..."
+      final len = archiveFile.lengthSync();
+      ModelDownloadCoordinator._events.add(
+        ModelDownloadProgress(received: len, total: len),
+      );
     }
-
-    await Future.wait([
-      for (final f in kWhisperSmallBundleFiles)
-        guard(() => _downloadOne(f, dir, support)),
-      guard(() => _ensureVad(dir)),
-    ]);
-    final error = firstError;
-    if (error != null) Error.throwWithStackTrace(error, firstStack!);
-
+    try {
+      await _extract(archiveFile, dir);
+    } catch (e) {
+      await _cleanupDownload(archiveFile, part, dir);
+      rethrow;
+    }
+    await _ensureVad(dir);
     if (!_verified(dir)) {
-      await _cleanupModelDir(dir);
+      await _cleanupDownload(archiveFile, part, dir);
       throw const FormatException('downloaded bundle failed verification');
     }
     await _retireRetiredBundles(support);
     return File('$dir/small-tokens.txt');
-  }
-
-  /// Skips files that are already complete, clears truncated ones, then
-  /// streams whatever is missing. Every file lands via [_transfer].
-  Future<void> _downloadOne(
-    ({String name, int bytes}) f,
-    String dir,
-    Directory support,
-  ) async {
-    final dest = File('$dir/${f.name}');
-    if (dest.existsSync() && _sizeOk(dest.lengthSync(), f.bytes)) return;
-    if (dest.existsSync()) {
-      try {
-        await dest.delete();
-      } catch (_) {}
-    }
-
-    onEvent?.call('downloading ${f.name}…');
-    final part = File('${support.path}/${f.name}.part');
-    await _transfer(_fileUrl(f.name), dest, part, expected: f.bytes);
-  }
-
-  /// Bytes already counted as progress for one bundle member: a finished
-  /// file in full, otherwise its resumable `.part` prefix (clamped).
-  int _settledBytes(
-    String dir,
-    Directory support,
-    ({String name, int bytes}) f,
-  ) {
-    final dest = File('$dir/${f.name}');
-    if (dest.existsSync()) {
-      final len = dest.lengthSync();
-      if (_sizeOk(len, f.bytes)) return len;
-    }
-    final part = File('${support.path}/${f.name}.part');
-    if (part.existsSync()) {
-      final len = part.lengthSync();
-      return len < f.bytes ? len : f.bytes;
-    }
-    return 0;
-  }
-
-  /// Streams one model file into [dest] with range-resume, folding each
-  /// chunk into the shared byte counter. An interrupted transfer leaves a
-  /// valid prefix in [part] (kept outside the model dir so purges never
-  /// touch it) that the next attempt resumes from. Throws if the transfer
-  /// stops short, so the retry loop never installs a truncated model.
-  Future<void> _transfer(
-    String url,
-    File dest,
-    File part, {
-    required int expected,
-  }) async {
-    var start = part.existsSync() ? part.lengthSync() : 0;
-    if (start > expected) {
-      // Stale/overshot partial (e.g. a different mirror): start over.
-      await part.delete();
-      start = 0;
-    } else if (start == expected) {
-      // A previous attempt finished the bytes but died before the rename.
-      await part.rename(dest.path);
-      _emit(force: true);
-      return;
-    }
-
-    final client = http.Client();
-    try {
-      final request = http.Request('GET', Uri.parse(url));
-      if (start > 0) {
-        request.headers[HttpHeaders.rangeHeader] = 'bytes=$start-';
-      }
-      final response = await client.send(request);
-
-      final bool append;
-      if (response.statusCode == 206) {
-        append = true;
-      } else if (response.statusCode == 200) {
-        // The server dropped the range request: restart this file in
-        // place instead of discarding the transfer.
-        append = false;
-        start = 0;
-      } else if (response.statusCode == 416) {
-        await part.delete();
-        throw HttpException('resume range rejected for $url');
-      } else {
-        throw HttpException('unexpected status ${response.statusCode} for $url');
-      }
-
-      final remaining = response.contentLength;
-      final sink = part.openWrite(
-        mode: append ? FileMode.append : FileMode.write,
-      );
-      var received = start;
-      try {
-        await for (final chunk in response.stream) {
-          sink.add(chunk);
-          received += chunk.length;
-          _received += chunk.length;
-          _emit();
-        }
-        await sink.flush();
-      } finally {
-        try {
-          await sink.close();
-        } catch (_) {}
-      }
-
-      if (remaining != null) {
-        final fileTotal = append ? start + remaining : remaining;
-        if (received != fileTotal) {
-          throw FormatException('incomplete download: $received of $fileTotal');
-        }
-      }
-      if (received == 0) throw FormatException('empty download: $url');
-
-      await part.rename(dest.path);
-      _emit(force: true);
-    } finally {
-      client.close();
-    }
-  }
-
-  void _emit({bool force = false}) {
-    if (!force &&
-        _received < _total &&
-        _received - _lastEmitted < _progressGranularity) {
-      return;
-    }
-    _lastEmitted = _received;
-    ModelDownloadCoordinator._events.add(
-      ModelDownloadProgress(received: _received, total: _total),
-    );
   }
 
   Future<void> _ensureVad(String dir) async {
@@ -403,28 +216,89 @@ final class _ActiveTask {
     }
   }
 
-  /// Removes the 610 MB GitHub archive (and its `.part`) left behind by
-  /// builds that tried to download-and-extract the bundle.
-  Future<void> _purgeLegacyArchive(Directory support) async {
-    for (final name in [
-      kWhisperSmallTarFileName,
-      '$kWhisperSmallTarFileName.part',
-    ]) {
-      try {
-        final file = File('${support.path}/$name');
-        if (file.existsSync()) {
-          await file.delete();
-          debugPrint('[tanu] removed legacy archive $name');
-        }
-      } catch (e) {
-        debugPrint('[tanu] could not remove legacy archive $name: $e');
+  /// Range-resumes into [part] from its existing length, emitting byte-level
+  /// progress. Throws so the caller can retry; an interrupted transfer leaves
+  /// a valid prefix behind resuming later.
+  Future<void> _transfer(File part) async {
+    final client = http.Client();
+    try {
+      final start = part.existsSync() ? part.lengthSync() : 0;
+      final request = http.Request('GET', Uri.parse(kWhisperSmallTarUrl));
+      if (start > 0) {
+        request.headers[HttpHeaders.rangeHeader] = 'bytes=$start-';
       }
+      final response = await client.send(request);
+      // A 200 to a resume means the server dropped the range request; scrap
+      // the partial and let the retry loop start fresh.
+      if (start > 0 && response.statusCode == 200) {
+        await part.delete();
+        throw const FormatException('server ignored the resume range request');
+      }
+      final int total;
+      if (response.statusCode == 206) {
+        total = start + (response.contentLength ?? 0);
+      } else if (response.statusCode == 200) {
+        total = response.contentLength ?? 0;
+      } else {
+        throw HttpException('unexpected status ${response.statusCode}');
+      }
+
+      final sink = part.openWrite(mode: FileMode.append);
+      var received = start;
+      try {
+        await for (final chunk in response.stream) {
+          sink.add(chunk);
+          received += chunk.length;
+          ModelDownloadCoordinator._events.add(
+            ModelDownloadProgress(received: received, total: total),
+          );
+        }
+        await sink.flush();
+      } finally {
+        try {
+          await sink.close();
+        } catch (_) {}
+      }
+      if (total > 0 && received != total) {
+        throw FormatException('incomplete download: $received of $total');
+      }
+    } finally {
+      client.close();
     }
   }
 
-  /// Drops a bad model directory but keeps the resumable `.part` files in
-  /// app support, so a failed verification never throws away 375 MB.
-  Future<void> _cleanupModelDir(String dir) async {
+  /// Expands the archive into [dir]. `BZip2Decoder(verify: true)` checks the
+  /// stream CRC, so truncated bytes can never silently unpack into broken
+  /// model files. Runs inside `Isolate.run`: BZip2/TAR decode of ~100 MB is
+  /// CPU-bound work that would stall the UI isolate for seconds otherwise.
+  /// Only allowlisted members are written, taken from the archive's own
+  /// entries.
+  Future<void> _extract(File archiveFile, String dir) {
+    return Isolate.run(() => _extractSync(archiveFile.path, dir));
+  }
+
+  static Future<void> _extractSync(String archivePath, String dir) async {
+    final bytes = await File(archivePath).readAsBytes();
+    final tarBytes = Uint8List.fromList(
+      BZip2Decoder().decodeBytes(bytes, verify: true),
+    );
+    final archive = TarDecoder().decodeBytes(tarBytes);
+    final out = Directory(dir);
+    if (out.existsSync()) await out.delete(recursive: true);
+    await out.create(recursive: true);
+    final expected = kWhisperSmallBundleFiles.map((f) => f.name).toSet();
+    for (final f in archive.files) {
+      final name = f.name.split('/').last;
+      if (name.isEmpty || !expected.contains(name)) continue;
+      final content = f.content as List<int>;
+      await File('${out.path}/$name').writeAsBytes(content);
+    }
+  }
+
+  Future<void> _cleanupDownload(File archiveFile, File part, String dir) async {
+    try {
+      if (part.existsSync()) await part.delete();
+    } catch (_) {}
     try {
       final d = Directory(dir);
       if (d.existsSync()) await d.delete(recursive: true);

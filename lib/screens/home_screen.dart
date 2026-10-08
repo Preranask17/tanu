@@ -1,15 +1,18 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/audio_source.dart';
+import '../models/conversation.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
-import 'ask_screen.dart';
-import '../widgets/aura_orb.dart';
-import '../widgets/home_chat_bar.dart';
-import '../widgets/page_layout.dart';
+import '../screens/chat_screen.dart';
+import '../widgets/ai_presence_orb.dart';
+import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
+import '../widgets/page_header.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -87,196 +90,374 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  void _openDevicePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DevicePickerSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final status =
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
 
-    // The VoicePill is part of the page now, so only reserve room for the
-    // mobile navigation dock at the bottom.
+    // Bottom cushion clears the floating nav dock (no chat bar anymore).
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
     final bottomPadding =
-        MediaQuery.paddingOf(context).bottom + (isDesktop ? 24 : 96);
+        MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            onRefresh: () async =>
-                ref.read(conversationProvider.notifier).reloadFromStorage(),
-            child: CustomScrollView(
-              controller: _scroll,
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              slivers: [
-                SliverAppBar(
-                  expandedHeight: 140,
-                  floating: true,
-                  pinned: true,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  flexibleSpace: FlexibleSpaceBar(
-                    centerTitle: false,
-                    title: const TanuPageTitle('Capture'),
-                    titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
+      body: RefreshIndicator(
+        onRefresh: () async =>
+            ref.read(conversationProvider.notifier).reloadFromStorage(),
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            // Consistent page header: logo top-left, status top-right,
+            // heading below. UI only: reads existing status, opens the
+            // existing picker.
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Capture',
+                actions: [
+                  DeviceStatusActions(
+                    status: status,
+                    onBluetoothTap: _openDevicePicker,
                   ),
-                  actions: [
-                    IconButton(
-                      tooltip: 'Ask Tanu',
-                      icon: const Icon(Icons.search_rounded),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const AskScreen()),
-                      ),
+                ],
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Calm AI presence. Pure visual: only reads the
+                    // already-watched mic level / listening flag.
+                    AiPresenceOrb(
+                      level: conversation.micLevel,
+                      listening: conversation.isListening,
                     ),
-                    const SizedBox(width: 8),
+                    // Live transcription: always visible (placeholder when
+                    // idle), capped height with internal scrolling.
+                    _LiveCaptureCard(
+                      status: status,
+                      conversation: conversation,
+                    ),
                   ],
                 ),
-                SliverToBoxAdapter(
-                  child: SafeArea(
-                    top: false,
-                    bottom: false,
-                    child: Padding(
-                      padding: EdgeInsets.only(bottom: bottomPadding + 100),
-                      child: TanuPageRail(
-                        top: 8,
-                        bottom: 0,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Center(child: _ConnectionCard(status: status)),
-                            const SizedBox(height: 64),
-                            _CaptureHero(
-                              micLevel: conversation.micLevel,
-                              isConnected: status.isConnected,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveCaptureCard extends ConsumerWidget {
+  const _LiveCaptureCard({required this.status, required this.conversation});
+
+  final PendantStatus status;
+  final ConversationState conversation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final words = conversation.liveTranscript.trim();
+    final active = conversation.active;
+    // The one existing capture flag: STT session live or not. Nothing else
+    // drives this badge, and nothing here writes any backend state.
+    final capturing = conversation.isListening;
+    final label = switch (conversation.sttEvent) {
+      'stt unavailable' => 'Transcription unavailable',
+      'Model missing. Download in Settings.' =>
+        'Model missing. Download in Settings.',
+      _ => capturing ? 'Capturing...' : 'Ready',
+    };
+
+    final preview = words.isNotEmpty
+        ? words
+        : (active != null && active.segments.isNotEmpty
+              ? active.segments.last.text.trim()
+              : '');
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final listening = conversation.isListening;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => const ChatPage(),
+            ),
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : const Color(0xFFE5E5E5),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _Equalizer(
+                    color: Theme.of(context).primaryColor,
+                    level: conversation.micLevel,
+                  ),
+                  const SizedBox(width: 12),
+                  // Status badge: fades between Capturing... (pulsing accent
+                  // dot) and muted Ready as the existing capture flag flips.
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Row(
+                        key: ValueKey<bool>(capturing),
+                        children: [
+                          if (capturing) ...[
+                            _BlinkDot(
+                              color: Theme.of(context).primaryColor,
                             ),
+                            const SizedBox(width: 8),
                           ],
-                        ),
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: capturing
+                                    ? null
+                                    : const Color(0xFF888888),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Text(
+                    status.deviceName ?? 'Pendant',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF888888),
+                    ),
+                  ),
+                ],
+              ),
+              if (active != null && active.segments.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(conversationProvider.notifier).forceEndSession();
+                    },
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: const Text(
+                      'New memory',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
               ],
-            ),
-          ),
-          Positioned(
-            bottom: bottomPadding,
-            left: 0,
-            right: 0,
-            child: const SafeArea(
-              top: false,
-              bottom: false,
-              child: TanuPageRail(
-                top: 0,
-                bottom: 0,
-                child: HomeChatBar(),
+              const SizedBox(height: 16),
+              // Capped transcript area: placeholder when idle, internal
+              // scroll when the stream grows long.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: SingleChildScrollView(
+                  child: preview.isNotEmpty
+                      ? Text(
+                          preview,
+                          style: TextStyle(
+                            fontStyle: words.isNotEmpty
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withValues(alpha: 0.85),
+                            fontSize: 16,
+                            height: 1.4,
+                          ),
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                listening
+                                    ? 'Listening…'
+                                    : 'Transcription will appear here…',
+                                style: const TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xFF888888),
+                                  fontSize: 15,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            if (listening) ...[
+                              const SizedBox(width: 8),
+                              _BlinkDot(
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard({required this.status});
+/// Subtle blinking cursor dot shown while transcription is live.
+class _BlinkDot extends StatefulWidget {
+  const _BlinkDot({this.color = const Color(0xFFE5484D)});
 
-  final PendantStatus status;
+  final Color color;
+
+  @override
+  State<_BlinkDot> createState() => _BlinkDotState();
+}
+
+class _BlinkDotState extends State<_BlinkDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _blink;
+
+  @override
+  void initState() {
+    super.initState();
+    _blink = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final connected = status.isConnected;
-    final accent = connected ? Colors.green : const Color(0xFF888888);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF252525) : const Color(0xFFE5E5E5),
+    return FadeTransition(
+      opacity: Tween<double>(begin: 1, end: 0.25).animate(_blink),
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.color,
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              connected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-              size: 17,
-              color: accent,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              switch (status.state) {
-                PendantState.connected => status.deviceName ?? 'Connected',
-                PendantState.reconnecting => 'Reconnecting...',
-                PendantState.scanning => 'Looking for pendant...',
-                PendantState.connecting => 'Connecting...',
-                PendantState.disconnected => 'Not connected',
-              },
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: accent,
-              ),
-            ),
-          ),
-          if (status.batteryPercent != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text(
-                '${status.batteryPercent}%',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-            ),
-        ],
       ),
     );
   }
 }
 
-class _CaptureHero extends StatelessWidget {
-  const _CaptureHero({required this.micLevel, required this.isConnected});
+/// Animated 4-bar voice meter.
+class _Equalizer extends StatefulWidget {
+  const _Equalizer({required this.color, required this.level});
 
-  final double micLevel;
-  final bool isConnected;
+  final Color color;
+  final double level;
+
+  @override
+  State<_Equalizer> createState() => _EqualizerState();
+}
+
+class _EqualizerState extends State<_Equalizer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          isConnected
-              ? 'Listening for your thoughts'
-              : 'Connect your pendant to begin',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isConnected
-              ? 'Tap the control below when you are ready'
-              : 'Your conversations stay on this device',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
-        ),
-        const SizedBox(height: 28),
-        Center(
-          child: AuraOrb(micLevel: micLevel, isConnected: isConnected),
-        ),
-      ],
+    const barCount = 4;
+    final frequencies = [0.9, 1.4, 1.1, 0.7];
+    final phases = [0.0, 1.7, 0.9, 2.6];
+
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final t = _pulse.value * 2 * math.pi;
+        final amp = 0.3 + 0.7 * widget.level.clamp(0.0, 1.0);
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (var i = 0; i < barCount; i++)
+              Container(
+                width: 3.5,
+                height:
+                    12 +
+                    (16 * amp) *
+                        (0.5 +
+                            0.5 *
+                                math.sin(
+                                  i * 0.9 + t * frequencies[i] + phases[i],
+                                )),
+                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                decoration: BoxDecoration(
+                  color: widget.color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
