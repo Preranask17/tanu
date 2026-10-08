@@ -176,6 +176,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
 
     return MaterialApp(
       title: 'Tanu',
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: TanuTheme.getTheme(brightness),
       home: !settings.hasCompletedOnboarding
@@ -215,6 +216,10 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     );
   }
 }
+
+/// Global navigator key so the proactive notification tap can deep-link
+/// from anywhere.
+final appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Entry point the foreground service uses to install an (idle) task handler.
 /// Keeps the process alive so BLE + STT keep running in the background.

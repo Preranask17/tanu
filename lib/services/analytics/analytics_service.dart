@@ -34,6 +34,10 @@ class AnalyticsService {
     'stt model deleted',
     'setting changed',
     'commitment added',
+    'memory retry queued',
+    'memory retry succeeded',
+    'memory retry gave up',
+    'proactive notified',
   };
 
   /// The complete set of property keys this app is allowed to send, matched
@@ -67,6 +71,10 @@ class AnalyticsService {
     'setting', 'value',
     // 'commitment added'
     'source', 'has_due', 'has_person',
+    // 'memory retry queued'
+    'error',
+    // 'proactive notified'
+    'kind',
   };
 
   /// Non-null while [init] is running or has completed successfully. Captures

@@ -17,6 +17,7 @@ import 'analytics_provider.dart';
 import 'ble_provider.dart';
 import 'commitment_provider.dart';
 import 'rag_provider.dart';
+import 'proactive_provider.dart';
 
 import '../services/stt/whisper_small_engine.dart';
 
@@ -709,6 +710,23 @@ class ConversationNotifier extends Notifier<ConversationState> {
       )));
     }
 
+    try {
+      final svc = await ref.read(proactiveServiceProvider.future);
+      final updated = idx != -1 && idx < state.conversations.length
+          ? state.conversations[idx]
+          : session;
+      final kind = await svc.maybeNotify(
+        session: updated,
+        result: result,
+      );
+      if (kind != null) {
+        ref.read(analyticsProvider).capture(
+          'proactive notified',
+          properties: {'kind': kind.name},
+        );
+      }
+    } catch (_) {}
+
     ref
         .read(analyticsProvider)
         .capture(
@@ -820,6 +838,10 @@ class ConversationNotifier extends Notifier<ConversationState> {
             unawaited(indexer.indexSession(conversations[idx]));
           } catch (_) {}
           ref.read(analyticsProvider).capture('memory retry succeeded');
+        try {
+          final svc = await ref.read(proactiveServiceProvider.future);
+          await svc.maybeNotify(session: conversations[idx], result: result);
+        } catch (_) {}
         } else {
           final attempts = _retryAttemptCount(id) + 1;
           final box = Hive.box(Boxes.conversation);
