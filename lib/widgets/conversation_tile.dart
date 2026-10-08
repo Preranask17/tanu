@@ -19,6 +19,9 @@ class ConversationTile extends StatefulWidget {
     this.isTrash = false,
     this.onRestore,
     this.onDeletePermanently,
+    this.isProcessing = false,
+    this.isFailed = false,
+    this.onRetry,
   });
 
   final ConversationSession session;
@@ -28,6 +31,15 @@ class ConversationTile extends StatefulWidget {
   final bool isTrash;
   final VoidCallback? onRestore;
   final VoidCallback? onDeletePermanently;
+
+  /// AI title/summary still generating: shows the shimmer row.
+  final bool isProcessing;
+
+  /// Last AI attempt failed or never ran: shows tap-to-retry.
+  final bool isFailed;
+
+  /// Single-shot AI retry for [isFailed]. Ignored while processing.
+  final VoidCallback? onRetry;
 
   @override
   State<ConversationTile> createState() => _ConversationTileState();
@@ -66,12 +78,12 @@ class _ConversationTileState extends State<ConversationTile> {
           color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2C).withOpacity(0.5) : const Color(0xFFE9ECEF).withOpacity(0.8),
+            color: isDark ? const Color(0xFF2A2A2C).withValues(alpha: 0.5) : const Color(0xFFE9ECEF).withValues(alpha: 0.8),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.03),
+              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.03),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -169,7 +181,7 @@ class _ConversationTileState extends State<ConversationTile> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: _getAvatarGradients(session.id).last.withOpacity(0.3),
+                    color: _getAvatarGradients(session.id).last.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -221,6 +233,63 @@ class _ConversationTileState extends State<ConversationTile> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  if (widget.isProcessing)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Writing summary…',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (widget.isFailed && widget.onRetry != null)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        widget.onRetry!();
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.refresh_rounded,
+                            size: 14,
+                            color: Color(0xFF888888),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'AI paused — tap to retry',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (widget.isProcessing ||
+                      (widget.isFailed && widget.onRetry != null))
+                    const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(
@@ -232,11 +301,15 @@ class _ConversationTileState extends State<ConversationTile> {
                       ),
                       if (session.segmentCount > 0) ...[
                         const SizedBox(width: 8),
-                        Text(
-                          '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                            color: Color(0xFF888888),
-                            fontSize: 14,
+                        Flexible(
+                          child: Text(
+                            '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
@@ -276,7 +349,7 @@ class _ConversationTileState extends State<ConversationTile> {
               const SizedBox(width: 4),
               IconButton(
                 onPressed: widget.onDeletePermanently,
-                style: IconButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.1)),
+                style: IconButton.styleFrom(backgroundColor: Colors.red.withValues(alpha: 0.1)),
                 icon: const Icon(Icons.delete_forever, size: 20, color: Colors.red),
               ),
             ] else ...[

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../constants.dart';
+import '../config/stt_config.dart';
 import '../services/storage_service.dart';
 import 'analytics_provider.dart';
 
@@ -14,6 +15,7 @@ class AppSettings {
     this.geminiApiKey = '',
     this.speakerDiarization = true,
     this.keepSessionAudio = false,
+    this.sttLanguageCode = '',
   });
 
   final String deviceName;
@@ -29,6 +31,11 @@ class AppSettings {
   /// Audio never leaves the phone either way.
   final bool keepSessionAudio;
 
+  /// Explicit Indic STT language (`hi`, `kn`, …). `''` = auto-detect via the
+  /// default Whisper engine. A non-empty code routes the recognizer through
+  /// [IndicSttEngine] with the same on-device bundle.
+  final String sttLanguageCode;
+
   AppSettings copyWith({
     String? deviceName,
     ThemeMode? themeMode,
@@ -36,6 +43,7 @@ class AppSettings {
     String? geminiApiKey,
     bool? speakerDiarization,
     bool? keepSessionAudio,
+    String? sttLanguageCode,
   }) {
     return AppSettings(
       deviceName: deviceName ?? this.deviceName,
@@ -45,6 +53,7 @@ class AppSettings {
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       speakerDiarization: speakerDiarization ?? this.speakerDiarization,
       keepSessionAudio: keepSessionAudio ?? this.keepSessionAudio,
+      sttLanguageCode: sttLanguageCode ?? this.sttLanguageCode,
     );
   }
 
@@ -55,6 +64,7 @@ class AppSettings {
     'geminiApiKey': geminiApiKey,
     'speakerDiarization': speakerDiarization,
     'keepSessionAudio': keepSessionAudio,
+    'sttLanguageCode': sttLanguageCode,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -65,6 +75,7 @@ class AppSettings {
     geminiApiKey: json['geminiApiKey'] as String? ?? '',
     speakerDiarization: json['speakerDiarization'] as bool? ?? true,
     keepSessionAudio: json['keepSessionAudio'] as bool? ?? false,
+    sttLanguageCode: json['sttLanguageCode'] as String? ?? '',
   );
 }
 
@@ -131,6 +142,25 @@ class SettingsNotifier extends Notifier<AppSettings> {
         .capture(
           'setting changed',
           properties: {'setting': 'keep_session_audio', 'value': '$keep'},
+        );
+  }
+
+  /// `''` = auto-detect (default Whisper engine). Any supported Indic code
+  /// routes the recognizer through [IndicSttEngine]; unknown codes are
+  /// ignored so a stale value can never break transcription.
+  void setSttLanguageCode(String code) {
+    final normalized = code.trim();
+    if (normalized.isNotEmpty && SttConfig.indicLabelFor(normalized) == null) {
+      return;
+    }
+    if (normalized == state.sttLanguageCode) return;
+    state = state.copyWith(sttLanguageCode: normalized);
+    _save();
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'setting changed',
+          properties: {'setting': 'stt_language', 'value': normalized},
         );
   }
 

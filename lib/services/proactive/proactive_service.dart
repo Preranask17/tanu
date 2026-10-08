@@ -11,10 +11,9 @@ enum ProactiveKind { commitment, highlight }
 /// Fires local notifications for fresh memories that contain commitments or
 /// decisions. Always-on, spam-limited (3/day, 1h gap), no extra API calls.
 class ProactiveService {
-  ProactiveService._(this._plugin, this._onTap);
+  ProactiveService._(this._plugin);
 
   final FlutterLocalNotificationsPlugin _plugin;
-  final ValueChanged<String> _onTap;
 
   static const _channelId = 'tanu_insights';
   static const _channelName = 'Tanu insights';
@@ -39,6 +38,10 @@ class ProactiveService {
     await plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             _channelId,
@@ -47,7 +50,35 @@ class ProactiveService {
             importance: Importance.high,
           ),
         );
-    return ProactiveService._(plugin, onTap);
+    return ProactiveService._(plugin);
+  }
+
+  /// Immediate test notification that bypasses the daily/interval caps and
+  /// content gates. Wired to the Settings "Under the Hood" console so a
+  /// silent phone can be diagnosed on-device: if this shows, plumbing and
+  /// permission are fine and real memories are being gated by caps/content.
+  Future<bool> showTestNotification() async {
+    try {
+      await _plugin.show(
+        id: -1,
+        title: 'Tanu test notification',
+        body: 'Notifications are working.',
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: const DarwinNotificationDetails(),
+        ),
+        payload: '',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[tanu] test notify failed: $e');
+      return false;
+    }
   }
 
   static const _maxPerDay = 3;
@@ -96,7 +127,11 @@ class ProactiveService {
     required ConversationSession session,
     required MemoryResult result,
   }) async {
-    if (!_allowedNow()) return null;
+    // Skip reasons are logged as booleans/counts only — never content.
+    if (!_allowedNow()) {
+      debugPrint('[tanu] proactive skipped: over cap or inside min gap');
+      return null;
+    }
 
     final hasCommitments = result.commitments.isNotEmpty &&
         result.commitments.any((c) => c.isCommitment && (c.action?.isNotEmpty ?? false));
@@ -123,6 +158,9 @@ class ProactiveService {
           ? '${result.summary.substring(0, 80)}…'
           : result.summary;
     } else {
+      debugPrint(
+        '[tanu] proactive skipped: no commitments and summary too short/generic',
+      );
       return null;
     }
 

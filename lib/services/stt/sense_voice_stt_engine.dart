@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -139,6 +138,11 @@ class SenseVoiceSttEngine implements ContinuousSttEngine {
   }
 
   @override
+  Future<void> flushUtterance() async {
+    // No worker-side audio held: nothing to salvage.
+  }
+
+  @override
   Future<void> stop() async {
     await stopContinuous();
   }
@@ -164,7 +168,9 @@ class SenseVoiceSttEngine implements ContinuousSttEngine {
   double _level(Float32List samples) {
     if (samples.isEmpty) return 0;
     var sum = 0.0;
-    for (final v in samples) sum += v * v;
+    for (final v in samples) {
+      sum += v * v;
+    }
     return math.min(1.0, math.sqrt(sum / samples.length) * 3);
   }
 
@@ -222,7 +228,7 @@ Future<void> _senseVoiceWorker(List<dynamic> args) async {
     if (msg is List) {
       final cmd = msg[0] as String;
       if (cmd == 'shutdown') {
-        vad?.free();
+        vad.free();
         recognizer.free();
         break;
       } else if (cmd == 'reset') {

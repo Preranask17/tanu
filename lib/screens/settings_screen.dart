@@ -6,14 +6,17 @@ import '../providers/ble_provider.dart';
 import '../providers/commitment_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/dev_capture_provider.dart';
+import '../providers/proactive_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/speaker_provider.dart';
 import '../services/stt/session_audio_buffer.dart';
+import '../config/stt_config.dart';
 import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
-import '../widgets/page_layout.dart';
+import '../widgets/device_status_controls.dart';
+import '../widgets/page_header.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -24,6 +27,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _developerOpen = false;
+
+  void _openDevicePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const DevicePickerSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,19 +48,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: true,
-            pinned: true,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: false,
-              title: const TanuPageTitle('Settings'),
-              titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
+          // Consistent page header (logo top-left, status top-right,
+          // heading below). Sections below are untouched and functional.
+          SliverToBoxAdapter(
+            child: PageHeader(
+              title: 'Settings',
+              actions: [
+                DeviceStatusActions(
+                  status: status,
+                  onBluetoothTap: _openDevicePicker,
+                ),
+              ],
             ),
           ),
           SliverToBoxAdapter(
-            child: TanuPageRail(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -73,6 +88,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   const _SttModelDashboard(),
+                  const SizedBox(height: 16),
+                  const _SttLanguagePicker(),
 
                   const SizedBox(height: 36),
 
@@ -131,6 +148,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 16),
                     _DeveloperConsole(capture: capture, stats: stats),
                   ],
+
+                  // Bottom cushion: clears the floating nav dock (64 tall,
+                  // offset safeArea + 16) on every screen size, so the last
+                  // card scrolls fully into view and stays tappable.
+                  SizedBox(
+                    height: MediaQuery.paddingOf(context).bottom + 112,
+                  ),
                 ],
               ),
             ),
@@ -275,52 +299,13 @@ class _PendantDashboard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isConnected
-                            ? Icons.bluetooth_connected
-                            : Icons.bluetooth_disabled,
-                        color: accent,
-                      ),
+                  child: Text(
+                    isConnected ? 'Tanu is\nConnected' : 'Tanu is\nOffline',
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      height: 1.1,
+                      fontSize: 32,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isConnected
-                                ? 'Pendant connected'
-                                : 'Pendant offline',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            isConnected
-                                ? (status.deviceName ?? 'Tanu pendant')
-                                : 'Connect a pendant to start capturing',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
               ),
               if (isConnected && status.batteryPercent != null)
                 _BatteryBadge(percent: status.batteryPercent!),
@@ -554,6 +539,83 @@ class _ThemePill extends StatelessWidget {
   }
 }
 
+/// Speech-language picker. Auto-detect (default Whisper engine) or one
+/// explicit Indic language (same on-device bundle driven through the Indic
+/// engine core with a fixed language hint). Pure selection UI: the engine
+/// factory rebuilds the recognizer when the persisted code changes.
+class _SttLanguagePicker extends ConsumerWidget {
+  const _SttLanguagePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final code = ref.watch(
+      settingsProvider.select((s) => s.sttLanguageCode),
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.translate_rounded,
+            size: 20,
+            color: Color(0xFF888888),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Speech language',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  'Same offline model, fixed hint',
+                  style: TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          DropdownButton<String>(
+            value: code.isEmpty ? '' : code,
+            underline: const SizedBox.shrink(),
+            onChanged: (next) {
+              if (next != null) {
+                ref.read(settingsProvider.notifier).setSttLanguageCode(next);
+              }
+            },
+            items: [
+              const DropdownMenuItem(
+                value: '',
+                child: Text('Auto-detect'),
+              ),
+              for (final lang in SttConfig.indicLanguages)
+                DropdownMenuItem(
+                  value: lang.code,
+                  child: Text(lang.label),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SttModelDashboard extends ConsumerWidget {
   const _SttModelDashboard();
 
@@ -584,6 +646,10 @@ class _SttModelDashboard extends ConsumerWidget {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Active recognizer core: identical to the bundle title by default,
+    // "Whisper Small · Hindi"-style only when an Indic language is fixed.
+    final engineLabel = ref.watch(sttEngineProvider).modelLabel;
+    final showEngineLabel = engineLabel != kOfflineModelLabel;
 
     return Container(
       width: double.infinity,
@@ -618,6 +684,14 @@ class _SttModelDashboard extends ConsumerWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (showEngineLabel)
+                      Text(
+                        engineLabel,
+                        style: const TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 12,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1108,6 +1182,37 @@ class _DeveloperConsole extends ConsumerWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.notifications_outlined, size: 16),
+            label: const Text('SEND TEST NOTIFICATION'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF353535),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            onPressed: () async {
+              final ok = await ref
+                  .read(proactiveServiceProvider.future)
+                  .then((svc) => svc.showTestNotification())
+                  .catchError((_) => false);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Test notification sent — check the shade'
+                          : 'Test notification failed — check permission',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
     );

@@ -103,8 +103,8 @@ class VectorStore {
           jsonEncode(vectors[i]),
         ]);
       }
-      stmt.dispose();
-      del.dispose();
+      stmt.close();
+      del.close();
       _db.execute('COMMIT');
     } catch (_) {
       _db.execute('ROLLBACK');
@@ -156,5 +156,5 @@ class VectorStore {
     return rs.first['n'] as int;
   }
 
-  void dispose() => _db.dispose();
+  void dispose() => _db.close();
 }

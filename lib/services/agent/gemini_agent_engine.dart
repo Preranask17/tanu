@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import '../../abstractions/agent_engine.dart';
 import '../../constants.dart';
 import '../../models/transcript.dart';
-import '../rag/rate_limiter.dart';
 import 'mistral_agent_engine.dart' show AgentException;
 
 /// Agent backed by Google's Gemini generateContent API.
@@ -22,10 +21,6 @@ class GeminiAgentEngine implements AgentEngine {
   final String model;
   final String endpoint;
   final String? systemPrompt;
-
-  static final _limiter = RateLimiter(
-    Duration(milliseconds: kGeminiMinGapChatMs),
-  );
 
   @override
   Future<String> prompt(
@@ -81,33 +76,16 @@ class GeminiAgentEngine implements AgentEngine {
     });
 
     try {
-      final response = await _limiter.run(() async {
-        var r = await http
-            .post(
-              Uri.parse('$endpoint?key=$apiKey'),
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-              },
-              body: body,
-            )
-            .timeout(const Duration(seconds: 45));
-        if (r.statusCode == 429) {
-          final wait = retryDelayFromBody(r.body) ?? const Duration(seconds: 5);
-          await Future.delayed(wait);
-          r = await http
-              .post(
-                Uri.parse('$endpoint?key=$apiKey'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                },
-                body: body,
-              )
-              .timeout(const Duration(seconds: 45));
-        }
-        return r;
-      });
+      final response = await http
+          .post(
+            Uri.parse('$endpoint?key=$apiKey'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 45));
 
       if (response.statusCode != 200) {
         throw AgentException(
@@ -127,21 +105,7 @@ class GeminiAgentEngine implements AgentEngine {
       if (parts == null || parts.isEmpty) {
         throw AgentException('Gemini returned empty content');
       }
-      String? text;
-      for (final p in parts) {
-        final m = p as Map<String, dynamic>;
-        if (m['thought'] == true) continue;
-        final t = m['text'] as String?;
-        if (t != null && t.trim().isNotEmpty) {
-          text = t;
-          break;
-        }
-      }
-      text ??= ((parts.first as Map<String, dynamic>)['text'] as String?);
-      if (text == null || text.trim().isEmpty) {
-        throw AgentException('Gemini returned no text');
-      }
-      return text.trim();
+      return ((parts.first as Map<String, dynamic>)['text'] as String?)?.trim() ?? '';
     } on AgentException {
       rethrow;
     } catch (e) {

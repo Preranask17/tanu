@@ -235,7 +235,7 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                                 )
                               : ListView.separated(
                                   itemCount: devices.length,
-                                  separatorBuilder: (_, __) => Container(
+                                  separatorBuilder: (_, _) => Container(
                                     height: 1,
                                     color: Theme.of(context).dividerTheme.color,
                                   ),

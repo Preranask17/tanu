@@ -40,6 +40,7 @@ dependencies:
   hive_ce_flutter: ^2.3.4
   flutter_riverpod: ^3.4.3
   http: ^1.6.0
+  archive: ^3.6.1
   uuid: ^4.6.0
   path_provider: ^2.1.5
   sherpa_onnx: ^1.13.8
@@ -63,6 +64,15 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# Launcher icon generation (Android only; iOS untouched).
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/app_icon_source.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/images/app_icon_source.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -74,6 +84,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Brand imagery bundled with the app.
+  assets:
+    - assets/images/tanu_wordmark.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
