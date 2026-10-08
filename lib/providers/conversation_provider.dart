@@ -860,6 +860,61 @@ class ConversationNotifier extends Notifier<ConversationState> {
     }
   }
 
+  Future<void> seedDemoMemories() async {
+    final now = DateTime.now();
+    final demos = <ConversationSession>[
+      ConversationSession(
+        id: 'demo_project',
+        title: 'Project deadline discussion',
+        startedAt: now.subtract(const Duration(days: 2)),
+        finishedAt: now.subtract(const Duration(days: 2)).add(const Duration(hours: 1)),
+        status: ConversationStatus.completed,
+        summary: 'Team agreed the launch deadline is Friday and Ramesh owns the report.',
+        cleanedTranscript:
+            'Speaker 1: Let\'s lock the plan. The launch deadline is Friday.\n'
+            'Speaker 2: Agreed. I will send the final report to Ramesh by Thursday.\n'
+            'Speaker 1: Perfect. I will follow up with the design team tomorrow.',
+        segments: const [],
+      ),
+      ConversationSession(
+        id: 'demo_grocery',
+        title: 'Grocery run',
+        startedAt: now.subtract(const Duration(days: 1, hours: 5)),
+        finishedAt: now.subtract(const Duration(days: 1, hours: 4)),
+        status: ConversationStatus.completed,
+        summary: 'Picked up milk, eggs and bread from the market.',
+        cleanedTranscript:
+            'Speaker 1: I went to the market yesterday.\n'
+            'Speaker 1: Got milk, eggs, and fresh bread. Nothing else was needed.',
+        segments: const [],
+      ),
+      ConversationSession(
+        id: 'demo_gym',
+        title: 'Workout reminder',
+        startedAt: now.subtract(const Duration(hours: 20)),
+        finishedAt: now.subtract(const Duration(hours: 19, minutes: 30)),
+        status: ConversationStatus.completed,
+        summary: 'Decided to lift weights on Monday, Wednesday and Friday.',
+        cleanedTranscript:
+            'Speaker 1: I need to be consistent. I will work out every Monday, Wednesday and Friday.\n'
+            'Speaker 1: Also I promise to skip sugar this month.',
+        segments: const [],
+      ),
+    ];
+
+    state = state.copyWith(conversations: [...demos, ...state.conversations]);
+    _persist();
+
+    try {
+      final indexer = await ref.read(memoryIndexerProvider.future);
+      for (final demo in demos) {
+        await indexer.indexSession(demo);
+      }
+    } catch (_) {
+      // Embeddings unavailable — memories are still listed, just not embedded.
+    }
+  }
+
   /// --- Persistence -------------------------------------------------------
 
   void _persist() {

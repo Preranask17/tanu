@@ -118,6 +118,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (_developerOpen) ...[
                     const SizedBox(height: 16),
                     _DeveloperConsole(capture: capture, stats: stats),
+                    const SizedBox(height: 16),
+                    const _SeedDemoButton(),
                   ],
                 ],
               ),
@@ -686,6 +688,56 @@ class _SttModelDashboard extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _SeedDemoButton extends ConsumerStatefulWidget {
+  const _SeedDemoButton();
+
+  @override
+  ConsumerState<_SeedDemoButton> createState() => _SeedDemoButtonState();
+}
+
+class _SeedDemoButtonState extends ConsumerState<_SeedDemoButton> {
+  bool _busy = false;
+  String _msg = '';
+
+  Future<void> _seed() async {
+    setState(() {
+      _busy = true;
+      _msg = 'Seeding…';
+    });
+    try {
+      await ref
+          .read(conversationProvider.notifier)
+          .seedDemoMemories();
+      if (mounted) setState(() => _msg = 'Seeded demo memories & indexed them');
+    } catch (e) {
+      if (mounted) setState(() => _msg = 'Failed: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.science_outlined),
+            label: Text(_busy ? 'Seeding…' : 'SEED DEMO MEMORIES'),
+            onPressed: _busy ? null : _seed,
+          ),
+        ),
+        if (_msg.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_msg, style: const TextStyle(fontSize: 12)),
+          ),
+      ],
     );
   }
 }
