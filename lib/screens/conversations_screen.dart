@@ -5,8 +5,8 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../widgets/conversation_tile.dart';
+import '../widgets/page_header.dart';
 import 'trash_screen.dart';
-import '../widgets/page_layout.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
@@ -19,18 +19,12 @@ class ConversationsScreen extends ConsumerStatefulWidget {
 class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _query = TextEditingController();
-  bool _searching = false;
 
   @override
   void dispose() {
     _scroll.dispose();
     _query.dispose();
     super.dispose();
-  }
-
-  void toggleSearch() {
-    setState(() => _searching = !_searching);
-    if (!_searching) _query.clear();
   }
 
   void scrollToTop() {
@@ -119,124 +113,106 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            SliverAppBar(
-              expandedHeight: 140,
-              floating: true,
-              pinned: true,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: false,
-                title: const TanuPageTitle('Memories'),
-                titlePadding: const EdgeInsets.only(left: 24, bottom: 20),
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Positioned(
-                      top: -50,
-                      right: -50,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Theme.of(
-                            context,
-                          ).primaryColor.withValues(alpha: 0.15),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -80,
-                      left: -50,
-                      child: Container(
-                        width: 250,
-                        height: 250,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.blueAccent.withValues(alpha: 0.08),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    onPressed: () {
+            SliverToBoxAdapter(
+              child: PageHeader(
+                title: 'Memories',
+                actions: [
+                  _HeaderCircleButton(
+                    icon: Icons.delete_outline,
+                    tooltip: 'Trash',
+                    onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const TrashScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const TrashScreen(),
+                        ),
                       );
                     },
-                    icon: const Icon(Icons.delete_outline),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: IconButton(
-                    onPressed: toggleSearch,
-                    icon: Icon(_searching ? Icons.close : Icons.search),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-            if (_searching)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-                  child: TextField(
-                    controller: _query,
-                    autofocus: true,
-                    style: const TextStyle(fontSize: 16),
-                    decoration: InputDecoration(
-                      hintText: 'Search memories...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: query.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded),
-                              onPressed: () {
-                                _query.clear();
-                                setState(() {});
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: isDark
-                          ? const Color(0xFF161618)
-                          : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(100), // Pill shape
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF2A2A2C)
-                              : const Color(0xFFE9ECEF),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(100),
-                        borderSide: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF2A2A2C)
-                              : const Color(0xFFE9ECEF),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(100),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).primaryColor,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                child: Container(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : const Color(0xFFF2F2F7),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : const Color(0xFFE5E5E5),
+                      width: 1.0,
                     ),
-                    onChanged: (_) => setState(() {}),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.search,
+                        size: 20,
+                        color: Color(0xFF888888),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _query,
+                          decoration: const InputDecoration(
+                            hintText: 'Ask or search memories...',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 15,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          style: TextStyle(
+                            color:
+                                isDark ? Colors.white : Colors.black,
+                            fontSize: 15,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      if (query.isNotEmpty)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            _query.clear();
+                            setState(() {});
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.clear,
+                              size: 18,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                        ),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => ref
+                            .read(conversationProvider.notifier)
+                            .microphoneTest(),
+                        child: const Padding(
+                          padding: EdgeInsets.only(left: 8),
+                          child: Icon(
+                            Icons.mic_none,
+                            size: 20,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+            ),
             if (sessions.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
@@ -245,13 +221,15 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             else
               SliverPadding(
                 padding: EdgeInsets.only(
-                  top: _searching ? 4 : 12,
-                  left: 24,
-                  right: 24,
+                  top: 12,
+                  left: 20,
+                  right: 20,
                   bottom: bottomInset,
                 ),
                 sliver: visible.isEmpty && query.isNotEmpty
-                    ? const SliverToBoxAdapter(child: _NoMatches())
+                    ? SliverToBoxAdapter(
+                        child: _NoMatches(query: query.trim()),
+                      )
                     : SliverList(
                         delegate: SliverChildListDelegate([
                           for (final label in order) ...[
@@ -292,6 +270,43 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
         ),
       ),
     );
+  }
+}
+
+/// 44px circle header action matching the Capture pendant-button language.
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final button = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
+        ),
+        child: Icon(icon, size: 20, color: const Color(0xFF888888)),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -339,16 +354,19 @@ class _DayHeader extends StatelessWidget {
 }
 
 class _NoMatches extends StatelessWidget {
-  const _NoMatches();
+  const _NoMatches({required this.query});
+
+  final String query;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 80),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 80),
       child: Center(
         child: Text(
-          'No matches for that search.',
-          style: TextStyle(color: Color(0xFF888888)),
+          'No memories found matching "$query".',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Color(0xFF888888)),
         ),
       ),
     );

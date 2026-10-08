@@ -7,9 +7,12 @@ import '../providers/conversation_provider.dart';
 import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
 import '../providers/rag_provider.dart';
+import '../providers/stt_model_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
+import '../widgets/connection_status_bar.dart';
+import '../widgets/state_indicator.dart';
 
 /// Live memory page: the in-progress session's timestamped transcript streams
 /// here, partial words in italic, locked lines in place — Omi's chat. Pushed
@@ -22,21 +25,57 @@ class ChatPage extends ConsumerWidget {
     final conversation = ref.watch(conversationProvider);
     final status =
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
+    final model = ref.watch(sttModelProvider);
+    final engine = ref.watch(sttEngineProvider);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          conversation.active?.title.isNotEmpty == true
+              ? conversation.active!.title
+              : 'Tanu',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: engine.warmingUp,
+            builder: (context, warming, _) {
+              final show = model.busy || warming;
+              if (!show) return const SizedBox.shrink();
+              final title = model.phase == SttModelPhase.downloading
+                  ? model.label
+                  : 'Loading model…';
+              return _ModelLoadingChip(title: title);
+            },
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
       body: SafeArea(
+        top: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _LiveHeader(
-              status: status,
-              onClose: () => Navigator.of(context).maybePop(),
+            const ConnectionStatusBar(),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: StateIndicator(
+                state: status.state,
+                isListening: conversation.isListening,
+                isThinking: false,
+                error: conversation.error,
+              ),
             ),
             if (conversation.isListening)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
-                child: AudioWaveform(level: conversation.micLevel),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 10, 20, 2),
+                child: _ChatWaveformProxy(),
               ),
+            const SizedBox(height: 4),
             Expanded(
               child: conversation.active == null
                   ? _ChatWelcome(status: status)
@@ -53,78 +92,49 @@ class ChatPage extends ConsumerWidget {
   }
 }
 
-class _LiveHeader extends StatelessWidget {
-  const _LiveHeader({required this.status, required this.onClose});
+/// Theme-aware wrapper so the existing waveform can live under the new
+/// AppBar chrome without changing transcript/RAG logic.
+class _ChatWaveformProxy extends ConsumerWidget {
+  const _ChatWaveformProxy();
 
-  final PendantStatus status;
-  final VoidCallback onClose;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final level = ref.watch(conversationProvider).micLevel;
+    return AudioWaveform(level: level);
+  }
+}
+
+class _ModelLoadingChip extends StatelessWidget {
+  const _ModelLoadingChip({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = status.isConnected
-        ? Colors.greenAccent
-        : Colors.white54;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-      child: SizedBox(
-        height: 48,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                tooltip: 'Close',
-                onPressed: onClose,
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                  size: 25,
-                ),
-              ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF888888),
             ),
-            const Text(
-              'Tanu',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    status.isConnected
-                        ? Icons.bluetooth
-                        : Icons.bluetooth_disabled,
-                    color: statusColor,
-                    size: 16,
-                  ),
-                  if (status.batteryPercent != null) ...[
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.battery_full_rounded,
-                      color: Colors.white60,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${status.batteryPercent}%',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
