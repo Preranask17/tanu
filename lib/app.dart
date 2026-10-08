@@ -13,8 +13,6 @@ import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/welcome/returning_startup_gate.dart';
-import 'screens/welcome/welcome_flow.dart';
 import 'screens/settings_screen.dart';
 import 'screens/welcome/returning_startup_gate.dart';
 import 'screens/welcome/welcome_flow.dart';
@@ -38,7 +36,6 @@ class _TanuAppState extends ConsumerState<TanuApp> {
   /// Whether this process ever showed first-run onboarding. After an
   /// in-session Get Started we go straight to the app — the returning-user
   /// startup movie must NOT replay.
-  /// startup movie must NOT replay. Plain UI-local flag, set idempotently.
   bool _sawOnboarding = false;
 
   /// Tab index -> screen name. Indexed in step with the `BottomNavigationBarItem`
@@ -180,11 +177,6 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     );
     final index = ref.watch(navigationTabProvider);
     final settings = ref.watch(settingsProvider);
-    final completed = settings.hasCompletedOnboarding;
-    // Remember first-run within this process (idempotent plain-flag write;
-    // no rebuild triggered). Distinguishes the in-session Get Started
-    // handoff (straight to app) from a genuine cold start (startup movie).
-    if (!completed) _sawOnboarding = true;
     final platformBrightness = MediaQuery.platformBrightnessOf(context);
     final brightness = settings.themeMode == ThemeMode.dark
         ? Brightness.dark
@@ -245,50 +237,6 @@ class _TanuAppState extends ConsumerState<TanuApp> {
                 const SettingsScreen(),
               ],
             );
-      home: !completed
-          ? const WelcomeFlow()
-          : (_sawOnboarding
-                // In-session Get Started: straight into the app, no movie.
-                ? _mainScaffold(index)
-                // Cold start after onboarding: short formation movie first.
-                : ReturningStartupGate(child: _mainScaffold(index))),
-    );
-  }
-
-  /// The existing main tab scaffold, unchanged.
-  Widget _mainScaffold(int index) {
-    return ResponsiveScaffold(
-      currentIndex: index,
-      onTabTapped: (i) {
-        if (i == index) {
-          _onTabTap(i, true);
-        } else {
-          ref.read(navigationTabProvider.notifier).goTo(i);
-        }
-      },
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.mic_none),
-          activeIcon: Icon(Icons.mic),
-          label: 'Capture',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.inventory_2_outlined),
-          activeIcon: Icon(Icons.inventory_2),
-          label: 'Memories',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings_outlined),
-          activeIcon: Icon(Icons.settings),
-          label: 'Settings',
-        ),
-      ],
-      pages: [
-        HomeScreen(key: _homeKey),
-        ConversationsScreen(key: _conversationsKey),
-        const SettingsScreen(),
-      ],
-    );
   }
 }
 

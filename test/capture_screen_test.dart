@@ -49,11 +49,10 @@ void main() {
     expect(find.text('Ready'), findsOneWidget);
     expect(find.text('Capturing...'), findsNothing);
 
-    // 4. Empty memories placeholder (no Scan card anymore).
-    expect(
-      find.text('No memories recorded yet. TANU is listening...'),
-      findsOneWidget,
-    );
+    // 4. Fresh installs auto-seed demo memories (main backend), so the
+    // Recent Memories rail lists them instead of the empty placeholder.
+    expect(find.text('Recent Memories'), findsOneWidget);
+    expect(find.text('Project deadline discussion'), findsOneWidget);
     expect(find.text('Scan'), findsNothing);
     expect(find.text('No pendant yet'), findsNothing);
   }, timeout: const Timeout(Duration(minutes: 5)));
