@@ -20,6 +20,7 @@ import 'commitment_provider.dart';
 import 'rag_provider.dart';
 import 'proactive_provider.dart';
 
+import '../config/conversation_end_phrases.dart';
 import '../services/stt/whisper_small_engine.dart';
 import '../services/stt/indic_stt_engine.dart';
 import 'settings_provider.dart';
@@ -430,32 +431,20 @@ class ConversationNotifier extends Notifier<ConversationState> {
   Timer? _softEndTimer;
   DateTime? _lastEndCloseAt;
 
-  /// Strong closers — the whole utterance wraps up, close right away.
-  static final RegExp _strongEndPattern = RegExp(
-    r'^(?:okay|ok|alright|well|so)?\s*(?:thank you|thanks(?: a lot| so much| everyone| all)?|'
-    r'got it[.,]? thanks|bye+|goodbye|see (?:you|ya)(?: later| all)?|farewell|take care|'
-    r'talk (?:later|soon)|catch you later|'
-    r"that's (?:all|it)(?: for (?:today|now))?|"
-    r"that's enough(?: for (?:today|now))?|we'?re (?:done|finished|wrapped up)|"
-    "i'?m done(?: now| here)?|(?:let'?s|we can|let us) (?:call it a day|wrap (?:it )?up|finish up|end here)|"
-    r'end of (?:meeting|discussion|conversation)|meeting adjourned|'
-    "let'?s end here|"
-    r'perfect[.,]? (?:thanks|thank you)|great[.,]? thanks|sounds good[.,]? (?:thanks|thank you)|'
-    r'agreed[.,]? (?:thanks|thank you)|'
-    "i think that'?s (?:it|all|everything)|"
-    r'no (?:more )?questions(?:[.,]? ?(?:\w+ \w+)?)?|any other business|'
-    r"i'?ll let you go|i appreciate (?:your time|it)|have a (?:good|great) (?:day|one)|"
-    r'thanks everybody|thank you everyone)\b[.!\s]*$',
-    caseSensitive: false,
-  );
+  // --- End-of-conversation detection -------------------------------------
+  // Segmentation, not stopping: a detected closing splits the current memory
+  // and the next topic starts fresh. Tables live in
+  // [ConversationEndPhrases] (English patterns moved there verbatim);
+  // meeting-style closers below stay English-only by design.
 
-  /// Softer closers — only close after ~20 s of no new speech.
-  static final RegExp _softEndPattern = RegExp(
-    r'^(?:great|okay|ok|right|well|so|alright|cool|nice|perfect|understood|sure|fine|'
-    r'works for me|that works|sounds good|no problem|no worries|all right|'
-    r'yeah|yes|maybe|hmm|uh|mm)[.!?…\s]*$',
-    caseSensitive: false,
-  );
+  /// Active end-phrase language: explicit Indic code from Settings, else `en`
+  /// (today's exact behavior). Unknown codes fall back to English so a stale
+  /// value can never disable segmentation.
+  String get _endPhraseCode {
+    final code = ref.read(settingsProvider).sttLanguageCode;
+    if (code.isEmpty) return 'en';
+    return ConversationEndPhrases.strong.containsKey(code) ? code : 'en';
+  }
 
   /// Meeting-style closers — treated as strong once a session has some meat.
   static final RegExp _businessEndPattern = RegExp(
@@ -477,17 +466,22 @@ class ConversationNotifier extends Notifier<ConversationState> {
       return;
     }
 
-    final cleaned =
-        utterance.replaceAll(RegExp(r'[.!?…,"\s]+$'), '').trim();
+    final code = _endPhraseCode;
+    final strong = ConversationEndPhrases.strongPattern(code);
+    final soft = ConversationEndPhrases.softPattern(code);
 
-    if (_strongEndPattern.hasMatch(cleaned) ||
+    final cleaned =
+        utterance.replaceAll(RegExp(r'[.!?…।॥,"\s]+$'), '').trim();
+
+    if ((strong != null && strong.hasMatch(cleaned)) ||
+        ConversationEndPhrases.endsWithStrongCloser(utterance, code) ||
         (segmentCount >= 2 && _businessEndPattern.hasMatch(cleaned))) {
       _softEndTimer?.cancel();
       _closeFromEndPhrase('end_phrase');
       return;
     }
 
-    if (_softEndPattern.hasMatch(cleaned)) {
+    if (soft != null && soft.hasMatch(cleaned)) {
       _softEndTimer = Timer(const Duration(seconds: 20), () {
         if (_continuousStarted && !_micTestActive && state.active != null) {
           _closeFromEndPhrase('end_phrase_soft');
@@ -496,10 +490,14 @@ class ConversationNotifier extends Notifier<ConversationState> {
     }
   }
 
+  /// Segmenting close: the finished memory lands in history AND listening
+  /// keeps flowing into a brand-new session, so the next topic starts fresh
+  /// instead of extending the closed memory — or silencing the app. Manual
+  /// stops still pause via [stopListening]; this path never pauses.
   void _closeFromEndPhrase(String reason) {
     _lastEndCloseAt = DateTime.now();
     state = state.copyWith(sttEvent: '— conversation ended —');
-    unawaited(stopListening(reason));
+    forceEndSession(reason);
   }
 
   ConversationSession _withTitle(
