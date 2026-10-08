@@ -83,6 +83,8 @@ class BluetoothPendantSource implements AudioSource {
 
   bool _manualDisconnect = false;
   bool _reconnecting = false;
+  Timer? _reconnectTimer;
+  bool _connectInProgress = false;
 
   @override
   Stream<Uint8List> get audioFrames => _audioFrames.stream;
@@ -143,6 +145,8 @@ class BluetoothPendantSource implements AudioSource {
 
     _manualDisconnect = false;
     _reconnecting = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
 
     final current = _device;
     if (current != null && current.isConnected) {
@@ -152,6 +156,8 @@ class BluetoothPendantSource implements AudioSource {
         _log('[tanu] dropping old connection: $e');
       }
     }
+    await _teardownSubscriptions();
+    _device = null;
 
     _rememberDevice(remoteId);
     try {
@@ -165,8 +171,11 @@ class BluetoothPendantSource implements AudioSource {
   @override
   Future<void> disconnect() async {
     _manualDisconnect = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     await _teardownSubscriptions();
     final device = _device;
+    _device = null;
     if (device != null) {
       try {
         await device.disconnect();
@@ -174,7 +183,7 @@ class BluetoothPendantSource implements AudioSource {
         _log('[tanu] disconnect error: $e');
       }
     }
-    _setState(PendantState.disconnected);
+    _setState(PendantState.disconnected, clearBattery: true, clearName: true);
     _stats.value = const PendantStats();
   }
 
@@ -187,38 +196,70 @@ class BluetoothPendantSource implements AudioSource {
   Future<void> _connectKnown(String remoteId) async {
     final adapter = FlutterBluePlus.adapterStateNow;
     if (adapter == BluetoothAdapterState.off) {
+      _setState(
+        PendantState.disconnected,
+        clearBattery: true,
+        clearName: true,
+      );
       throw StateError('Bluetooth is off');
     }
 
+    if (_connectInProgress) {
+      _log('[tanu] connection attempt already in progress');
+      return;
+    }
+
+    _connectInProgress = true;
     final device = BluetoothDevice(remoteId: DeviceIdentifier(remoteId));
+    _device = device;
+    _watchConnection(device);
     _setState(PendantState.connecting);
 
     try {
-      await device.connect(
-        license: License.nonprofit,
-        timeout: const Duration(seconds: 35),
-      );
-    } catch (e) {
-      _setState(PendantState.disconnected);
-      rethrow;
-    }
-
-    _device = device;
-    try {
-      await _setupPendant(device);
-    } catch (e) {
-      _log('[tanu] setup failed, disconnecting: $e');
       try {
-        await device.disconnect();
-      } catch (_) {}
-      _setState(PendantState.disconnected);
-      rethrow;
-    }
+        if (device.isConnected) {
+          _log('[tanu] device is already connected; configuring it');
+        } else {
+          await device.connect(
+            license: License.nonprofit,
+            timeout: const Duration(seconds: 35),
+          );
+        }
+      } catch (e) {
+        // Some platforms report an "already connected" error even though the
+        // device is usable. Continue setup when the native connection is alive.
+        if (!device.isConnected) {
+          _setState(
+            PendantState.disconnected,
+            clearBattery: true,
+            clearName: true,
+          );
+          rethrow;
+        }
+        _log('[tanu] connect reported an error but the device is connected: $e');
+      }
 
-    _watchConnection(device);
-    _startBatteryPolling();
-    _setState(PendantState.connected, name: device.platformName);
-    _log('[tanu] connected to ${device.platformName}');
+      try {
+        await _setupPendant(device);
+      } catch (e) {
+        _log('[tanu] setup failed, disconnecting: $e');
+        try {
+          await device.disconnect();
+        } catch (_) {}
+        _setState(
+          PendantState.disconnected,
+          clearBattery: true,
+          clearName: true,
+        );
+        rethrow;
+      }
+
+      _startBatteryPolling();
+      _setState(PendantState.connected, name: device.platformName);
+      _log('[tanu] connected to ${device.platformName}');
+    } finally {
+      _connectInProgress = false;
+    }
   }
 
   // ---- discovery ----
@@ -242,10 +283,14 @@ class BluetoothPendantSource implements AudioSource {
       final adapterState = await FlutterBluePlus.adapterState
           .where((s) => s == BluetoothAdapterState.on)
           .first
-          .timeout(const Duration(seconds: 5), onTimeout: () {
-        throw Exception(
-            'Bluetooth is off. Please turn on Bluetooth in Settings.');
-      });
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              throw Exception(
+                'Bluetooth is off. Please turn on Bluetooth in Settings.',
+              );
+            },
+          );
       _log('[tanu] adapter state: $adapterState');
     } catch (e) {
       _log('[tanu] adapter/permission check failed: $e');
@@ -274,7 +319,7 @@ class BluetoothPendantSource implements AudioSource {
     } catch (e) {
       _log('[tanu] systemDevices error: $e');
     }
-    
+
     _emitDevices();
     await FlutterBluePlus.startScan(
       continuousUpdates: true,
@@ -643,26 +688,51 @@ class BluetoothPendantSource implements AudioSource {
     _connSub?.cancel();
     _connSub = device.connectionState.listen((state) {
       _log('[tanu] connection state: $state');
+      // flutter_blue_plus emits the current state immediately when the
+      // subscription starts. Ignore that initial disconnected value while
+      // connect()/service discovery is still in progress.
+      if (_connectInProgress) return;
+
       if (state == BluetoothConnectionState.disconnected) {
         _reassembler.reset();
         _utteranceBuffer.clear();
         _silentFrames = 0;
 
         if (_manualDisconnect) {
-          _setState(PendantState.disconnected);
+          _setState(
+            PendantState.disconnected,
+            clearBattery: true,
+            clearName: true,
+          );
           return;
         }
 
         _setState(PendantState.reconnecting);
         _reconnecting = true;
-        Timer(const Duration(seconds: 2), () async {
+        _reconnectTimer?.cancel();
+        _reconnectTimer = Timer(const Duration(seconds: 2), () async {
+          _reconnectTimer = null;
           if (_reconnecting && !_manualDisconnect) {
+            if (FlutterBluePlus.adapterStateNow == BluetoothAdapterState.off) {
+              _log('[tanu] Bluetooth is off; waiting for the user to enable it');
+              _reconnecting = false;
+              _setState(
+                PendantState.disconnected,
+                clearBattery: true,
+                clearName: true,
+              );
+              return;
+            }
             _log('[tanu] attempting reconnect...');
             try {
               await connect();
             } catch (e) {
               _log('[tanu] reconnect failed: $e');
-              _setState(PendantState.disconnected);
+              _setState(
+                PendantState.disconnected,
+                clearBattery: true,
+                clearName: true,
+              );
             }
           }
         });
@@ -672,11 +742,19 @@ class BluetoothPendantSource implements AudioSource {
 
   // ---- helpers ----
 
-  void _setState(PendantState state, {int? battery, String? name}) {
+  void _setState(
+    PendantState state, {
+    int? battery,
+    String? name,
+    bool clearBattery = false,
+    bool clearName = false,
+  }) {
     _status.value = _status.value.copyWith(
       state: state,
       batteryPercent: battery,
       deviceName: name,
+      clearBatteryPercent: clearBattery,
+      clearDeviceName: clearName,
     );
     if (!_statusController.isClosed) {
       _statusController.add(_status.value);
@@ -685,6 +763,8 @@ class BluetoothPendantSource implements AudioSource {
 
   Future<void> _teardownSubscriptions() async {
     _reconnecting = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     await _audioSub?.cancel();
     await _buttonSub?.cancel();
     await _connSub?.cancel();
@@ -698,6 +778,7 @@ class BluetoothPendantSource implements AudioSource {
     _reassembler.reset();
   }
 
+  @override
   void dispose() {
     _teardownSubscriptions();
     _scanAutoStop?.cancel();

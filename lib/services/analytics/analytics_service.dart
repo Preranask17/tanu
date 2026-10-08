@@ -34,6 +34,10 @@ class AnalyticsService {
     'stt model deleted',
     'setting changed',
     'commitment added',
+    'memory retry queued',
+    'memory retry succeeded',
+    'memory retry gave up',
+    'proactive notified',
   };
 
   /// The complete set of property keys this app is allowed to send, matched
@@ -54,8 +58,8 @@ class AnalyticsService {
     'screen',
     // 'pendant connected' / 'pendant disconnected' / 'session started'
     'codec', 'battery_pct', 'simulated',
-    // 'session started' — the engine's own label, e.g. 'Moonshine', never a
-    // path or a file name.
+    // 'session started' — the engine's own label, e.g. 'Whisper Small ·
+    // 375 MB', never a path or a file name.
     'stt_model',
     // 'session ended'
     'close_reason', 'segment_count', 'duration_s',
@@ -67,6 +71,10 @@ class AnalyticsService {
     'setting', 'value',
     // 'commitment added'
     'source', 'has_due', 'has_person',
+    // 'memory retry queued'
+    'error',
+    // 'proactive notified'
+    'kind',
   };
 
   /// Non-null while [init] is running or has completed successfully. Captures

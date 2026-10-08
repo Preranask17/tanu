@@ -54,10 +54,14 @@ class ResponsiveScaffold extends StatelessWidget {
                   child: Container(
                     height: 64,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+                      color: isDark
+                          ? const Color(0xFF111111)
+                          : const Color(0xFFFFFFFF),
                       borderRadius: BorderRadius.circular(32),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+                        color: isDark
+                            ? const Color(0xFF2A2A2A)
+                            : const Color(0xFFE5E5E5),
                         width: 1,
                       ),
                       boxShadow: [
@@ -75,25 +79,39 @@ class ResponsiveScaffold extends StatelessWidget {
                         final isSelected = index == currentIndex;
                         final activeIconData = (item.activeIcon as Icon?)?.icon;
                         final iconData = (item.icon as Icon?)?.icon;
-                        
-                        return GestureDetector(
-                          onTap: () => onTabTapped(index),
-                          behavior: HitTestBehavior.opaque,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected 
-                                  ? (isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0))
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Icon(
-                              isSelected ? (activeIconData ?? iconData) : iconData,
-                              color: isSelected 
-                                  ? (isDark ? Colors.white : Colors.black)
-                                  : const Color(0xFF888888),
-                              size: 24,
+
+                        return Tooltip(
+                          message: item.label ?? '',
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () => onTabTapped(index),
+                              behavior: HitTestBehavior.opaque,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeOutCubic,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? (isDark
+                                            ? const Color(0xFF222222)
+                                            : const Color(0xFFF0F0F0))
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Icon(
+                                  isSelected
+                                      ? (activeIconData ?? iconData)
+                                      : iconData,
+                                  color: isSelected
+                                      ? (isDark ? Colors.white : Colors.black)
+                                      : const Color(0xFF888888),
+                                  size: 24,
+                                ),
+                              ),
                             ),
                           ),
                         );
@@ -151,41 +169,54 @@ class _Sidebar extends StatelessWidget {
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => onTabTapped(index),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? (isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0))
+                              ? (isDark
+                                    ? const Color(0xFF222222)
+                                    : const Color(0xFFF0F0F0))
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected ? (activeIconData ?? iconData) : iconData,
-                              color: isSelected
-                                  ? (isDark ? Colors.white : Colors.black)
-                                  : const Color(0xFF888888),
-                              size: 20,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => onTabTapped(index),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              item.label ?? '',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                color: isSelected
-                                    ? (isDark ? Colors.white : Colors.black)
-                                    : const Color(0xFF888888),
-                              ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? (activeIconData ?? iconData)
+                                      : iconData,
+                                  color: isSelected
+                                      ? (isDark ? Colors.white : Colors.black)
+                                      : const Color(0xFF888888),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  item.label ?? '',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? (isDark ? Colors.white : Colors.black)
+                                        : const Color(0xFF888888),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),

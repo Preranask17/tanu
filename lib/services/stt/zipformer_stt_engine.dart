@@ -36,7 +36,7 @@ class ZipformerSttEngine implements ContinuousSttEngine {
   bool get hasActiveUtterance => _hasActiveUtterance;
 
   @override
-  String get modelLabel => 'Zipformer Streaming Â· 120 MB';
+  String get modelLabel => 'Offline Streaming Model · 120 MB';
 
   @override
   Future<bool> isAvailable() async {
@@ -95,7 +95,7 @@ class ZipformerSttEngine implements ContinuousSttEngine {
     _continuousActive = true;
     _hasActiveUtterance = false;
 
-    _onEventCb?.call('Starting Zipformer...');
+    _onEventCb?.call('Starting Offline Streaming Model...');
     final ready = await _ensureWorker();
     if (!ready || !_continuousActive) {
       _warmingUp.value = false;
@@ -103,7 +103,7 @@ class ZipformerSttEngine implements ContinuousSttEngine {
     }
 
     _warmingUp.value = false;
-    _onEventCb?.call('Zipformer Listening');
+    _onEventCb?.call('Offline Streaming Model Listening');
 
     _workerPort?.send(['reset']);
 

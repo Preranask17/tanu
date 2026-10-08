@@ -9,13 +9,14 @@ import '../models/conversation.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../screens/chat_screen.dart';
 import '../providers/stt_model_provider.dart';
 import '../widgets/ai_presence_orb.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
 import '../widgets/page_header.dart';
+import 'ask_screen.dart';
+import 'chat_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -36,7 +37,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  /// Auto-downloads the Moonshine STT model on first launch, or upgrades
+  /// Auto-downloads the Whisper Small STT model on first launch, or upgrades
   /// from a retired model if one exists.
   Future<void> _ensureSttModel() async {
     final notifier = ref.read(sttModelProvider.notifier);
@@ -50,7 +51,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         builder: (context) => AlertDialog(
           title: const Text('STT Model Upgrade'),
           content: const Text(
-            'We\'ve upgraded the offline speech engine to Moonshine '
+            'We\'ve upgraded the offline speech engine '
             '(fast, accurate English, fully offline). '
             'Please delete the old model to make room and install the latest one.',
           ),
@@ -143,6 +144,13 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                   child: PageHeader(
                     title: 'Capture',
                     actions: [
+                      _AskButton(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AskScreen(),
+                          ),
+                        ),
+                      ),
                       if (status.isConnected &&
                           status.batteryPercent != null)
                         _BatteryPill(
@@ -213,6 +221,39 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
             child: const Center(child: HomeChatBar()),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact Ask Tanu button matching the pendant button circle language.
+/// Opens the RAG-backed AskScreen; no backend logic here.
+class _AskButton extends StatelessWidget {
+  const _AskButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
+        ),
+        child: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF888888)),
       ),
     );
   }

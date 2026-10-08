@@ -30,11 +30,15 @@ class PendantStatus {
     PendantState? state,
     int? batteryPercent,
     String? deviceName,
+    bool clearBatteryPercent = false,
+    bool clearDeviceName = false,
   }) {
     return PendantStatus(
       state: state ?? this.state,
-      batteryPercent: batteryPercent ?? this.batteryPercent,
-      deviceName: deviceName ?? this.deviceName,
+      batteryPercent: clearBatteryPercent
+          ? null
+          : (batteryPercent ?? this.batteryPercent),
+      deviceName: clearDeviceName ? null : (deviceName ?? this.deviceName),
     );
   }
 }

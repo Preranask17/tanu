@@ -65,29 +65,36 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 16, bottom: 8, top: 16),
+          padding: const EdgeInsets.only(left: 24, bottom: 8, top: 24),
           child: Text(
             header.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
-              color: Color(0xFF888888),
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: isDark ? const Color(0xFFCCCCCC) : const Color(0xFF666666),
             ),
           ),
         ),
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          child: Material(
-            color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-            clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-                width: 1,
-              ),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark ? const Color(0xFF2A2A2C).withOpacity(0.5) : const Color(0xFFE9ECEF).withOpacity(0.8),
+              width: 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.03),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
             child: Column(
               children: children,
             ),
@@ -125,7 +132,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
           CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 120,
+                expandedHeight: 140,
                 floating: true,
                 pinned: true,
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -134,7 +141,36 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                     'Commitments',
                     style: Theme.of(context).textTheme.displayMedium,
                   ),
-                  titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                  titlePadding: const EdgeInsets.only(left: 20, bottom: 20),
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Positioned(
+                        top: -50,
+                        right: -50,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Theme.of(context).primaryColor.withOpacity(0.15),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: -80,
+                        left: -50,
+                        child: Container(
+                          width: 250,
+                          height: 250,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.redAccent.withOpacity(0.08),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
@@ -277,45 +313,88 @@ class _CommitmentTile extends ConsumerWidget {
     final isDone = done || commitment.done;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return ListTile(
-      tileColor: highlight
-          ? Colors.red.withOpacity(0.1)
-          : null,
+    return InkWell(
       onTap: () => notifier.toggleDone(commitment.id),
-      leading: Icon(
-        isDone ? Icons.check_circle : Icons.circle_outlined,
-        color: isDone ? Colors.grey : Theme.of(context).primaryColor,
-        size: 24,
-      ),
-      title: Text(
-        commitment.action,
-        style: TextStyle(
-          color: isDone
-              ? const Color(0xFF888888)
-              : (isDark ? Colors.white : Colors.black),
-          decoration: isDone ? TextDecoration.lineThrough : null,
-          fontWeight: isDone ? FontWeight.w400 : FontWeight.w600,
-        ),
-      ),
-      subtitle: dueText.isEmpty
-          ? null
-          : Text(
-              dueText,
-              style: TextStyle(
-                color: highlight
-                    ? Colors.red
-                    : const Color(0xFF888888),
-                fontSize: 12,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => notifier.toggleDone(commitment.id),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDone 
+                      ? Theme.of(context).primaryColor 
+                      : (highlight ? Colors.red.withOpacity(0.1) : Colors.transparent),
+                  border: Border.all(
+                    color: isDone 
+                        ? Theme.of(context).primaryColor 
+                        : (highlight ? Colors.red : const Color(0xFF888888)),
+                    width: 2,
+                  ),
+                ),
+                child: isDone
+                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    : null,
               ),
             ),
-      trailing: IconButton(
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(),
-        onPressed: () => notifier.remove(commitment.id),
-        icon: const Icon(
-          Icons.close,
-          size: 18,
-          color: Colors.grey,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    commitment.action,
+                    style: TextStyle(
+                      color: isDone
+                          ? const Color(0xFF888888)
+                          : (isDark ? Colors.white : Colors.black),
+                      decoration: isDone ? TextDecoration.lineThrough : null,
+                      fontSize: 16,
+                      fontWeight: isDone ? FontWeight.w500 : FontWeight.w600,
+                    ),
+                  ),
+                  if (dueText.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: highlight 
+                            ? Colors.red.withOpacity(0.1) 
+                            : (isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        dueText,
+                        style: TextStyle(
+                          color: highlight ? Colors.red : (isDark ? const Color(0xFFCCCCCC) : const Color(0xFF666666)),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ]
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => notifier.remove(commitment.id),
+              style: IconButton.styleFrom(
+                backgroundColor: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
+                shape: const CircleBorder(),
+              ),
+              icon: const Icon(
+                Icons.close,
+                size: 16,
+                color: Color(0xFF888888),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -327,31 +406,37 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
       child: Column(
         children: [
-          Icon(
-            Icons.auto_awesome,
-            size: 40,
-            color: Theme.of(context).primaryColor,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No commitments yet',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black,
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.task_alt_rounded,
+              size: 64,
+              color: Theme.of(context).primaryColor.withOpacity(0.8),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 32),
           const Text(
-            'Say “I’ll send the file tomorrow” and Tanu will note it here.',
+            'All caught up!',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Say "Remind me to..." during your day and Tanu will automatically add it here.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 15,
+              height: 1.5,
               color: Color(0xFF888888),
             ),
           ),
@@ -378,19 +463,25 @@ class _ManualAddBar extends StatelessWidget {
   final VoidCallback onPickDue;
   final VoidCallback onSubmit;
 
-  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(
-            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-          ),
+        color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.4 : 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -402,25 +493,19 @@ class _ManualAddBar extends StatelessWidget {
                   controller: actionCtrl,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => onSubmit(),
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                   decoration: InputDecoration(
-                    hintText: 'New commitment...',
+                    hintText: 'Add a new commitment...',
+                    hintStyle: const TextStyle(fontWeight: FontWeight.w400),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 12,
+                      vertical: 14,
                     ),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                    fillColor: isDark ? const Color(0xFF222222) : Colors.white,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
-                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
@@ -433,13 +518,12 @@ class _ManualAddBar extends StatelessWidget {
                       ? const Color(0xFF888888)
                       : Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
-                  shape: const CircleBorder(),
-                  padding: const EdgeInsets.all(12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.all(16),
                 ),
-                icon: const Icon(
-                  Icons.arrow_upward,
-                  size: 20,
-                ),
+                icon: const Icon(Icons.arrow_upward_rounded, size: 24),
               ),
             ],
           ),
@@ -451,47 +535,37 @@ class _ManualAddBar extends StatelessWidget {
                   controller: personCtrl,
                   decoration: InputDecoration(
                     hintText: 'For who? (optional)',
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+                    prefixIcon: const Icon(Icons.person_outline, size: 20),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                    fillColor: isDark ? const Color(0xFF222222) : Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerTheme.color ?? Colors.transparent,
-                      ),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              ElevatedButton(
+              ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
-                  foregroundColor: isDark ? Colors.white : Colors.black,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
+                  backgroundColor: due != null 
+                      ? Theme.of(context).primaryColor.withOpacity(0.1)
+                      : (isDark ? const Color(0xFF222222) : Colors.white),
+                  foregroundColor: due != null 
+                      ? Theme.of(context).primaryColor
+                      : (isDark ? Colors.white : Colors.black),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 0,
                 ),
                 onPressed: onPickDue,
-                child: Text(
-                  due == null ? 'Pick date' : _shortDate(due!),
-                  style: const TextStyle(
-                    fontSize: 14,
-                  ),
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  due == null ? 'Date' : _shortDate(due!),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -502,20 +576,7 @@ class _ManualAddBar extends StatelessWidget {
   }
 
   String _shortDate(DateTime d) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return '${months[d.month - 1]} ${d.day}';
   }
 }

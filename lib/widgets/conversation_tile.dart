@@ -14,12 +14,20 @@ class ConversationTile extends StatefulWidget {
     super.key,
     required this.session,
     this.onDelete,
+    this.onPin,
     this.isNew = false,
+    this.isTrash = false,
+    this.onRestore,
+    this.onDeletePermanently,
   });
 
   final ConversationSession session;
   final VoidCallback? onDelete;
+  final VoidCallback? onPin;
   final bool isNew;
+  final bool isTrash;
+  final VoidCallback? onRestore;
+  final VoidCallback? onDeletePermanently;
 
   @override
   State<ConversationTile> createState() => _ConversationTileState();
@@ -55,21 +63,37 @@ class _ConversationTileState extends State<ConversationTile> {
         duration: const Duration(milliseconds: 200),
         width: double.maxFinite,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-          borderRadius: BorderRadius.circular(20),
+          color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            color: isDark ? const Color(0xFF2A2A2C).withOpacity(0.5) : const Color(0xFFE9ECEF).withOpacity(0.8),
             width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.03),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
-          child: widget.onDelete == null
+          child: (widget.onDelete == null && widget.onPin == null)
               ? _body(context)
               : Dismissible(
                   key: ValueKey('dismissible_${session.id}'),
-                  direction: DismissDirection.endToStart,
+                  direction: DismissDirection.horizontal,
                   background: Container(
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    color: Colors.orange,
+                    child: Icon(
+                      session.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+                      color: Colors.white,
+                    ),
+                  ),
+                  secondaryBackground: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
                     color: Colors.redAccent,
@@ -78,7 +102,20 @@ class _ConversationTileState extends State<ConversationTile> {
                       color: Colors.white,
                     ),
                   ),
-                  onDismissed: (_) => widget.onDelete!(),
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.startToEnd) {
+                      if (widget.onPin != null) {
+                        widget.onPin!();
+                      }
+                      return false; // Don't actually dismiss the widget
+                    }
+                    return true; // Let the delete dismiss it
+                  },
+                  onDismissed: (direction) {
+                    if (direction == DismissDirection.endToStart && widget.onDelete != null) {
+                      widget.onDelete!();
+                    }
+                  },
                   child: _body(context),
                 ),
         ),
@@ -105,7 +142,7 @@ class _ConversationTileState extends State<ConversationTile> {
         revealedAt.isAfter(DateTime.now().subtract(const Duration(minutes: 1)));
 
     return InkWell(
-      onTap: () {
+      onTap: widget.isTrash ? null : () {
         HapticFeedback.selectionClick();
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -120,19 +157,31 @@ class _ConversationTileState extends State<ConversationTile> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
-                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _getAvatarGradients(session.id),
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _getAvatarGradients(session.id).last.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Text(
-                title.isEmpty ? 'T' : title.characters.first.toUpperCase(),
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+                title.isEmpty ? 'M' : title.characters.first.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  shadows: [Shadow(color: Colors.black26, blurRadius: 2, offset: Offset(0, 1))],
                 ),
               ),
             ),
@@ -141,15 +190,25 @@ class _ConversationTileState extends State<ConversationTile> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title.isEmpty ? 'Untitled memory' : title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      if (session.isPinned) ...[
+                        Icon(Icons.push_pin, size: 14, color: Theme.of(context).primaryColor),
+                        const SizedBox(width: 4),
+                      ],
+                      Expanded(
+                        child: Text(
+                          title.isEmpty ? 'Untitled memory' : title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -208,14 +267,53 @@ class _ConversationTileState extends State<ConversationTile> {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: Color(0xFF888888),
-            ),
+            if (widget.isTrash) ...[
+              IconButton(
+                onPressed: widget.onRestore,
+                style: IconButton.styleFrom(backgroundColor: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF)),
+                icon: Icon(Icons.restore, size: 20, color: Theme.of(context).primaryColor),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: widget.onDeletePermanently,
+                style: IconButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.1)),
+                icon: const Icon(Icons.delete_forever, size: 20, color: Colors.red),
+              ),
+            ] else ...[
+              if (widget.onDelete != null)
+                IconButton(
+                  onPressed: widget.onDelete,
+                  icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFF888888)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  splashRadius: 20,
+                ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: Color(0xFF888888),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  List<Color> _getAvatarGradients(String id) {
+    // Deterministically pick a beautiful gradient based on the session ID
+    final palettes = [
+      [const Color(0xFFFF9A9E), const Color(0xFFFECFEF)],
+      [const Color(0xFFa18cd1), const Color(0xFFfbc2eb)],
+      [const Color(0xFF84fab0), const Color(0xFF8fd3f4)],
+      [const Color(0xFFfccb90), const Color(0xFFd57eeb)],
+      [const Color(0xFFe0c3fc), const Color(0xFF8ec5fc)],
+      [const Color(0xFF4facfe), const Color(0xFF00f2fe)],
+      [const Color(0xFF43e97b), const Color(0xFF38f9d7)],
+      [const Color(0xFFfa709a), const Color(0xFFfee140)],
+    ];
+    final hash = id.hashCode.abs();
+    return palettes[hash % palettes.length];
   }
 }
