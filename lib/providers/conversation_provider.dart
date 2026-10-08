@@ -762,7 +762,10 @@ class ConversationNotifier extends Notifier<ConversationState> {
         summary.startsWith('Failed to process memory');
   }
 
-  Future<void> _processMemoryAsync(ConversationSession session) async {
+  Future<void> _processMemoryAsync(
+    ConversationSession session, {
+    bool bypassCache = false,
+  }) async {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
@@ -775,7 +778,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     }
 
     final processor = ref.read(memoryProcessorProvider);
-    final result = await processor.process(text);
+    final result = await processor.process(text, bypassCache: bypassCache);
 
     if (_isFailedResult(result)) {
       state = state.copyWith(
@@ -877,7 +880,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (state.processingIds.contains(id)) return;
     final idx = state.conversations.indexWhere((c) => c.id == id);
     if (idx == -1) return;
-    await _processMemoryAsync(state.conversations[idx]);
+    // Explicit user retry: bypass the result cache so a previously failed
+    // (and cached) parse gets a genuinely fresh attempt.
+    await _processMemoryAsync(state.conversations[idx], bypassCache: true);
   }
 
   /// True when [id] sits in the persisted AI retry queue (last attempt

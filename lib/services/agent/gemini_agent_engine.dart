@@ -1,10 +1,57 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 import '../../abstractions/agent_engine.dart';
 import '../../constants.dart';
+import '../rag/rate_limiter.dart';
 import 'mistral_agent_engine.dart' show AgentException;
+
+/// Throttle + retry policy shared by every chat-path Gemini call
+/// (structuring, memory chat, RAG answers). The embeddings path already
+/// paces itself; this is the same discipline for the prompt path so one
+/// 429 can no longer start a retry death spiral.
+RateLimiter get chatRateLimiter => _chatLimiter;
+final RateLimiter _chatLimiter =
+    RateLimiter(Duration(milliseconds: kGeminiMinGapChatMs));
+
+/// True for failures worth retrying: rate limits, server errors, transport
+/// timeouts. Everything else (bad key, bad request, deterministic shape
+/// errors) fails fast — resending never helps those.
+bool isTransientGeminiFailure({int? statusCode, Object? error}) {
+  if (statusCode != null) {
+    return statusCode == 429 || statusCode >= 500;
+  }
+  return error is TimeoutException || error is http.ClientException;
+}
+
+/// Backoff before retry number [attempt] (0-based): the server's
+/// `retryDelay` hint wins when present, else 5 s then 15 s.
+Duration chatBackoffFor(int attempt, {Duration? serverHint}) {
+  if (serverHint != null) return serverHint;
+  return attempt <= 0 ? const Duration(seconds: 5) : const Duration(seconds: 15);
+}
+
+/// Token budget for a single prompt: head-biased cut that keeps the opening
+/// (topic) and the tail (where closers and commitments usually land),
+/// with an explicit marker so the model knows middle is missing.
+String capPromptTranscript(String text) {
+  if (text.length <= kGeminiPromptMaxChars) return text;
+  final head = text.substring(0, kGeminiPromptHeadChars);
+  final tail = text.substring(text.length - kGeminiPromptTailChars);
+  return '$head\n…[${text.length - kGeminiPromptMaxChars} chars omitted]…\n$tail';
+}
+
+/// 32-bit FNV-1a: dependency-free content hash for the result cache.
+int fnv1a32(String text) {
+  var hash = 0x811c9dc5;
+  for (var i = 0; i < text.length; i++) {
+    hash ^= text.codeUnitAt(i);
+    hash = (hash * 0x01000193) & 0xffffffff;
+  }
+  return hash;
+}
 
 /// Agent backed by Google's Gemini generateContent API.
 class GeminiAgentEngine implements AgentEngine {
@@ -66,26 +113,65 @@ class GeminiAgentEngine implements AgentEngine {
     });
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('$endpoint?key=$apiKey'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: body,
-          )
-          .timeout(const Duration(seconds: 45));
+      var attempt = 0;
+      while (true) {
+        http.Response response;
+        try {
+          response = await _chatLimiter.run(
+            () => http
+                .post(
+                  Uri.parse('$endpoint?key=$apiKey'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                  body: body,
+                )
+                .timeout(const Duration(seconds: 45)),
+          );
+        } on TimeoutException {
+          if (attempt >= kGeminiChatMaxRetries) {
+            throw AgentException('Gemini timed out');
+          }
+          await Future.delayed(chatBackoffFor(attempt));
+          attempt++;
+          continue;
+        } catch (e) {
+          if (e is http.ClientException && attempt < kGeminiChatMaxRetries) {
+            await Future.delayed(chatBackoffFor(attempt));
+            attempt++;
+            continue;
+          }
+          throw AgentException('Network error calling Gemini: $e');
+        }
 
-      if (response.statusCode != 200) {
-        throw AgentException(
-          'Gemini returned ${response.statusCode}: ${response.body}',
-          statusCode: response.statusCode,
-        );
+        if (isTransientGeminiFailure(statusCode: response.statusCode)) {
+          if (attempt >= kGeminiChatMaxRetries) {
+            throw AgentException(
+              'Gemini returned ${response.statusCode}: ${response.body}',
+              statusCode: response.statusCode,
+            );
+          }
+          await Future.delayed(
+            chatBackoffFor(
+              attempt,
+              serverHint: retryDelayFromBody(response.body),
+            ),
+          );
+          attempt++;
+          continue;
+        }
+
+        if (response.statusCode != 200) {
+          throw AgentException(
+            'Gemini returned ${response.statusCode}: ${response.body}',
+            statusCode: response.statusCode,
+          );
+        }
+
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        return extractGeminiAnswerText(decoded);
       }
-
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      return extractGeminiAnswerText(decoded);
     } on AgentException {
       rethrow;
     } catch (e) {
@@ -159,10 +245,28 @@ class GeminiMemoryProcessor {
 
   final GeminiAgentEngine _engine;
 
-  Future<MemoryResult> process(String conversation) async {
+  /// Structuring results keyed by content hash: queue re-runs and duplicate
+  /// processing return instantly with zero API calls. Memory-only, bounded,
+  /// TTL'd — never persisted (summaries live on their sessions instead).
+  final Map<int, ({MemoryResult result, DateTime at})> _resultCache = {};
+
+  Future<MemoryResult> process(
+    String conversation, {
+    bool bypassCache = false,
+  }) async {
+    final capped = capPromptTranscript(conversation);
+    final key = fnv1a32(capped);
+    if (!bypassCache) {
+      final hit = _resultCache[key];
+      if (hit != null &&
+          DateTime.now().difference(hit.at).inMinutes <
+              kGeminiResultCacheTtlMinutes) {
+        return hit.result;
+      }
+    }
     try {
       final raw = await _engine.prompt(
-        conversation,
+        capped,
         history: [
           const ChatMessage(
             role: 'system',
@@ -182,13 +286,22 @@ No commentary, no markdown fences.
           ),
         ],
       );
-      return _parse(raw);
+      final result = _parse(raw);
+      _storeResult(key, result);
+      return result;
     } catch (e) {
       return MemoryResult(
         title: 'Memory',
         summary: 'Failed to process memory: $e',
         commitments: const [],
       );
+    }
+  }
+
+  void _storeResult(int key, MemoryResult result) {
+    _resultCache[key] = (result: result, at: DateTime.now());
+    while (_resultCache.length > kGeminiResultCacheSize) {
+      _resultCache.remove(_resultCache.keys.first);
     }
   }
 
