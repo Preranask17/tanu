@@ -6,6 +6,7 @@ import '../providers/ble_provider.dart';
 import '../providers/commitment_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/dev_capture_provider.dart';
+import '../providers/proactive_provider.dart';
 import '../providers/settings_provider.dart';
 import '../config/stt_config.dart';
 import '../constants.dart';
@@ -947,6 +948,37 @@ class _DeveloperConsole extends ConsumerWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.notifications_outlined, size: 16),
+            label: const Text('SEND TEST NOTIFICATION'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF353535),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            onPressed: () async {
+              final ok = await ref
+                  .read(proactiveServiceProvider.future)
+                  .then((svc) => svc.showTestNotification())
+                  .catchError((_) => false);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Test notification sent — check the shade'
+                          : 'Test notification failed — check permission',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
     );
