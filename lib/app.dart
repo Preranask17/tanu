@@ -12,8 +12,8 @@ import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/onboarding_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/welcome/welcome_flow.dart';
 import 'theme.dart';
 
 import 'widgets/responsive_scaffold.dart';
@@ -180,7 +180,9 @@ class _TanuAppState extends ConsumerState<TanuApp> {
       debugShowCheckedModeBanner: false,
       theme: TanuTheme.getTheme(brightness),
       home: !settings.hasCompletedOnboarding
-          ? const OnboardingScreen()
+          // First launch only: the pendant story. Completing it flips
+          // hasCompletedOnboarding, so this never shows again.
+          ? const WelcomeFlow()
           : ResponsiveScaffold(
               currentIndex: index,
               onTabTapped: (i) {
