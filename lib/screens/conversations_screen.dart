@@ -9,7 +9,7 @@ import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/rag_provider.dart';
 import '../widgets/conversation_tile.dart';
-import '../widgets/page_header.dart';
+import '../widgets/pinned_header.dart';
 import 'chat_screen.dart';
 import 'trash_screen.dart';
 
@@ -149,7 +149,8 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
 
     // Group by calendar day, newest first. Pinned items get their own group at the top.
     final pinned = visible.where((s) => s.isPinned).toList();
-    final unpinned = visible.where((s) => !s.isPinned).toList();
+    final unpinned =
+        visible.where((s) => !s.isPinned).toList().reversed.toList();
 
     final groups = <String, List<ConversationSession>>{};
     final order = <String>[];
@@ -181,31 +182,31 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            SliverToBoxAdapter(
-              child: PageHeader(
-                title: 'Memories',
-                actions: [
-                  _HeaderCircleButton(
-                    icon: Icons.delete_outline,
-                    tooltip: 'Trash',
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const TrashScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+            PinnedHeader(
+              title: 'Memories',
+              actions: [
+                _HeaderCircleButton(
+                  icon: Icons.delete_outline,
+                  tooltip: 'Trash',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TrashScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                 child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.07)
@@ -238,8 +239,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                               fontSize: 15,
                             ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12,
+                            ),
                           ),
                           style: TextStyle(
                             color: isDark ? Colors.white : Colors.black,

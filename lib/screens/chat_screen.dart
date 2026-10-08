@@ -260,7 +260,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
             Expanded(
               child: ListView(
                 controller: _scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 children: [
                   if (session.summary != null &&
                       session.summary!.isNotEmpty) ...[
@@ -396,64 +396,87 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              margin: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                12 + MediaQuery.paddingOf(context).bottom,
+              ),
+              padding: const EdgeInsets.only(left: 20, right: 6, top: 6, bottom: 6),
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                border: Border(
-                  top: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF2A2A2A)
-                        : const Color(0xFFE5E5E5),
-                  ),
+                color: isDark
+                    ? const Color(0xFF1C1C1E)
+                    : const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFE5E5E5),
+                  width: 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context)
+                        .primaryColor
+                        .withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    spreadRadius: 1,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _chatCtrl,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         hintText: 'Ask about this memory...',
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                        hintStyle: TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 15,
                         ),
-                        filled: true,
-                        fillColor: isDark
-                            ? const Color(0xFF1C1C1E)
-                            : const Color(0xFFF2F2F7),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(
-                            color:
-                                Theme.of(context).dividerTheme.color ??
-                                Colors.transparent,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(
-                            color:
-                                Theme.of(context).dividerTheme.color ??
-                                Colors.transparent,
-                          ),
-                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 15,
                       ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _isGenerating ? null : _send,
-                    style: IconButton.styleFrom(
-                      backgroundColor: _isGenerating
-                          ? const Color(0xFF888888)
-                          : Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(12),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _isGenerating ? null : _send,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isGenerating
+                            ? const Color(0xFF888888)
+                            : Theme.of(context).primaryColor,
+                      ),
+                      child: _isGenerating
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.arrow_upward,
+                              size: 20,
+                              color: Colors.white,
+                            ),
                     ),
-                    icon: const Icon(Icons.arrow_upward, size: 20),
                   ),
                 ],
               ),
