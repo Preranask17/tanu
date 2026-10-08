@@ -331,27 +331,39 @@ Future<void> _indicWorker(List<dynamic> args) async {
             // Guard 1: ignore very short blips (door slams, mic taps).
             if (segment.samples.length < sampleRate * 0.4) continue;
 
-            final seg = Float32List.fromList(segment.samples);
+            // Long segments decode synchronously and would stall live
+            // partials for seconds, so split anything over ~10 s into
+            // back-to-back decode windows. Same guards apply per window;
+            // the provider still groups the pieces into one memory.
+            final all = segment.samples;
+            var offset = 0;
+            while (offset < all.length) {
+              final end = (offset + sampleRate * 10 < all.length)
+                  ? offset + sampleRate * 10
+                  : all.length;
+              final seg = Float32List.fromList(all.sublist(offset, end));
+              offset = end;
 
-            // Guard 2: ignore near-silent segments that slipped past VAD.
-            var sum = 0.0;
-            for (final v in seg) {
-              sum += v * v;
+              // Guard 2: ignore near-silent pieces that slipped past VAD.
+              var sum = 0.0;
+              for (final v in seg) {
+                sum += v * v;
+              }
+              if (seg.isEmpty || sum / seg.length < 0.0002) continue;
+
+              final stream = recognizer.createStream();
+              stream.acceptWaveform(samples: seg, sampleRate: sampleRate);
+              recognizer.decode(stream);
+
+              final result = recognizer.getResult(stream);
+              final text = result.text.trim();
+              stream.free();
+
+              // Guard 3: drop hallucinated filler phrases.
+              if (text.isEmpty || _isJunk(text)) continue;
+              replyPort.send(['partial', text]);
+              replyPort.send(['final', text]);
             }
-            if (seg.isEmpty || sum / seg.length < 0.0002) continue;
-
-            final stream = recognizer.createStream();
-            stream.acceptWaveform(samples: seg, sampleRate: sampleRate);
-            recognizer.decode(stream);
-
-            final result = recognizer.getResult(stream);
-            final text = result.text.trim();
-            stream.free();
-
-            // Guard 3: drop hallucinated filler phrases.
-            if (text.isEmpty || _isJunk(text)) continue;
-            replyPort.send(['partial', text]);
-            replyPort.send(['final', text]);
           }
         }
       }

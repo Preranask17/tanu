@@ -101,6 +101,11 @@ class ConversationNotifier extends Notifier<ConversationState> {
       // One-time demo memories so RAG is usable on a fresh install.
       unawaited(seedDemoMemories());
     });
+    ref.onDispose(() {
+      _persistTimer?.cancel();
+      _persistTimer = null;
+      _writePersist();
+    });
     return ConversationState(
       active: loaded.active,
       conversations: loaded.completed,
@@ -280,7 +285,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
       _clock = Stopwatch()..start();
     }
-    _persist();
+    _persist(urgent: true);
   }
 
   Future<void> _stopContinuous() async {
@@ -323,7 +328,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         micLevel: 0,
       );
     }
-    _persist();
+    _persist(urgent: true);
   }
 
   void _bumpReceiving() {
@@ -676,13 +681,21 @@ class ConversationNotifier extends Notifier<ConversationState> {
     final text = session.transcriptText;
     if (text.isEmpty) return;
 
-    // Drain any previously failed sessions first (best effort).
-    unawaited(_drainRetryQueue());
+    // The just-finished memory jumps the queue: stale retries drain AFTER it
+    // so the newest summary never waits behind yesterday's failures.
+    if (!state.processingIds.contains(session.id)) {
+      state = state.copyWith(
+        processingIds: {...state.processingIds, session.id},
+      );
+    }
 
     final processor = ref.read(memoryProcessorProvider);
     final result = await processor.process(text);
 
     if (result.error != null) {
+      state = state.copyWith(
+        processingIds: state.processingIds.difference({session.id}),
+      );
       _enqueueForRetry(session.id);
       ref.read(analyticsProvider).capture(
         'memory retry queued',
@@ -704,8 +717,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
             ? null
             : result.cleanedTranscript,
       );
-      state = state.copyWith(conversations: conversations);
+      state = state.copyWith(
+        conversations: conversations,
+        processingIds: state.processingIds.difference({session.id}),
+      );
       _persist();
+    } else {
+      state = state.copyWith(
+        processingIds: state.processingIds.difference({session.id}),
+      );
     }
 
     // Push any extracted commitments to the commitments provider
@@ -759,6 +779,29 @@ class ConversationNotifier extends Notifier<ConversationState> {
             'has_summary': result.summary.isNotEmpty,
           },
         );
+
+    // Stale retries drain after the fresh memory, never ahead of it.
+    unawaited(_drainRetryQueue());
+  }
+
+  /// Single-shot retry for one memory (tap-to-retry in the UI). No-op while
+  /// it is already processing or gone. Shares [_processMemoryAsync], so the
+  /// flag lifecycle, summary update and trailing drain all behave the same.
+  Future<void> retrySession(String id) async {
+    if (state.processingIds.contains(id)) return;
+    final idx = state.conversations.indexWhere((c) => c.id == id);
+    if (idx == -1) return;
+    await _processMemoryAsync(state.conversations[idx]);
+  }
+
+  /// True when [id] sits in the persisted AI retry queue (last attempt
+  /// failed or never ran). Synchronous Hive read, safe to call in build.
+  bool isQueuedForRetry(String id) {
+    try {
+      return _retryQueue().contains(id);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _indexSession(ConversationSession session) async {
@@ -785,6 +828,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (!queue.contains(sessionId)) {
       queue.add(sessionId);
       box.put('memoryRetryQueue', queue);
+      // New state instance (no == override) so listeners rebuild into the
+      // failed/queued UI even though no session data changed.
+      state = state.copyWith();
     }
   }
 
@@ -929,7 +975,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     ];
 
     state = state.copyWith(conversations: [...demos, ...state.conversations]);
-    _persist();
+    _persist(urgent: true);
 
     try {
       final indexer = await ref.read(memoryIndexerProvider.future);
@@ -943,13 +989,46 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
   /// --- Persistence -------------------------------------------------------
 
-  void _persist() {
-    final box = Hive.box(Boxes.conversation);
-    box.put('sessions', state.conversations.map((c) => c.toJson()).toList());
-    if (state.active != null) {
-      box.put('activeSession', state.active!.toJson());
-    } else {
-      box.delete('activeSession');
+  Timer? _persistTimer;
+  bool _persistDirty = false;
+
+  /// Coalesced Hive write. Audio chunks are forwarded on this same isolate,
+  /// so a full-history JSON re-encode on every update would stall live
+  /// partials. Routine updates wait up to 2 s and merge; closes, deletes,
+  /// pins and seeds pass [urgent] to hit disk now.
+  void _persist({bool urgent = false}) {
+    if (urgent) {
+      _persistTimer?.cancel();
+      _persistTimer = null;
+      _persistDirty = false;
+      _writePersist();
+      return;
+    }
+    if (_persistTimer != null) {
+      _persistDirty = true;
+      return;
+    }
+    _writePersist();
+    _persistTimer = Timer(const Duration(seconds: 2), () {
+      _persistTimer = null;
+      if (_persistDirty) {
+        _persistDirty = false;
+        _writePersist();
+      }
+    });
+  }
+
+  void _writePersist() {
+    try {
+      final box = Hive.box(Boxes.conversation);
+      box.put('sessions', state.conversations.map((c) => c.toJson()).toList());
+      if (state.active != null) {
+        box.put('activeSession', state.active!.toJson());
+      } else {
+        box.delete('activeSession');
+      }
+    } catch (e) {
+      debugPrint('[tanu] persist failed: $e');
     }
   }
 
@@ -1070,7 +1149,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     // Soft delete
     conversations[idx] = conversations[idx].copyWith(isDeleted: true);
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void togglePin(String id) {
@@ -1081,7 +1160,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       isPinned: !conversations[idx].isPinned,
     );
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void restoreSession(String id) {
@@ -1090,7 +1169,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (idx < 0) return;
     conversations[idx] = conversations[idx].copyWith(isDeleted: false);
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void deleteSessionPermanently(String id) {
@@ -1099,7 +1178,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (idx < 0) return;
     conversations.removeAt(idx);
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void emptyTrash() {
@@ -1107,7 +1186,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       state.conversations,
     ).where((c) => !c.isDeleted).toList();
     state = state.copyWith(conversations: conversations);
-    _persist();
+    _persist(urgent: true);
   }
 
   void clear() {

@@ -30,7 +30,11 @@ class SttConfig {
   static const double vadMinSpeech = 0.25;
 
   /// Maximum segment length (seconds); also the VAD ring-buffer size.
-  static const double vadMaxSpeech = 25.0;
+  /// Kept short on purpose: the worker decodes each segment synchronously,
+  /// so a 25 s monologue would stall live partials for seconds. Twelve
+  /// seconds bounds every decode while the UI still groups segments into
+  /// one memory.
+  static const double vadMaxSpeech = 12.0;
 
   /// Silero window size in samples (32 ms @ 16 kHz).
   static const int vadWindowSize = 512;

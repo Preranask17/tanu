@@ -19,6 +19,9 @@ class ConversationTile extends StatefulWidget {
     this.isTrash = false,
     this.onRestore,
     this.onDeletePermanently,
+    this.isProcessing = false,
+    this.isFailed = false,
+    this.onRetry,
   });
 
   final ConversationSession session;
@@ -28,6 +31,15 @@ class ConversationTile extends StatefulWidget {
   final bool isTrash;
   final VoidCallback? onRestore;
   final VoidCallback? onDeletePermanently;
+
+  /// AI title/summary still generating: shows the shimmer row.
+  final bool isProcessing;
+
+  /// Last AI attempt failed or never ran: shows tap-to-retry.
+  final bool isFailed;
+
+  /// Single-shot AI retry for [isFailed]. Ignored while processing.
+  final VoidCallback? onRetry;
 
   @override
   State<ConversationTile> createState() => _ConversationTileState();
@@ -221,6 +233,55 @@ class _ConversationTileState extends State<ConversationTile> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  if (widget.isProcessing)
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Writing summary…',
+                          style: TextStyle(
+                            color: Color(0xFF888888),
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (widget.isFailed && widget.onRetry != null)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        widget.onRetry!();
+                      },
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.refresh_rounded,
+                            size: 14,
+                            color: Color(0xFF888888),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'AI summary paused — tap to retry',
+                            style: TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (widget.isProcessing ||
+                      (widget.isFailed && widget.onRetry != null))
+                    const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(

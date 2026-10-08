@@ -71,7 +71,10 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sessions = ref.watch(conversationProvider).conversations;
+    final convState = ref.watch(conversationProvider);
+    final sessions = convState.conversations;
+    final processingIds = convState.processingIds;
+    final notifier = ref.read(conversationProvider.notifier);
     final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 16;
     final query = _query.text.trim().toLowerCase();
 
@@ -267,6 +270,14 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: ConversationTile(
                                   session: session,
+                                  isProcessing:
+                                      processingIds.contains(session.id),
+                                  isFailed: !processingIds.contains(
+                                    session.id,
+                                  ) &&
+                                      notifier.isQueuedForRetry(session.id),
+                                  onRetry: () =>
+                                      notifier.retrySession(session.id),
                                   isNew:
                                       session.status ==
                                           ConversationStatus.completed &&
