@@ -11,22 +11,26 @@ class AppSettings {
     this.deviceName = kPendantName,
     this.themeMode = ThemeMode.system,
     this.hasCompletedOnboarding = true,
+    this.geminiApiKey = '',
   });
 
   final String deviceName;
   final ThemeMode themeMode;
   final bool hasCompletedOnboarding;
+  final String geminiApiKey;
 
   AppSettings copyWith({
     String? deviceName,
     ThemeMode? themeMode,
     bool? hasCompletedOnboarding,
+    String? geminiApiKey,
   }) {
     return AppSettings(
       deviceName: deviceName ?? this.deviceName,
       themeMode: themeMode ?? this.themeMode,
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
+      geminiApiKey: geminiApiKey ?? this.geminiApiKey,
     );
   }
 
@@ -34,6 +38,7 @@ class AppSettings {
     'deviceName': deviceName,
     'themeMode': themeMode.name,
     'hasCompletedOnboarding': hasCompletedOnboarding,
+    'geminiApiKey': geminiApiKey,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -41,6 +46,7 @@ class AppSettings {
     themeMode:
         ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
     hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,
+    geminiApiKey: json['geminiApiKey'] as String? ?? '',
   );
 }
 
@@ -78,6 +84,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
 
   void completeOnboarding() {
     state = state.copyWith(hasCompletedOnboarding: true);
+    _save();
+  }
+
+  void setGeminiApiKey(String key) {
+    state = state.copyWith(geminiApiKey: key.trim());
     _save();
   }
 

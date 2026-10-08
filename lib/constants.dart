@@ -99,7 +99,7 @@ const String kPostHogHost = String.fromEnvironment(
 
 /// ---- Gemini (agent brain) -------------------------------------------------
 /// Cloud agent used for memory processing and in-memory chat.
-const String kGeminiApiKey = 'AIzaSyCJhOvW1GqEiYVhREytzohUJCBSwMv7FT4';
+const String kGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
 const String kGeminiModel = 'gemini-3.5-flash';
 const String kGeminiEndpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/$kGeminiModel:generateContent';
