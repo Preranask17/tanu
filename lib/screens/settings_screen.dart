@@ -34,6 +34,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
+          // Consistent page header (logo top-left, heading below).
+          // Sections below are untouched and fully functional.
           const SliverToBoxAdapter(
             child: PageHeader(title: 'Settings'),
           ),
@@ -113,6 +115,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 16),
                     _DeveloperConsole(capture: capture, stats: stats),
                   ],
+
+                  // Bottom cushion: clears the floating nav dock (64 tall,
+                  // offset safeArea + 16) on every screen size, so the last
+                  // card scrolls fully into view and stays tappable.
                   SizedBox(
                     height: MediaQuery.paddingOf(context).bottom + 112,
                   ),

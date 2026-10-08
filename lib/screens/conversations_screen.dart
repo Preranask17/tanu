@@ -209,8 +209,125 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         ),
                       ),
                     ],
+            // Consistent page header (logo top-left, heading below) plus
+            // an always-visible glass search. UI only: filters the
+            // already-loaded sessions locally, no backend changes.
+            const SliverToBoxAdapter(
+              child: PageHeader(title: 'Memories'),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                // Stadium-pill ask/search bar: search left, query middle,
+                // clear + mic right. UI only: the mic reuses the existing
+                // phone-mic test handler, nothing new is wired.
+                child: Container(
+                  height: 50,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : const Color(0xFFF2F2F7),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : const Color(0xFFE5E5E5),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.search,
+                        size: 20,
+                        color:
+                            Colors.white.withValues(alpha: 0.6),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _query,
+                          decoration: InputDecoration(
+                            hintText: 'Ask or search memories...',
+                            hintStyle: TextStyle(
+                              color: Colors.white
+                                  .withValues(alpha: 0.4),
+                              fontSize: 15,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          style: TextStyle(
+                            color:
+                                isDark ? Colors.white : Colors.black,
+                            fontSize: 15,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      if (query.isNotEmpty)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            _query.clear();
+                            setState(() {});
+                          },
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.clear,
+                              size: 18,
+                              color: Colors.white
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => ref
+                            .read(conversationProvider.notifier)
+                            .microphoneTest(),
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.only(left: 8),
+                          child: Icon(
+                            Icons.mic_none,
+                            size: 20,
+                            color:
+                                Colors.white.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+            ),
+            // AI reply card: fades in below the pill while a query matches.
+            // Built from the real filtered matches — no backend query layer.
+            SliverToBoxAdapter(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                transitionBuilder: (child, animation) =>
+                    SizeTransition(
+                  sizeFactor: animation,
+                  alignment: Alignment.topCenter,
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: child,
+                  ),
+                ),
+                child: query.isNotEmpty && visible.isNotEmpty
+                    ? _AiReplyCard(
+                        key: const ValueKey('reply'),
+                        session: visible.first,
+                        matchCount: visible.length,
+                      )
+                    : const SizedBox.shrink(key: ValueKey('empty')),
               ),
             ),
             if (sessions.isEmpty)
@@ -284,6 +401,18 @@ class _HeaderCircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
+/// AI reply card under the search pill. Display only: summarizes the real
+/// filtered matches (top hit + count) with key details in bold. Hidden
+/// whenever the query is cleared or matches nothing.
+class _AiReplyCard extends StatelessWidget {
+  const _AiReplyCard({
+    super.key,
+    required this.session,
+    required this.matchCount,
+  });
+
+  final ConversationSession session;
+  final int matchCount;
 
   @override
   Widget build(BuildContext context) {
@@ -307,6 +436,77 @@ class _HeaderCircleButton extends StatelessWidget {
     );
     if (tooltip == null) return button;
     return Tooltip(message: tooltip!, child: button);
+    final summary = session.summary?.isNotEmpty == true
+        ? session.summary!
+        : (session.segments.isNotEmpty
+              ? session.segments.last.text.trim()
+              : session.title);
+    final title = session.title.trim().isNotEmpty
+        ? session.title.trim()
+        : 'Untitled memory';
+    return Container(
+      margin: const EdgeInsets.only(top: 12, bottom: 16, left: 20, right: 20),
+      padding: const EdgeInsets.all(18),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFE5E5E5),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 14,
+                color: Theme.of(context).primaryColor,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                matchCount == 1
+                    ? '1 memory found'
+                    : '$matchCount memories found',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF888888),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.4,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+              children: [
+                TextSpan(
+                  text: '“$summary”',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const TextSpan(text: ' — saved in '),
+                TextSpan(
+                  text: '“$title”.',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
