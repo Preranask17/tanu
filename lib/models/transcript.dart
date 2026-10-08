@@ -15,6 +15,7 @@ class TranscriptSegment {
     this.startMs = 0,
     this.endMs,
     this.isUser = true,
+    this.speaker,
   });
 
   final String id;
@@ -28,6 +29,11 @@ class TranscriptSegment {
   /// Always true today — the pendant is a single-user mic.
   final bool isUser;
 
+  /// Acoustic speaker label assigned by post-session diarization
+  /// (`'You'`, `'Other 1'`, …). Null until (or when) diarization runs —
+  /// never invent one from text alone.
+  final String? speaker;
+
   TranscriptSegment copyWith({
     String? id,
     String? text,
@@ -35,6 +41,8 @@ class TranscriptSegment {
     int? startMs,
     int? endMs,
     bool? isUser,
+    String? speaker,
+    bool clearSpeaker = false,
   }) {
     return TranscriptSegment(
       id: id ?? this.id,
@@ -43,6 +51,7 @@ class TranscriptSegment {
       startMs: startMs ?? this.startMs,
       endMs: endMs ?? this.endMs,
       isUser: isUser ?? this.isUser,
+      speaker: clearSpeaker ? null : (speaker ?? this.speaker),
     );
   }
 
@@ -53,6 +62,7 @@ class TranscriptSegment {
     'startMs': startMs,
     'endMs': endMs,
     'isUser': isUser,
+    if (speaker != null) 'speaker': speaker,
   };
 
   factory TranscriptSegment.fromJson(Map<String, dynamic> json) {
@@ -65,6 +75,63 @@ class TranscriptSegment {
       startMs: json['startMs'] as int? ?? 0,
       endMs: json['endMs'] as int?,
       isUser: json['isUser'] as bool? ?? true,
+      speaker: json['speaker'] as String?,
+    );
+  }
+}
+
+/// One speaker-attributed turn of a processed memory: the structured,
+/// reviewable unit the RAG layer indexes and the UI renders.
+///
+/// Turns are produced post-session — either by acoustic diarization aligned
+/// to STT segments, by the memory processor's structured output, or both —
+/// so unlike raw [TranscriptSegment]s they always carry a speaker label and
+/// a time span.
+@immutable
+class TranscriptTurn {
+  const TranscriptTurn({
+    required this.speaker,
+    required this.text,
+    this.startMs = 0,
+    this.endMs,
+  });
+
+  /// `'You'` for the wearer, `'Other 1'…` for everyone else. Session-local:
+  /// `Other 1` in one memory is not the same person as `Other 1` in another.
+  final String speaker;
+  final String text;
+
+  /// Milliseconds since the session started.
+  final int startMs;
+  final int? endMs;
+
+  TranscriptTurn copyWith({
+    String? speaker,
+    String? text,
+    int? startMs,
+    int? endMs,
+  }) {
+    return TranscriptTurn(
+      speaker: speaker ?? this.speaker,
+      text: text ?? this.text,
+      startMs: startMs ?? this.startMs,
+      endMs: endMs ?? this.endMs,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'speaker': speaker,
+    'text': text,
+    'startMs': startMs,
+    'endMs': endMs,
+  };
+
+  factory TranscriptTurn.fromJson(Map<String, dynamic> json) {
+    return TranscriptTurn(
+      speaker: json['speaker'] as String? ?? 'Other 1',
+      text: json['text'] as String? ?? '',
+      startMs: json['startMs'] as int? ?? 0,
+      endMs: json['endMs'] as int?,
     );
   }
 }
@@ -83,6 +150,7 @@ class ConversationSession {
     this.segments = const [],
     this.summary,
     this.cleanedTranscript,
+    this.turns = const [],
     this.isDeleted = false,
     this.isPinned = false,
   });
@@ -95,6 +163,11 @@ class ConversationSession {
   final List<TranscriptSegment> segments;
   final String? summary;
   final String? cleanedTranscript;
+
+  /// Structured speaker turns, filled in by post-session processing. Empty
+  /// for sessions captured before the structured pipeline existed (they fall
+  /// back to [segments] / [cleanedTranscript] everywhere).
+  final List<TranscriptTurn> turns;
   final bool isDeleted;
   final bool isPinned;
 
@@ -109,6 +182,7 @@ class ConversationSession {
     List<TranscriptSegment>? segments,
     String? summary,
     String? cleanedTranscript,
+    List<TranscriptTurn>? turns,
     bool? isDeleted,
     bool? isPinned,
   }) {
@@ -121,6 +195,7 @@ class ConversationSession {
       segments: segments ?? this.segments,
       summary: summary ?? this.summary,
       cleanedTranscript: cleanedTranscript ?? this.cleanedTranscript,
+      turns: turns ?? this.turns,
       isDeleted: isDeleted ?? this.isDeleted,
       isPinned: isPinned ?? this.isPinned,
     );
@@ -134,6 +209,7 @@ class ConversationSession {
     'segments': segments.map((s) => s.toJson()).toList(),
     'summary': summary,
     'cleanedTranscript': cleanedTranscript,
+    if (turns.isNotEmpty) 'turns': turns.map((t) => t.toJson()).toList(),
     'isDeleted': isDeleted,
     'isPinned': isPinned,
   };
@@ -146,6 +222,10 @@ class ConversationSession {
         .whereType<Map>()
         .map((s) => TranscriptSegment.fromJson(Map<String, dynamic>.from(s)))
         .toList();
+    final turns = (json['turns'] as List? ?? [])
+        .whereType<Map>()
+        .map((t) => TranscriptTurn.fromJson(Map<String, dynamic>.from(t)))
+        .toList();
     return ConversationSession(
       id: json['id'] as String,
       title: json['title'] as String? ?? '',
@@ -157,6 +237,7 @@ class ConversationSession {
       segments: segments,
       summary: json['summary'] as String?,
       cleanedTranscript: json['cleanedTranscript'] as String?,
+      turns: turns,
       isDeleted: json['isDeleted'] as bool? ?? false,
       isPinned: json['isPinned'] as bool? ?? false,
     );

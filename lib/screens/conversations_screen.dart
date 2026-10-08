@@ -82,6 +82,13 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       if (s.summary != null && s.summary!.toLowerCase().contains(query)) {
         return true;
       }
+      if (s.turns.any(
+        (t) =>
+            t.text.toLowerCase().contains(query) ||
+            t.speaker.toLowerCase().contains(query),
+      )) {
+        return true;
+      }
       return s.segments.any((seg) => seg.text.toLowerCase().contains(query));
     }).toList();
 

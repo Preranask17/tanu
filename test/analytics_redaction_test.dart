@@ -37,6 +37,9 @@ void main() {
         event: 'memory processed',
         properties: {
           'commitment_count': 2,
+          'turn_count': 5,
+          'speaker_count': 2,
+          'diarized': true,
           'transcript': 'remember to call the dentist',
           'rawText': 'remember to call the dentist',
           'title': 'Dentist',
@@ -47,8 +50,38 @@ void main() {
       final result = AnalyticsService.beforeSend(event);
 
       expect(result, isNotNull);
-      // Only the aggregate survives.
-      expect(result!.properties, {'commitment_count': 2});
+      // Only the aggregates survive.
+      expect(result!.properties, {
+        'commitment_count': 2,
+        'turn_count': 5,
+        'speaker_count': 2,
+        'diarized': true,
+      });
+    });
+
+    test('strips speaker names and turn text from memory events', () {
+      // The structured pipeline knows WHO said WHAT — that knowledge must
+      // never become a property value. Labels, names and quoted turns are
+      // user content even when they look like enums.
+      final event = PostHogEvent(
+        event: 'memory processed',
+        properties: {
+          'commitment_count': 1,
+          'turn_count': 3,
+          'speaker': 'Ramesh',
+          'speakers': ['You', 'Other 1'],
+          'who_said': 'You said the password is hunter2',
+          'turn_text': 'let us meet at noon',
+        },
+      );
+
+      final result = AnalyticsService.beforeSend(event);
+
+      expect(result, isNotNull);
+      expect(result!.properties, {
+        'commitment_count': 1,
+        'turn_count': 3,
+      });
     });
 
     test('strips device identifier keys', () {
@@ -149,6 +182,9 @@ void main() {
         'duration_s',
         'commitment_count',
         'has_summary',
+        'turn_count',
+        'speaker_count',
+        'diarized',
         'bytes',
         'reason',
         'setting',
@@ -196,6 +232,8 @@ void main() {
         'stt model deleted',
         'setting changed',
         'commitment added',
+        'speaker model downloaded',
+        'speaker model failed',
       ];
 
       for (final name in emitted) {

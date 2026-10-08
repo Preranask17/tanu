@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -18,8 +19,11 @@ import 'ble_provider.dart';
 import 'commitment_provider.dart';
 import 'rag_provider.dart';
 import 'proactive_provider.dart';
+import 'settings_provider.dart';
+import 'speaker_provider.dart';
 
 import '../services/stt/whisper_small_engine.dart';
+import '../services/stt/session_audio_buffer.dart';
 
 final sttEngineProvider = Provider<ContinuousSttEngine>((ref) {
   final engine = WhisperSmallEngine();
@@ -61,6 +65,12 @@ class ConversationNotifier extends Notifier<ConversationState> {
   DateTime? _lastShortPressAt;
   Stopwatch _clock = Stopwatch();
 
+  /// Per-session WAV tap feeding post-session diarization. Opened when a
+  /// session starts capturing, finalized when it closes; null when storage
+  /// is unavailable or the session came from the mic test / legacy import.
+  SessionAudioBuffer? _audioBuffer;
+  String? _audioBufferSessionId;
+
   @override
   ConversationState build() {
     final loaded = _loadState();
@@ -76,6 +86,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
       unawaited(_drainRetryQueue());
       // One-time demo memories so RAG is usable on a fresh install.
       unawaited(seedDemoMemories());
+      // Drop orphaned session WAVs (crash between close and processing).
+      unawaited(SessionAudioBuffer.purgeStale());
     });
     return ConversationState(
       active: loaded.active,
@@ -154,7 +166,14 @@ class ConversationNotifier extends Notifier<ConversationState> {
       // The "phone just received bytes from the pendant" cue: any PCM chunk
       // lights the receiving flag for a short window.
       _receivingSub?.cancel();
-      _receivingSub = source.pcmAudio.listen((_) => _bumpReceiving());
+      // The session WAV tap rides this same subscription (no extra listener
+      // on the pendant stream): every captured chunk lands in the buffer for
+      // post-session diarization.
+      unawaited(_ensureAudioBuffer(state.active?.id));
+      _receivingSub = source.pcmAudio.listen((pcm) {
+        _bumpReceiving();
+        _audioBuffer?.add(pcm);
+      });
       ref
           .read(analyticsProvider)
           .capture(
@@ -215,7 +234,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
   Future<void> stopListening([String reason = 'manual']) async {
     // Pause first so [forceEndSession] does not open a replacement session.
     await pauseListening();
-    forceEndSession(reason);
+    await forceEndSession(reason);
   }
 
   /// Closes the current memory into the conversations list. Recording keeps
@@ -223,7 +242,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
   ///
   /// [reason] is only used to label the `session ended` analytics event; it
   /// defaults to `manual` so existing call sites keep working.
-  void forceEndSession([String reason = 'manual']) {
+  Future<void> forceEndSession([String reason = 'manual']) async {
     final session = state.active;
     if (session != null && session.segments.isNotEmpty) {
       final finished = session.copyWith(
@@ -236,9 +255,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
         liveTranscript: '',
       );
       _trackSessionEnded(finished, reason);
-      _processMemoryAsync(finished);
+      // Finalize the session WAV before processing: the diarizer needs the
+      // complete waveform, and nothing else is still writing to it.
+      final audioPath = await _finishAudioBuffer(finished.id);
+      unawaited(_processMemoryAsync(finished, audioPath: audioPath));
     } else {
       state = state.copyWith(clearActive: true, liveTranscript: '');
+      if (session != null) await _finishAudioBuffer(session.id);
     }
     _idleTimer?.cancel();
     _idleTimer = null;
@@ -246,14 +269,15 @@ class ConversationNotifier extends Notifier<ConversationState> {
     if (_continuousStarted) {
       // Keep listening: open the next memory so speech continues seamlessly.
       final now = DateTime.now();
-      state = state.copyWith(
-        active: ConversationSession(
-          id: 's${now.microsecondsSinceEpoch}',
-          title: '',
-          startedAt: now,
-          status: ConversationStatus.inProgress,
-        ),
+      final next = ConversationSession(
+        id: 's${now.microsecondsSinceEpoch}',
+        title: '',
+        startedAt: now,
+        status: ConversationStatus.inProgress,
       );
+      state = state.copyWith(active: next);
+      // The tap keeps flowing: point it at the new session's WAV.
+      unawaited(_ensureAudioBuffer(next.id));
       _clock = Stopwatch()..start();
     }
     _persist();
@@ -289,7 +313,8 @@ class ConversationNotifier extends Notifier<ConversationState> {
         micLevel: 0,
       );
       _trackSessionEnded(finished, 'disconnect');
-      _processMemoryAsync(finished);
+      final audioPath = await _finishAudioBuffer(finished.id);
+      unawaited(_processMemoryAsync(finished, audioPath: audioPath));
     } else {
       state = state.copyWith(
         clearActive: true,
@@ -298,6 +323,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         receivingAudio: false,
         micLevel: 0,
       );
+      if (session != null) await _finishAudioBuffer(session.id);
     }
     _persist();
   }
@@ -310,6 +336,40 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _receivingTimer = Timer(const Duration(milliseconds: 450), () {
       state = state.copyWith(receivingAudio: false);
     });
+  }
+
+  /// --- Session audio tap ---------------------------------------------------
+
+  /// Opens the WAV tap for [sessionId], discarding any stale buffer for a
+  /// previous session. The tap stays open across pause/resume — the session
+  /// continues, so its waveform does too.
+  Future<void> _ensureAudioBuffer(String? sessionId) async {
+    if (sessionId == null || sessionId.isEmpty) return;
+    if (_audioBufferSessionId == sessionId && _audioBuffer != null) return;
+    final stale = _audioBuffer;
+    _audioBuffer = null;
+    _audioBufferSessionId = null;
+    await stale?.discard();
+    _audioBuffer = await SessionAudioBuffer.begin(sessionId);
+    if (_audioBuffer != null) _audioBufferSessionId = sessionId;
+  }
+
+  /// Closes the tap for [sessionId] and returns the WAV path, or null when
+  /// nothing worth diarizing was captured. Safe to call for sessions that
+  /// never opened a tap (mic test, legacy, storage failure).
+  Future<String?> _finishAudioBuffer(String sessionId) async {
+    if (_audioBufferSessionId != sessionId || _audioBuffer == null) {
+      // No tap for this session — but never leak a stale one either.
+      final stale = _audioBuffer;
+      _audioBuffer = null;
+      _audioBufferSessionId = null;
+      await stale?.discard();
+      return null;
+    }
+    final buf = _audioBuffer;
+    _audioBuffer = null;
+    _audioBufferSessionId = null;
+    return buf?.finish();
   }
 
   /// --- Transcript stream (Omi-style in-place merge) ----------------------
@@ -502,7 +562,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
     _idleTimer?.cancel();
     _idleTimer = Timer(kSessionIdleTimeout, () {
       if (!_continuousStarted || _micTestActive) return;
-      forceEndSession('idle');
+      unawaited(forceEndSession('idle'));
     });
   }
 
@@ -538,7 +598,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       _lastShortPressAt = null;
       _doubleTapTimer?.cancel();
       _doubleTapTimer = null;
-      forceEndSession('button');
+      unawaited(forceEndSession('button'));
       return;
     }
     _doubleTapTimer?.cancel();
@@ -651,15 +711,90 @@ class ConversationNotifier extends Notifier<ConversationState> {
     );
   }
 
-  Future<void> _processMemoryAsync(ConversationSession session) async {
+  /// Renders a session's segments as timestamped lines with pause markers
+  /// and speaker tags for the memory processor — the structured input that
+  /// replaced the old flat space-joined blob.
+  ///
+  /// Format per line: `[mm:ss-mm:ss] [speaker] text`, with a `[pause Xs]`
+  /// line wherever silence of 2+ seconds separates two segments. Segments
+  /// without an acoustic label are tagged `[?]` so the model knows the
+  /// speaker is its own (conservative) inference, not a measurement.
+  /// Public and static so the contract is unit-testable.
+  static String buildStructuredInput(ConversationSession session) {
+    final buf = StringBuffer();
+    TranscriptSegment? prev;
+    for (final seg in session.segments) {
+      final text = seg.text.trim();
+      if (text.isEmpty) continue;
+      if (prev != null) {
+        final prevEnd = prev.endMs ?? prev.startMs;
+        final gapMs = seg.startMs - prevEnd;
+        if (gapMs >= 2000) {
+          buf.writeln('[pause ${(gapMs / 1000).toStringAsFixed(1)}s]');
+        }
+      }
+      final tag = seg.speaker?.trim().isNotEmpty == true ? seg.speaker : '?';
+      buf.writeln(
+        '[${_mmss(seg.startMs)}-${_mmss(seg.endMs ?? seg.startMs)}] '
+        '[$tag] $text',
+      );
+      prev = seg;
+    }
+    return buf.toString().trim();
+  }
+
+  static String _mmss(int ms) {
+    final total = ms ~/ 1000;
+    final m = total ~/ 60;
+    final s = total % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _processMemoryAsync(
+    ConversationSession session, {
+    String? audioPath,
+  }) async {
     final text = session.transcriptText;
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      await _deleteSessionAudio(audioPath);
+      return;
+    }
 
     // Drain any previously failed sessions first (best effort).
     unawaited(_drainRetryQueue());
 
+    // Acoustic diarization (best effort, fully on-device): voiceprint every
+    // speech window, cluster into speakers, and tag segments You/Other
+    // *before* the LLM sees them — so attribution is measured, not invented.
+    // Falls through silently to text-only turns when the model, the audio,
+    // or the setting is missing.
+    var tagged = session;
+    var diarized = false;
+    if (audioPath != null && ref.read(settingsProvider).speakerDiarization) {
+      try {
+        final diarizer = ref.read(speakerDiarizerProvider);
+        final labels = await diarizer.diarize(
+          wavPath: audioPath,
+          segments: session.segments,
+        );
+        if (labels != null && labels.labels.isNotEmpty) {
+          diarized = true;
+          tagged = session.copyWith(
+            segments: [
+              for (final s in session.segments)
+                labels.labels.containsKey(s.id)
+                    ? s.copyWith(speaker: labels.labels[s.id])
+                    : s,
+            ],
+          );
+        }
+      } catch (_) {}
+    }
+
     final processor = ref.read(memoryProcessorProvider);
-    final result = await processor.process(text);
+    // Timestamped segments with pause markers (and acoustic speaker tags when
+    // diarization ran) — the structure the old flat blob destroyed.
+    final result = await processor.process(buildStructuredInput(tagged));
 
     if (result.error != null) {
       _enqueueForRetry(session.id);
@@ -682,6 +817,9 @@ class ConversationNotifier extends Notifier<ConversationState> {
         cleanedTranscript: result.cleanedTranscript.isEmpty
             ? null
             : result.cleanedTranscript,
+        turns: result.turns,
+        // Persist acoustic tags so the Raw view and future retries keep them.
+        segments: tagged.segments,
       );
       state = state.copyWith(conversations: conversations);
       _persist();
@@ -703,12 +841,13 @@ class ConversationNotifier extends Notifier<ConversationState> {
 
     // Index the session chunks for RAG retrieval (best effort, non-blocking).
     if (idx != -1) {
-      unawaited(_indexSession(session.copyWith(
+      unawaited(_indexSession(tagged.copyWith(
         title: result.title,
         summary: result.summary,
         cleanedTranscript: result.cleanedTranscript.isEmpty
             ? null
             : result.cleanedTranscript,
+        turns: result.turns,
       )));
     }
 
@@ -716,7 +855,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       final svc = await ref.read(proactiveServiceProvider.future);
       final updated = idx != -1 && idx < state.conversations.length
           ? state.conversations[idx]
-          : session;
+          : tagged;
       final kind = await svc.maybeNotify(
         session: updated,
         result: result,
@@ -736,14 +875,38 @@ class ConversationNotifier extends Notifier<ConversationState> {
           properties: {
             'commitment_count': result.commitments.length,
             'has_summary': result.summary.isNotEmpty,
+            // Aggregate shapes only: how many structured turns and distinct
+            // speakers, and whether they were measured acoustically — never
+            // who said what.
+            'turn_count': result.turns.length,
+            'speaker_count':
+                result.turns.map((t) => t.speaker).toSet().length,
+            'diarized': diarized,
           },
         );
+
+    // The waveform has served its purpose (diarization input). Unless the
+    // user opted into keeping session audio, delete it now — embeddings and
+    // transcripts stay, raw voice does not accumulate.
+    await _deleteSessionAudio(audioPath);
+  }
+
+  /// Deletes a finished session WAV unless Settings says to keep it.
+  Future<void> _deleteSessionAudio(String? audioPath) async {
+    if (audioPath == null || audioPath.isEmpty) return;
+    try {
+      if (ref.read(settingsProvider).keepSessionAudio) return;
+      final file = File(audioPath);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
   }
 
   Future<void> _indexSession(ConversationSession session) async {
     try {
       final indexer = await ref.read(memoryIndexerProvider.future);
-      await indexer.indexSession(session);
+      // Replace, don't append: a re-processed session's speaker turns
+      // supersede whatever an earlier pipeline generation indexed.
+      await indexer.reindexSession(session);
     } catch (_) {}
   }
 
@@ -799,6 +962,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
             summary.startsWith('Failed to process memory');
         final looksUnprocessed = summary.isEmpty &&
             s.cleanedTranscript == null &&
+            s.turns.isEmpty &&
             s.transcriptText.trim().isNotEmpty;
         if ((looksFailed || looksUnprocessed) &&
             _retryAttemptCount(s.id) < _maxRetryAttempts) {
@@ -821,7 +985,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
         }
 
         final session = state.conversations[idx];
-        final result = await processor.process(session.transcriptText);
+        final result = await processor.process(buildStructuredInput(session));
 
         if (result.error == null) {
           final conversations = List<ConversationSession>.of(state.conversations);
@@ -831,13 +995,14 @@ class ConversationNotifier extends Notifier<ConversationState> {
             cleanedTranscript: result.cleanedTranscript.isEmpty
                 ? null
                 : result.cleanedTranscript,
+            turns: result.turns,
           );
           state = state.copyWith(conversations: conversations);
           _persist();
           _dequeueRetry(id);
           try {
             final indexer = await ref.read(memoryIndexerProvider.future);
-            unawaited(indexer.indexSession(conversations[idx]));
+            unawaited(indexer.reindexSession(conversations[idx]));
           } catch (_) {}
           ref.read(analyticsProvider).capture('memory retry succeeded');
         try {
@@ -876,9 +1041,29 @@ class ConversationNotifier extends Notifier<ConversationState> {
         status: ConversationStatus.completed,
         summary: 'Team agreed the launch deadline is Friday and Ramesh owns the report.',
         cleanedTranscript:
-            'Speaker 1: Let\'s lock the plan. The launch deadline is Friday.\n'
-            'Speaker 2: Agreed. I will send the final report to Ramesh by Thursday.\n'
-            'Speaker 1: Perfect. I will follow up with the design team tomorrow.',
+            'You: Let\'s lock the plan. The launch deadline is Friday.\n'
+            'Other 1: Agreed. I will send the final report to Ramesh by Thursday.\n'
+            'You: Perfect. I will follow up with the design team tomorrow.',
+        turns: const [
+          TranscriptTurn(
+            speaker: 'You',
+            text: 'Let\'s lock the plan. The launch deadline is Friday.',
+            startMs: 12000,
+            endMs: 18000,
+          ),
+          TranscriptTurn(
+            speaker: 'Other 1',
+            text: 'Agreed. I will send the final report to Ramesh by Thursday.',
+            startMs: 22000,
+            endMs: 31000,
+          ),
+          TranscriptTurn(
+            speaker: 'You',
+            text: 'Perfect. I will follow up with the design team tomorrow.',
+            startMs: 33000,
+            endMs: 39000,
+          ),
+        ],
         segments: const [],
       ),
       ConversationSession(
@@ -889,8 +1074,17 @@ class ConversationNotifier extends Notifier<ConversationState> {
         status: ConversationStatus.completed,
         summary: 'Picked up milk, eggs and bread from the market.',
         cleanedTranscript:
-            'Speaker 1: I went to the market yesterday.\n'
-            'Speaker 1: Got milk, eggs, and fresh bread. Nothing else was needed.',
+            'You: I went to the market yesterday.\n'
+            'You: Got milk, eggs, and fresh bread. Nothing else was needed.',
+        turns: const [
+          TranscriptTurn(
+            speaker: 'You',
+            text:
+                'I went to the market yesterday. Got milk, eggs, and fresh bread. Nothing else was needed.',
+            startMs: 5000,
+            endMs: 17000,
+          ),
+        ],
         segments: const [],
       ),
       ConversationSession(
@@ -901,8 +1095,17 @@ class ConversationNotifier extends Notifier<ConversationState> {
         status: ConversationStatus.completed,
         summary: 'Decided to lift weights on Monday, Wednesday and Friday.',
         cleanedTranscript:
-            'Speaker 1: I need to be consistent. I will work out every Monday, Wednesday and Friday.\n'
-            'Speaker 1: Also I promise to skip sugar this month.',
+            'You: I need to be consistent. I will work out every Monday, Wednesday and Friday.\n'
+            'You: Also I promise to skip sugar this month.',
+        turns: const [
+          TranscriptTurn(
+            speaker: 'You',
+            text:
+                'I need to be consistent. I will work out every Monday, Wednesday and Friday. Also I promise to skip sugar this month.',
+            startMs: 8000,
+            endMs: 24000,
+          ),
+        ],
         segments: const [],
       ),
     ];

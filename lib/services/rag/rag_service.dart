@@ -52,7 +52,13 @@ class RagService {
       final header = m.chunk.title.isNotEmpty
           ? m.chunk.title
           : m.chunk.sessionId;
-      final slice = '[memory $header @ ${m.chunk.startMs}ms]\n${m.chunk.text}\n\n';
+      // Speaker provenance travels with the excerpt so answers can say who
+      // said what ("You" is the wearer; "Other N" is session-local).
+      final who = m.chunk.speaker.trim().isNotEmpty
+          ? ' · says ${m.chunk.speaker.trim()}'
+          : '';
+      final slice =
+          '[memory $header @ ${m.chunk.startMs}ms$who]\n${m.chunk.text}\n\n';
       if (contextBuffer.length + slice.length > kRagContextMaxChars) break;
       contextBuffer.write(slice);
     }
@@ -65,7 +71,12 @@ class RagService {
           content:
               'You are Tanu, answering questions about the user\'s own memories. '
               'Use ONLY the provided transcript excerpts. If the answer is not in '
-              'the excerpts, say so honestly. Be concise.',
+              'the excerpts, say so honestly. Be concise. '
+              'Excerpts are tagged with who said each line ("You" is the user '
+              'wearing the pendant; "Other N" labels are local to one memory, '
+              'never the same person across memories): attribute claims to '
+              'their speaker, e.g. "You said…" or "Ramesh said…" is wrong — '
+              'say "the other person said…" unless a name was spoken.',
         ),
       ],
     );

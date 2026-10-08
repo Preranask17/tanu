@@ -7,6 +7,8 @@ import '../providers/commitment_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/dev_capture_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/speaker_provider.dart';
+import '../services/stt/session_audio_buffer.dart';
 import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
@@ -71,6 +73,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   const _SttModelDashboard(),
+
+                  const SizedBox(height: 36),
+
+                  // ── Voice ID ──
+                  const _SectionHeader(
+                    title: 'Voice ID',
+                    subtitle: 'Who said what — fully on-device',
+                  ),
+                  const SizedBox(height: 16),
+                  const _VoiceIdDashboard(),
 
                   const SizedBox(height: 36),
 
@@ -684,6 +696,247 @@ class _SttModelDashboard extends ConsumerWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VoiceIdDashboard extends ConsumerStatefulWidget {
+  const _VoiceIdDashboard();
+
+  @override
+  ConsumerState<_VoiceIdDashboard> createState() => _VoiceIdDashboardState();
+}
+
+class _VoiceIdDashboardState extends ConsumerState<_VoiceIdDashboard> {
+  int _audioRefresh = 0;
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final modelState = ref.watch(speakerModelProvider);
+    final modelNotifier = ref.read(speakerModelProvider.notifier);
+    final settings = ref.watch(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    String statusText = modelState.label;
+    if (modelState.phase == SpeakerModelPhase.downloading &&
+        modelState.totalBytes > 0) {
+      final pct =
+          (modelState.downloadedBytes / modelState.totalBytes * 100)
+              .toStringAsFixed(1);
+      statusText = 'Downloading... $pct%';
+    } else if (modelState.phase == SpeakerModelPhase.missing &&
+        modelState.error != null) {
+      statusText = 'Error: ${modelState.error}';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      kSpeakerModelLabel,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      statusText,
+                      style: const TextStyle(
+                        color: Color(0xFF888888),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (modelState.phase == SpeakerModelPhase.ready)
+                const Icon(Icons.check_circle, color: Colors.green)
+              else if (modelState.busy)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          if (modelState.phase == SpeakerModelPhase.downloading &&
+              modelState.totalBytes > 0) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: modelState.downloadedBytes / modelState.totalBytes,
+                minHeight: 6,
+              ),
+            ),
+          ],
+          if (modelState.phase != SpeakerModelPhase.ready &&
+              !modelState.busy) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.download),
+                label: const Text('Download Speaker Model (~25MB)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () => modelNotifier.download(),
+              ),
+            ),
+          ],
+          if (modelState.phase == SpeakerModelPhase.ready &&
+              !modelState.busy) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.delete),
+                label: const Text('Delete Speaker Model'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  side: const BorderSide(color: Colors.redAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => modelNotifier.deleteModel(),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          _VoiceSwitchRow(
+            title: 'Label speakers',
+            subtitle: 'You vs Others on every memory, computed on this phone',
+            value: settings.speakerDiarization,
+            onChanged: (v) => settingsNotifier.setSpeakerDiarization(v),
+          ),
+          _VoiceSwitchRow(
+            title: 'Keep session audio',
+            subtitle:
+                'Retain voice recordings after processing (never uploaded)',
+            value: settings.keepSessionAudio,
+            onChanged: (v) => settingsNotifier.setKeepSessionAudio(v),
+          ),
+          FutureBuilder<int>(
+            key: ValueKey(_audioRefresh),
+            future: SessionAudioBuffer.storedBytes(),
+            builder: (context, snap) {
+              final bytes = snap.data ?? 0;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Session audio on device: ${_formatBytes(bytes)}',
+                      style: const TextStyle(
+                        color: Color(0xFF888888),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: bytes <= 0
+                        ? null
+                        : () async {
+                            await SessionAudioBuffer.deleteAll();
+                            if (mounted) {
+                              setState(() => _audioRefresh++);
+                            }
+                          },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                    ),
+                    child: const Text('Delete audio'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A settings toggle row. A hand-rolled Row + Switch rather than
+/// SwitchListTile: the dashboard card is a DecoratedBox with its own
+/// background, which trips Flutter's ListTile-ink debug assertion.
+class _VoiceSwitchRow extends StatelessWidget {
+  const _VoiceSwitchRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
         ],
       ),
     );

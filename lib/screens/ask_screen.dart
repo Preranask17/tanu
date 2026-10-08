@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../abstractions/agent_engine.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/rag_provider.dart';
+import '../services/rag/vector_store.dart';
 
 /// Cross-memory Q&A over the RAG pipeline: ask anything about your saved
 /// memories and get an answer grounded in the actual transcript chunks.
@@ -54,7 +55,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
             role: 'assistant',
             content: result.sources.isEmpty
                 ? result.answer
-                : '${result.answer}\n\n(from ${result.sources.length} memory excerpts)',
+                : '${result.answer}\n\n(from ${result.sources.length} memory excerpts${_speakerSuffix(result.sources)})',
           ));
           _busy = false;
         });
@@ -155,4 +156,17 @@ class _AskScreenState extends ConsumerState<AskScreen> {
       ),
     );
   }
+}
+
+/// Speaker attribution suffix for RAG citations, e.g. " · You, Other 1".
+/// Empty when none of the grounding chunks carries a speaker.
+String _speakerSuffix(List<ScoredChunk> sources) {
+  final speakers = sources
+      .map((s) => s.chunk.speaker.trim())
+      .where((s) => s.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
+  if (speakers.isEmpty) return '';
+  return ' · ${speakers.join(', ')}';
 }

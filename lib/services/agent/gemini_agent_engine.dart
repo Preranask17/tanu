@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../abstractions/agent_engine.dart';
 import '../../constants.dart';
+import '../../models/transcript.dart';
 import '../rag/rate_limiter.dart';
 import 'mistral_agent_engine.dart' show AgentException;
 
@@ -27,7 +28,11 @@ class GeminiAgentEngine implements AgentEngine {
   );
 
   @override
-  Future<String> prompt(String transcript, {List<ChatMessage>? history}) async {
+  Future<String> prompt(
+    String transcript, {
+    List<ChatMessage>? history,
+    bool jsonMode = false,
+  }) async {
     if (apiKey.isEmpty) {
       throw AgentException('Gemini API key is empty');
     }
@@ -65,7 +70,13 @@ class GeminiAgentEngine implements AgentEngine {
       'contents': contents,
       'generationConfig': {
         'temperature': 0.6,
-        'maxOutputTokens': 1024,
+        // Structured memory output (turns + cleanup) is far longer than a
+        // chat reply; plain chat keeps the old tight budget.
+        'maxOutputTokens': jsonMode ? 4096 : 1024,
+        if (jsonMode) ...{
+          'responseMimeType': 'application/json',
+          'responseSchema': _memoryResponseSchema,
+        },
       },
     });
 
@@ -161,6 +172,7 @@ class MemoryResult {
     required this.summary,
     required this.commitments,
     this.cleanedTranscript = '',
+    this.turns = const [],
     this.error,
   });
 
@@ -171,9 +183,51 @@ class MemoryResult {
   /// The raw transcript rewritten into clean, speaker-labeled prose.
   final String cleanedTranscript;
 
+  /// Structured speaker turns: the reviewable, indexable form of the
+  /// memory. Empty when the model returned none (old path / parse fallback).
+  final List<TranscriptTurn> turns;
+
   /// Set when processing failed (network/parse) — caller should retry later.
   final String? error;
 }
+
+/// JSON schema enforced on the memory-processor call (`responseMimeType:
+/// application/json`). The model cannot drift field names or wrap the answer
+/// in fences — failures become retriable errors instead of silent garbage.
+const Map<String, Object> _memoryResponseSchema = {
+  'type': 'OBJECT',
+  'properties': {
+    'title': {'type': 'STRING'},
+    'summary': {'type': 'STRING'},
+    'cleaned_transcript': {'type': 'STRING'},
+    'turns': {
+      'type': 'ARRAY',
+      'items': {
+        'type': 'OBJECT',
+        'properties': {
+          'speaker': {'type': 'STRING'},
+          'start_ms': {'type': 'INTEGER'},
+          'end_ms': {'type': 'INTEGER'},
+          'text': {'type': 'STRING'},
+        },
+        'required': ['speaker', 'text'],
+      },
+    },
+    'commitments': {
+      'type': 'ARRAY',
+      'items': {
+        'type': 'OBJECT',
+        'properties': {
+          'is_commitment': {'type': 'BOOLEAN'},
+          'action': {'type': 'STRING'},
+          'person': {'type': 'STRING'},
+          'due': {'type': 'STRING'},
+        },
+      },
+    },
+  },
+  'required': ['title', 'summary', 'turns'],
+};
 
 /// Single-shot Gemini call that turns a raw transcript into a structured,
 /// clean memory: title, summary, speaker-labeled cleaned transcript, and
@@ -187,26 +241,40 @@ class GeminiMemoryProcessor {
     try {
       final raw = await _engine.prompt(
         conversation,
+        jsonMode: true,
         history: [
           const ChatMessage(
             role: 'system',
             content: '''
 You process a user's transcribed conversation memory.
+The input is timestamped speech segments in order, like
+[00:12-00:18] hello there
+[pause 4.2s]
+[00:22-00:31] ….
+Lines tagged [You] / [Other 1] / [Other 2] were labeled by on-device voice
+analysis — TRUST those tags and keep them. Lines tagged [?] have no acoustic
+label: infer the speaker from turn-taking (a pause usually means a turn
+change) and content, but stay conservative — when in doubt, continue the
+previous speaker rather than inventing a new one. The wearer is always "You".
+
 Given the raw speech-to-text transcript, produce a structured memory.
 
 Reply with ONLY a JSON object shaped exactly like this:
 {
   "title": "A short 3-5 word title",
   "summary": "A 1-2 sentence concise summary.",
-  "cleaned_transcript": "A clean rewrite of the full conversation: proper punctuation and capitalization, filler and jargon smoothed into clear sentences, attributed to speakers as 'Speaker 1:', 'Speaker 2:' etc. (or inferred names when obvious). Keep it faithful, do not invent content.",
+  "cleaned_transcript": "A clean rewrite of the full conversation: proper punctuation and capitalization, filler and jargon smoothed into clear sentences, attributed to speakers as 'You:', 'Other 1:' etc. Keep it faithful, do not invent content.",
+  "turns": [{"speaker": "You", "start_ms": 12000, "end_ms": 18000, "text": "cleaned turn text"}],
   "commitments": [{"is_commitment": true, "action": "...", "person": "...", "due": "YYYY-MM-DD"}]
 }
-No commentary, no markdown fences.
+One turn per speaker run: merge consecutive lines from the same speaker into
+a single turn. start_ms/end_ms come from the input timestamps (0 when the
+input line has none). No commentary, no markdown fences.
 ''',
           ),
         ],
       );
-      return _parse(raw);
+      return parseMemoryJson(raw);
     } catch (e) {
       return MemoryResult(
         title: 'Memory',
@@ -217,7 +285,13 @@ No commentary, no markdown fences.
     }
   }
 
-  MemoryResult _parse(String raw) {
+  /// Parses one memory-processor response. Public (and static) so the
+  /// contract is unit-testable without a network call.
+  static MemoryResult parseMemoryJson(String raw) {
+    return _parse(raw);
+  }
+
+  static MemoryResult _parse(String raw) {
     // Strip markdown fences Gemini sometimes adds despite instructions.
     var cleaned = raw.trim();
     if (cleaned.startsWith('```')) {
@@ -251,11 +325,31 @@ No commentary, no markdown fences.
           }).toList() ??
           [];
 
+      final rawTurns = decoded['turns'] as List<dynamic>?;
+      final turns =
+          rawTurns
+              ?.whereType<Map>()
+              .map((t) {
+                final m = Map<String, dynamic>.from(t);
+                return TranscriptTurn(
+                  speaker: (m['speaker'] as String? ?? '').trim().isEmpty
+                      ? 'Other 1'
+                      : (m['speaker'] as String).trim(),
+                  text: m['text'] as String? ?? '',
+                  startMs: (m['start_ms'] as num?)?.toInt() ?? 0,
+                  endMs: (m['end_ms'] as num?)?.toInt(),
+                );
+              })
+              .where((t) => t.text.trim().isNotEmpty)
+              .toList() ??
+          [];
+
       return MemoryResult(
         title: decoded['title'] as String? ?? 'Memory',
         summary: decoded['summary'] as String? ?? '',
         commitments: commitments,
         cleanedTranscript: decoded['cleaned_transcript'] as String? ?? '',
+        turns: turns,
       );
     } catch (_) {
       return const MemoryResult(

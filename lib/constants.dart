@@ -97,6 +97,63 @@ const String kPostHogHost = String.fromEnvironment(
   defaultValue: 'https://us.i.posthog.com',
 );
 
+/// ---- Speaker ID (on-device diarization) -----------------------------------
+/// Post-session speaker labeling runs fully offline: one 25 MB embedding
+/// model turns each VAD-gated STT segment into a voiceprint, pure-Dart
+/// clustering groups voiceprints into speakers, and mic-energy picks the
+/// wearer. No audio or embedding ever leaves the phone.
+///
+/// Single `.onnx` streamed straight to disk with range-resume (same pattern
+/// as the Whisper bundle) into `appSupport/<kSpeakerModelDirName>/`. English
+/// VoxCeleb embedding — language-agnostic enough for en + Indian languages.
+const String kSpeakerEmbeddingUrl =
+    'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx';
+const String kSpeakerModelDirName = 'speaker-id';
+const String kSpeakerEmbeddingFileName =
+    '3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx';
+
+/// Human label shown in Settings next to the speaker model row.
+const String kSpeakerModelLabel = 'Speaker ID · 25 MB';
+
+/// Cosine similarity at or above which two segment voiceprints count as the
+/// same speaker (eres2net cosine; 0.4–0.6 is the sane band).
+const double kSpeakerClusterThreshold = 0.45;
+
+/// Minimum speech audio (seconds) needed for a trustworthy voiceprint.
+/// Shorter segments are merged with a neighbor before embedding.
+const double kSpeakerMinWindowSeconds = 1.0;
+
+/// Maximum audio (seconds) embedded in one shot; longer spans are split so
+/// one window never straddles two speakers for long.
+const double kSpeakerMaxWindowSeconds = 10.0;
+
+/// The loudest cluster is called the wearer only when its mean RMS energy
+/// exceeds the runner-up by this ratio — the pendant mic sits on the
+/// wearer's chest, so their voice dominates. Below the margin every speaker
+/// stays anonymous (`Other N`) rather than mislabeling someone as you.
+const double kWearerEnergyMargin = 1.6;
+
+/// Canonical wearer label used across turns, chunks and the UI.
+const String kSpeakerYou = 'You';
+
+/// Label for the Nth non-wearer cluster (1-based): `Other 1`, `Other 2`, …
+String kSpeakerOther(int n) => 'Other $n';
+
+/// ---- Session audio retention ----------------------------------------------
+/// Per-session 16 kHz mono WAVs under `appSupport/<kSessionAudioDirName>/`,
+/// captured alongside STT so post-session diarization has a waveform to work
+/// on. Deleted right after processing unless the user opted into keeping
+/// them in Settings.
+const String kSessionAudioDirName = 'session_audio';
+
+/// Recorder stops appending past this many minutes (stale/forgotten
+/// sessions must not fill the disk): ~345 MB at 16 kHz mono 16-bit.
+const int kSessionAudioMaxMinutes = 180;
+
+/// Session WAVs older than this are purged on launch (safety net for
+/// crashes between close and processing).
+const Duration kSessionAudioMaxAge = Duration(days: 7);
+
 /// ---- Gemini (agent brain) -------------------------------------------------
 /// Cloud agent used for memory processing and in-memory chat.
 const String kGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');

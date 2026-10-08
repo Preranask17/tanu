@@ -7,6 +7,7 @@ import '../providers/conversation_provider.dart';
 import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
 import '../providers/rag_provider.dart';
+import '../services/rag/vector_store.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
@@ -144,8 +145,20 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
   final _chatCtrl = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isGenerating = false;
-  bool _showCleaned = true;
+  // 0 = speakers, 1 = cleaned, 2 = raw. Defaults to speakers when the
+  // session has structured turns, else the previous cleaned/raw behavior.
+  late int _viewMode;
+  String? _speakerFilter;
   final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    final hasTurns = widget.session.turns.isNotEmpty;
+    final hasCleaned =
+        widget.session.cleanedTranscript?.trim().isNotEmpty ?? false;
+    _viewMode = hasTurns ? 0 : (hasCleaned ? 1 : 2);
+  }
 
   @override
   void dispose() {
@@ -178,7 +191,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
             role: 'assistant',
             content: result.sources.isEmpty
                 ? result.answer
-                : '${result.answer}\n\n(from ${result.sources.length} excerpts in this memory)',
+                : '${result.answer}\n\n(from ${result.sources.length} excerpts in this memory${_speakerSuffix(result.sources)})',
           ));
           _isGenerating = false;
         });
@@ -191,15 +204,26 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
 
     final engine = ref.read(geminiEngineProvider);
     try {
+      // Richest context first: structured speaker turns read as
+      // "You (00:12): …", then the cleaned rewrite, then raw segments.
+      final turns = widget.session.turns;
+      final context = turns.isNotEmpty
+          ? turns
+              .map(
+                (t) =>
+                    '${t.speaker} (${_offsetLabel(t.startMs)}): ${t.text.trim()}',
+              )
+              .join('\n')
+          : ((widget.session.cleanedTranscript?.trim().isNotEmpty ?? false)
+              ? widget.session.cleanedTranscript!
+              : widget.session.transcriptText);
       final reply = await engine.prompt(
-        (widget.session.cleanedTranscript?.trim().isNotEmpty ?? false)
-            ? widget.session.cleanedTranscript!
-            : widget.session.transcriptText,
+        context,
         history: [
           const ChatMessage(
             role: 'system',
             content:
-                'You are an AI assistant helping a user recall details from their memory. Use the provided transcript context to answer.',
+                'You are an AI assistant helping a user recall details from their memory. Use the provided transcript context to answer. Lines are tagged with who said them ("You" is the user; "Other N" labels are local to this memory only).',
           ),
           ..._messages,
         ],
@@ -309,26 +333,53 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     ),
                     const SizedBox(height: 24),
                   ],
-                  if (session.cleanedTranscript != null &&
-                      session.cleanedTranscript!.trim().isNotEmpty) ...[
-                    Row(
-                      children: [
-                        _TranscriptToggle(
-                          label: 'Cleaned',
-                          selected: _showCleaned,
-                          onTap: () => setState(() => _showCleaned = true),
-                        ),
-                        const SizedBox(width: 8),
-                        _TranscriptToggle(
-                          label: 'Raw',
-                          selected: !_showCleaned,
-                          onTap: () => setState(() => _showCleaned = false),
-                        ),
-                      ],
+                  if (session.turns.isNotEmpty ||
+                      (session.cleanedTranscript != null &&
+                          session.cleanedTranscript!.trim().isNotEmpty)) ...[
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          if (session.turns.isNotEmpty) ...[
+                            _TranscriptToggle(
+                              label: 'Speakers',
+                              selected: _viewMode == 0,
+                              onTap: () => setState(() {
+                                _viewMode = 0;
+                                _speakerFilter = null;
+                              }),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (session.cleanedTranscript != null &&
+                              session.cleanedTranscript!
+                                  .trim()
+                                  .isNotEmpty) ...[
+                            _TranscriptToggle(
+                              label: 'Cleaned',
+                              selected: _viewMode == 1,
+                              onTap: () => setState(() => _viewMode = 1),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          _TranscriptToggle(
+                            label: 'Raw',
+                            selected: _viewMode == 2,
+                            onTap: () => setState(() => _viewMode = 2),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                   ],
-                  if (_showCleaned &&
+                  if (_viewMode == 0 && session.turns.isNotEmpty)
+                    _SpeakerTurns(
+                      turns: session.turns,
+                      filter: _speakerFilter,
+                      onFilter: (s) =>
+                          setState(() => _speakerFilter = s),
+                    )
+                  else if (_viewMode == 1 &&
                       session.cleanedTranscript != null &&
                       session.cleanedTranscript!.trim().isNotEmpty)
                     Text(
@@ -497,6 +548,180 @@ class _TranscriptToggle extends StatelessWidget {
             color: selected ? Colors.white : const Color(0xFF888888),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Structured speaker turns: one card per turn with a speaker badge and
+/// timestamp, plus filter chips to isolate one voice in long memories.
+/// "You" is the wearer; "Other N" labels are local to this memory.
+class _SpeakerTurns extends StatelessWidget {
+  const _SpeakerTurns({
+    required this.turns,
+    required this.filter,
+    required this.onFilter,
+  });
+
+  final List<TranscriptTurn> turns;
+  final String? filter;
+  final ValueChanged<String?> onFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final speakers = <String>[];
+    for (final t in turns) {
+      if (!speakers.contains(t.speaker)) speakers.add(t.speaker);
+    }
+    final visible = filter == null
+        ? turns
+        : turns.where((t) => t.speaker == filter).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (speakers.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _SpeakerChip(
+                    label: 'All',
+                    selected: filter == null,
+                    onTap: () => onFilter(null),
+                  ),
+                  for (final s in speakers) ...[
+                    const SizedBox(width: 8),
+                    _SpeakerChip(
+                      label: s,
+                      selected: filter == s,
+                      isYou: s == 'You',
+                      onTap: () => onFilter(s),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        for (final t in visible) _TurnRow(turn: t, isDark: isDark),
+      ],
+    );
+  }
+}
+
+class _SpeakerChip extends StatelessWidget {
+  const _SpeakerChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.isYou = false,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool isYou;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? Theme.of(context).primaryColor
+              : (isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected
+                ? Colors.white
+                : (isYou
+                      ? Theme.of(context).primaryColor
+                      : const Color(0xFF888888)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TurnRow extends StatelessWidget {
+  const _TurnRow({required this.turn, required this.isDark});
+
+  final TranscriptTurn turn;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final isYou = turn.speaker == 'You';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isYou
+              ? Theme.of(context).primaryColor.withValues(alpha: 0.35)
+              : (isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF)),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: isYou
+                      ? Theme.of(context).primaryColor
+                      : (isDark
+                            ? const Color(0xFF2A2A2C)
+                            : const Color(0xFFE5E5E5)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  turn.speaker,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isYou
+                        ? Colors.white
+                        : (isDark ? Colors.white70 : Colors.black87),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _offsetLabel(turn.startMs),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF888888),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            turn.text.trim(),
+            style: const TextStyle(height: 1.5, fontSize: 15),
+          ),
+        ],
       ),
     );
   }
@@ -713,6 +938,19 @@ String _offsetLabel(int ms) {
     return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
   return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+}
+
+/// Speaker attribution suffix for RAG citations, e.g. " · You, Other 1".
+/// Empty when none of the grounding chunks carries a speaker.
+String _speakerSuffix(List<ScoredChunk> sources) {
+  final speakers = sources
+      .map((s) => s.chunk.speaker.trim())
+      .where((s) => s.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
+  if (speakers.isEmpty) return '';
+  return ' · ${speakers.join(', ')}';
 }
 
 class _SegmentGroupRow extends StatelessWidget {

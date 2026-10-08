@@ -12,6 +12,8 @@ class AppSettings {
     this.themeMode = ThemeMode.system,
     this.hasCompletedOnboarding = true,
     this.geminiApiKey = '',
+    this.speakerDiarization = true,
+    this.keepSessionAudio = false,
   });
 
   final String deviceName;
@@ -19,11 +21,21 @@ class AppSettings {
   final bool hasCompletedOnboarding;
   final String geminiApiKey;
 
+  /// Post-session on-device speaker labeling (You vs Others). Runs fully
+  /// offline; disable to skip the diarization pass entirely.
+  final bool speakerDiarization;
+
+  /// Keep per-session WAVs after processing instead of deleting them.
+  /// Audio never leaves the phone either way.
+  final bool keepSessionAudio;
+
   AppSettings copyWith({
     String? deviceName,
     ThemeMode? themeMode,
     bool? hasCompletedOnboarding,
     String? geminiApiKey,
+    bool? speakerDiarization,
+    bool? keepSessionAudio,
   }) {
     return AppSettings(
       deviceName: deviceName ?? this.deviceName,
@@ -31,6 +43,8 @@ class AppSettings {
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
+      speakerDiarization: speakerDiarization ?? this.speakerDiarization,
+      keepSessionAudio: keepSessionAudio ?? this.keepSessionAudio,
     );
   }
 
@@ -39,6 +53,8 @@ class AppSettings {
     'themeMode': themeMode.name,
     'hasCompletedOnboarding': hasCompletedOnboarding,
     'geminiApiKey': geminiApiKey,
+    'speakerDiarization': speakerDiarization,
+    'keepSessionAudio': keepSessionAudio,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -47,6 +63,8 @@ class AppSettings {
         ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
     hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,
     geminiApiKey: json['geminiApiKey'] as String? ?? '',
+    speakerDiarization: json['speakerDiarization'] as bool? ?? true,
+    keepSessionAudio: json['keepSessionAudio'] as bool? ?? false,
   );
 }
 
@@ -90,6 +108,30 @@ class SettingsNotifier extends Notifier<AppSettings> {
   void setGeminiApiKey(String key) {
     state = state.copyWith(geminiApiKey: key.trim());
     _save();
+  }
+
+  void setSpeakerDiarization(bool enabled) {
+    if (enabled == state.speakerDiarization) return;
+    state = state.copyWith(speakerDiarization: enabled);
+    _save();
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'setting changed',
+          properties: {'setting': 'speaker_diarization', 'value': '$enabled'},
+        );
+  }
+
+  void setKeepSessionAudio(bool keep) {
+    if (keep == state.keepSessionAudio) return;
+    state = state.copyWith(keepSessionAudio: keep);
+    _save();
+    ref
+        .read(analyticsProvider)
+        .capture(
+          'setting changed',
+          properties: {'setting': 'keep_session_audio', 'value': '$keep'},
+        );
   }
 
   void _save() {

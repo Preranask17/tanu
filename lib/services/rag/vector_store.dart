@@ -15,6 +15,7 @@ class MemoryChunk {
     required this.text,
     required this.startMs,
     this.title = '',
+    this.speaker = '',
   });
 
   final String id;
@@ -22,6 +23,10 @@ class MemoryChunk {
   final String text;
   final int startMs;
   final String title;
+
+  /// Speaker the chunk starts with (`'You'`, `'Other 1'`, …). Empty for
+  /// legacy chunks and summary gist chunks.
+  final String speaker;
 }
 
 /// A chunk matched against a query, with its distance (lower = closer).
@@ -60,6 +65,7 @@ class VectorStore {
         text TEXT NOT NULL,
         start_ms INTEGER NOT NULL DEFAULT 0,
         title TEXT NOT NULL DEFAULT '',
+        speaker TEXT NOT NULL DEFAULT '',
         embedding BLOB
       )
     ''');
@@ -67,6 +73,11 @@ class VectorStore {
       _db.execute("ALTER TABLE chunks ADD COLUMN title TEXT NOT NULL DEFAULT ''");
     } catch (_) {
       // Column already exists.
+    }
+    try {
+      _db.execute("ALTER TABLE chunks ADD COLUMN speaker TEXT NOT NULL DEFAULT ''");
+    } catch (_) {
+      // Column already exists (structured-pipeline upgrade).
     }
     _db.execute(
         "SELECT vector_init('chunks', 'embedding', 'type=FLOAT32,dimension=$kEmbeddingDims')");
@@ -77,7 +88,7 @@ class VectorStore {
     _db.execute('BEGIN');
     try {
       final stmt = _db.prepare(
-        'INSERT OR REPLACE INTO chunks (id, session_id, text, start_ms, title, embedding) VALUES (?, ?, ?, ?, ?, vector_as_f32(?))',
+        'INSERT OR REPLACE INTO chunks (id, session_id, text, start_ms, title, speaker, embedding) VALUES (?, ?, ?, ?, ?, ?, vector_as_f32(?))',
       );
       final del = _db.prepare('DELETE FROM chunks WHERE id = ?');
       for (var i = 0; i < chunks.length; i++) {
@@ -88,6 +99,7 @@ class VectorStore {
           chunks[i].text,
           chunks[i].startMs,
           chunks[i].title,
+          chunks[i].speaker,
           jsonEncode(vectors[i]),
         ]);
       }
@@ -104,7 +116,7 @@ class VectorStore {
   List<ScoredChunk> query(List<double> vector, int topK, {String? sessionId}) {
     final scanK = sessionId == null ? topK : topK * 8;
     final rows = _db.select('''
-      SELECT c.id, c.session_id, c.text, c.start_ms, c.title, v.distance
+      SELECT c.id, c.session_id, c.text, c.start_ms, c.title, c.speaker, v.distance
       FROM chunks AS c
       JOIN vector_full_scan('chunks', 'embedding', vector_as_f32(?), $scanK) AS v
         ON c.rowid = v.rowid
@@ -121,6 +133,7 @@ class VectorStore {
           text: row['text'] as String,
           startMs: row['start_ms'] as int,
           title: row['title'] as String? ?? '',
+          speaker: row['speaker'] as String? ?? '',
         ),
         distance: (row['distance'] as num).toDouble(),
       ));

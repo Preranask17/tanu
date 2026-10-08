@@ -38,6 +38,8 @@ class AnalyticsService {
     'memory retry succeeded',
     'memory retry gave up',
     'proactive notified',
+    'speaker model downloaded',
+    'speaker model failed',
   };
 
   /// The complete set of property keys this app is allowed to send, matched
@@ -65,6 +67,10 @@ class AnalyticsService {
     'close_reason', 'segment_count', 'duration_s',
     // 'memory processed'
     'commitment_count', 'has_summary',
+    // 'memory processed' — structured-pipeline aggregates: turn/speaker
+    // counts and whether speakers were measured acoustically. Counts and a
+    // boolean only; speaker names and transcript text can never be keys.
+    'turn_count', 'speaker_count', 'diarized',
     // 'stt model downloaded' / 'stt model failed'
     'bytes', 'reason',
     // 'setting changed'
