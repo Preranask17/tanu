@@ -1,15 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/transcript.dart';
-import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../abstractions/audio_source.dart';
+import '../providers/rag_provider.dart';
 import '../widgets/conversation_tile.dart';
-import '../widgets/device_picker_sheet.dart';
-import '../widgets/device_status_controls.dart';
-import '../widgets/page_header.dart';
+import '../widgets/pinned_header.dart';
+import 'chat_screen.dart';
+import 'trash_screen.dart';
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
@@ -23,11 +25,71 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _query = TextEditingController();
 
+  /// Structured RAG reply for the submitted question. Same pipeline calls as
+  /// the Ask screen (backfill + rag.answer) — no new backend, new UI only.
+  String? _ragAnswer;
+  List<String> _ragSourceIds = const [];
+  bool _ragBusy = false;
+  String? _ragError;
+  bool _backfilled = false;
+
   @override
   void dispose() {
     _scroll.dispose();
     _query.dispose();
     super.dispose();
+  }
+
+  Future<void> _askRag() async {
+    final question = _query.text.trim();
+    if (question.isEmpty || _ragBusy) return;
+    setState(() {
+      _ragBusy = true;
+      _ragError = null;
+      _ragAnswer = null;
+      _ragSourceIds = const [];
+    });
+    try {
+      final indexer = await ref.read(memoryIndexerProvider.future);
+      if (!_backfilled) {
+        _backfilled = true;
+        // Fire-and-forget: don't block the answer on backfill.
+        unawaited(
+          indexer.backfill(ref.read(conversationProvider).conversations),
+        );
+      }
+      final rag = await ref.read(ragServiceProvider.future);
+      final result = await rag.answer(question);
+      if (!mounted) return;
+      final seen = <String>{};
+      final ordered = <String>[];
+      for (final source in result.sources) {
+        if (seen.add(source.chunk.sessionId)) {
+          ordered.add(source.chunk.sessionId);
+        }
+      }
+      setState(() {
+        _ragAnswer = result.answer;
+        _ragSourceIds = ordered;
+        _ragBusy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ragError = '$e';
+        _ragBusy = false;
+      });
+    }
+  }
+
+  void _clearSearch() {
+    _query.clear();
+    setState(() {
+      _ragAnswer = null;
+      _ragSourceIds = const [];
+      _ragError = null;
+      _ragBusy = false;
+    });
   }
 
   void scrollToTop() {
@@ -38,15 +100,6 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
         curve: Curves.easeOut,
       );
     }
-  }
-
-  void _openDevicePicker() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const DevicePickerSheet(),
-    );
   }
 
   String _dayLabel(DateTime time) {
@@ -77,9 +130,10 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sessions = ref.watch(conversationProvider).conversations;
-    final status =
-        ref.watch(pendantStatusProvider).value ?? const PendantStatus();
+    final convState = ref.watch(conversationProvider);
+    final sessions = convState.conversations;
+    final processingIds = convState.processingIds;
+    final notifier = ref.read(conversationProvider.notifier);
     final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 16;
     final query = _query.text.trim().toLowerCase();
 
@@ -95,7 +149,8 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
 
     // Group by calendar day, newest first. Pinned items get their own group at the top.
     final pinned = visible.where((s) => s.isPinned).toList();
-    final unpinned = visible.where((s) => !s.isPinned).toList();
+    final unpinned =
+        visible.where((s) => !s.isPinned).toList().reversed.toList();
 
     final groups = <String, List<ConversationSession>>{};
     final order = <String>[];
@@ -127,143 +182,130 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            // Consistent page header (logo top-left, status top-right,
-            // heading below) plus an always-visible glass search. UI only.
-            SliverToBoxAdapter(
-              child: PageHeader(
-                title: 'Memories',
-                actions: [
-                  DeviceStatusActions(
-                    status: status,
-                    onBluetoothTap: _openDevicePicker,
-                  ),
-                ],
-              ),
+            PinnedHeader(
+              title: 'Memories',
+              actions: [
+                _HeaderCircleButton(
+                  icon: Icons.delete_outline,
+                  tooltip: 'Trash',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TrashScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                // Stadium-pill ask/search bar: search left, query middle,
-                // clear + mic right. UI only: the mic reuses the existing
-                // phone-mic test handler, nothing new is wired.
-                child: Container(
-                  height: 50,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.07)
-                        : const Color(0xFFF2F2F7),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _askRag(),
+                  child: Container(
+                    padding: const EdgeInsets.only(
+                      left: 8,
+                      right: 16,
+                      top: 8,
+                      bottom: 8,
+                    ),
+                    decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : const Color(0xFFE5E5E5),
-                      width: 1.0,
+                          ? const Color(0xFF161618)
+                          : const Color(0xFFFFFFFF),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.35 : 0.06,
+                          ),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Theme.of(context)
+                                .primaryColor
+                                .withValues(alpha: 0.12),
+                          ),
+                          child: Icon(
+                            Icons.search_rounded,
+                            size: 20,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _query,
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => _askRag(),
+                            decoration: const InputDecoration(
+                              hintText: 'Ask anything about your day…',
+                              hintStyle: TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 16,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
+                            ),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                              fontSize: 16,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        if (query.isNotEmpty)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _clearSearch,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFF2F2F7),
+                              ),
+                              child: const Icon(
+                                Icons.clear_rounded,
+                                size: 16,
+                                color: Color(0xFF888888),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.search,
-                        size: 20,
-                        color:
-                            Colors.white.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _query,
-                          decoration: InputDecoration(
-                            hintText: 'Ask or search memories...',
-                            hintStyle: TextStyle(
-                              color: Colors.white
-                                  .withValues(alpha: 0.4),
-                              fontSize: 15,
-                            ),
-                            // Fully transparent input: no border, no fill, no
-                            // underline — the pill container is the only
-                            // visible surface.
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            disabledBorder: InputBorder.none,
-                            errorBorder: InputBorder.none,
-                            focusedErrorBorder: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
-                          ),
-                          style: TextStyle(
-                            color:
-                                isDark ? Colors.white : Colors.black,
-                            fontSize: 15,
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      if (query.isNotEmpty)
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            _query.clear();
-                            setState(() {});
-                          },
-                          child: Padding(
-                            padding:
-                                const EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.clear,
-                              size: 18,
-                              color: Colors.white
-                                  .withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => ref
-                            .read(conversationProvider.notifier)
-                            .microphoneTest(),
-                        child: Padding(
-                          padding:
-                              const EdgeInsets.only(left: 8),
-                          child: Icon(
-                            Icons.mic_none,
-                            size: 20,
-                            color:
-                                Colors.white.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
-            // AI reply card: fades in below the pill while a query matches.
-            // Built from the real filtered matches — no backend query layer.
-            SliverToBoxAdapter(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                transitionBuilder: (child, animation) =>
-                    SizeTransition(
-                  sizeFactor: animation,
-                  alignment: Alignment.topCenter,
-                  child: FadeTransition(
-                    opacity: animation,
-                    child: child,
-                  ),
+            if (_ragBusy || _ragAnswer != null || _ragError != null)
+              SliverToBoxAdapter(
+                child: _RagAnswerCard(
+                  busy: _ragBusy,
+                  answer: _ragAnswer,
+                  error: _ragError,
+                  sourceIds: _ragSourceIds,
+                  sessions: sessions,
+                  onRetry: _askRag,
+                  onClear: _clearSearch,
                 ),
-                child: query.isNotEmpty && visible.isNotEmpty
-                    ? _AiReplyCard(
-                        key: const ValueKey('reply'),
-                        session: visible.first,
-                        matchCount: visible.length,
-                      )
-                    : const SizedBox.shrink(key: ValueKey('empty')),
               ),
-            ),
             if (sessions.isEmpty)
               const SliverFillRemaining(
                 hasScrollBody: false,
@@ -278,9 +320,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                   bottom: bottomInset,
                 ),
                 sliver: visible.isEmpty && query.isNotEmpty
-                    ? SliverToBoxAdapter(
-                        child: _NoMatches(query: query.trim()),
-                      )
+                    ? const SliverToBoxAdapter(child: _NoMatches())
                     : SliverList(
                         delegate: SliverChildListDelegate([
                           for (final label in order) ...[
@@ -296,6 +336,14 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: ConversationTile(
                                   session: session,
+                                  isProcessing:
+                                      processingIds.contains(session.id),
+                                  isFailed: !processingIds.contains(
+                                    session.id,
+                                  ) &&
+                                      notifier.isQueuedForRetry(session.id),
+                                  onRetry: () =>
+                                      notifier.retrySession(session.id),
                                   isNew:
                                       session.status ==
                                           ConversationStatus.completed &&
@@ -324,32 +372,88 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   }
 }
 
-/// AI reply card under the search pill. Display only: summarizes the real
-/// filtered matches (top hit + count) with key details in bold. Hidden
-/// whenever the query is cleared or matches nothing.
-class _AiReplyCard extends StatelessWidget {
-  const _AiReplyCard({
-    super.key,
-    required this.session,
-    required this.matchCount,
+/// 44px circle header action in the pendant-button language.
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
   });
 
-  final ConversationSession session;
-  final int matchCount;
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final summary = session.summary?.isNotEmpty == true
-        ? session.summary!
-        : (session.segments.isNotEmpty
-              ? session.segments.last.text.trim()
-              : session.title);
-    final title = session.title.trim().isNotEmpty
-        ? session.title.trim()
-        : 'Untitled memory';
+    final button = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+            width: 1,
+          ),
+        ),
+        child: Icon(icon, size: 20, color: const Color(0xFF888888)),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip!, child: button);
+  }
+}
+
+/// Structured RAG reply card: the submitted question answered from saved
+/// memories (same pipeline as the Ask screen), with the source memories as
+/// tappable chips. Display only: every lookup below reads already-loaded
+/// sessions, nothing new is fetched or stored.
+class _RagAnswerCard extends StatelessWidget {
+  const _RagAnswerCard({
+    required this.busy,
+    required this.answer,
+    required this.error,
+    required this.sourceIds,
+    required this.sessions,
+    required this.onRetry,
+    required this.onClear,
+  });
+
+  final bool busy;
+  final String? answer;
+  final String? error;
+  final List<String> sourceIds;
+  final List<ConversationSession> sessions;
+  final VoidCallback onRetry;
+  final VoidCallback onClear;
+
+  String _sourceTitle(String id) {
+    for (final s in sessions) {
+      if (s.id == id) {
+        final title = s.title.trim();
+        return title.isEmpty ? 'Untitled memory' : title;
+      }
+    }
+    return 'Memory';
+  }
+
+  ConversationSession? _sourceSession(String id) {
+    for (final s in sessions) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.only(top: 12, bottom: 16, left: 20, right: 20),
+      margin: const EdgeInsets.only(top: 12, bottom: 4, left: 20, right: 20),
       padding: const EdgeInsets.all(18),
       width: double.infinity,
       decoration: BoxDecoration(
@@ -375,39 +479,143 @@ class _AiReplyCard extends StatelessWidget {
                 color: Theme.of(context).primaryColor,
               ),
               const SizedBox(width: 6),
-              Text(
-                matchCount == 1
-                    ? '1 memory found'
-                    : '$matchCount memories found',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF888888),
+              Expanded(
+                child: Text(
+                  busy
+                      ? 'Recalling memories…'
+                      : error != null
+                          ? 'Could not recall'
+                          : sourceIds.length == 1
+                              ? '1 memory found'
+                              : '${sourceIds.length} memories found',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF888888),
+                  ),
                 ),
               ),
+              if (busy)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClear,
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Color(0xFF888888),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
-          RichText(
-            text: TextSpan(
+          if (busy)
+            const Text(
+              'Searching your saved memories for relevant moments…',
               style: TextStyle(
-                fontSize: 15,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF888888),
+                fontSize: 14,
                 height: 1.4,
-                color: isDark ? Colors.white : Colors.black,
               ),
+            )
+          else if (error != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextSpan(
-                  text: '“$summary”',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                const Text(
+                  'The recall failed. Your memories are untouched.',
+                  style: TextStyle(fontSize: 14, height: 1.4),
                 ),
-                const TextSpan(text: ' — saved in '),
-                TextSpan(
-                  text: '“$title”.',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Try again'),
                 ),
               ],
+            )
+          else if (answer != null)
+            Text(
+              answer!,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                color: isDark ? Colors.white : Colors.black,
+              ),
             ),
-          ),
+          if (!busy && error == null && sourceIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final id in sourceIds)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      final target = _sourceSession(id);
+                      if (target == null) return;
+                      HapticFeedback.selectionClick();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          fullscreenDialog: true,
+                          builder: (_) => SessionDetailPage(session: target),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .primaryColor
+                            .withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 13,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              _sourceTitle(id),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -458,19 +666,16 @@ class _DayHeader extends StatelessWidget {
 }
 
 class _NoMatches extends StatelessWidget {
-  const _NoMatches({required this.query});
-
-  final String query;
+  const _NoMatches();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 80),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 80),
       child: Center(
         child: Text(
-          'No memories found matching "$query".',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Color(0xFF888888)),
+          'No matches for that search.',
+          style: TextStyle(color: Color(0xFF888888)),
         ),
       ),
     );

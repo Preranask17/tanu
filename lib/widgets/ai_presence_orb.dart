@@ -15,6 +15,7 @@ class AiPresenceOrb extends StatefulWidget {
     super.key,
     this.level = 0,
     this.listening = false,
+    this.transcribing = false,
     this.height = 280,
   });
 
@@ -23,6 +24,11 @@ class AiPresenceOrb extends StatefulWidget {
 
   /// Whether a session is live; only softens the glow, never restyles.
   final bool listening;
+
+  /// Whether words are actively streaming in. Energizes the form (quicker
+  /// morph, brighter accents, voice-reactive rim) while idle/listening
+  /// render exactly as before.
+  final bool transcribing;
 
   /// Render height; the orb scales to fit while staying round.
   final double height;
@@ -63,6 +69,7 @@ class _AiPresenceOrbState extends State<AiPresenceOrb>
             t: _flow.value * 2 * math.pi,
             level: widget.level.clamp(0.0, 1.0),
             listening: widget.listening,
+            transcribing: widget.transcribing,
           ),
         ),
       ),
@@ -75,11 +82,17 @@ class _OrbPainter extends CustomPainter {
     required this.t,
     required this.level,
     required this.listening,
+    this.transcribing = false,
   });
 
   final double t;
   final double level;
   final bool listening;
+  final bool transcribing;
+
+  /// Energized timeline while words stream in; identical to [t] otherwise
+  /// so idle/listening frames are pixel-identical to before.
+  double get _tt => transcribing ? t * 1.8 : t;
 
   /// Edge recipe: a circle first, alive second. Total circumference
   /// deviation stays within ~±5% so the silhouette always reads as round:
@@ -87,12 +100,15 @@ class _OrbPainter extends CustomPainter {
   /// of organic motion, and voice energy barely ripples the rim.
   double _radius(double angle, double base) {
     // Slow breathing swell (~7s loop frequency component): ±2.5%.
-    final breath = math.sin(t * 0.9) * 0.025;
+    final breath = math.sin(_tt * 0.9) * 0.025;
     // Fixed micro-ripple around the edge: ±2% combined, no points.
-    final ripple = 0.012 * math.sin(3 * angle + t * 1.1) +
-        0.008 * math.sin(5 * angle - t * 0.7 + 1.3);
-    // Voice energy: a ±2% shimmer at most, never a deformation.
-    final voice = level * 0.02 * math.sin(2 * angle + t * 2.0);
+    final ripple = 0.012 * math.sin(3 * angle + _tt * 1.1) +
+        0.008 * math.sin(5 * angle - _tt * 0.7 + 1.3);
+    // Voice energy: a ±2% shimmer at most, never a deformation. While
+    // transcribing there is always a floor shimmer so the rim stays alive
+    // between words too.
+    final voice =
+        (level * 0.02 + (transcribing ? 0.008 : 0.0)) * math.sin(2 * angle + _tt * 2.0);
     return base * (1 + breath + ripple + voice);
   }
 
@@ -131,7 +147,8 @@ class _OrbPainter extends CustomPainter {
     final r = math.min(size.width, size.height) * 0.30;
 
     // 1. Soft ambient glow on the dark background.
-    final glowAlpha = (listening ? 0.38 : 0.30) + level * 0.10;
+    var glowAlpha = (listening ? 0.38 : 0.30) + level * 0.10;
+    if (transcribing) glowAlpha += 0.12;
     canvas.drawCircle(
       center,
       r * 2.4,
@@ -168,24 +185,24 @@ class _OrbPainter extends CustomPainter {
     // diffuses rather than orbits.
     canvas.save();
     canvas.clipPath(body);
-    final drift = t * 0.35;
+    final drift = _tt * 0.35;
     _accent(
       canvas,
       center + Offset(r * 0.38 * math.cos(drift), r * 0.30 * math.sin(drift)),
       r * 0.85,
-      const Color(0xFF59D6E6).withValues(alpha: 0.16),
+      const Color(0xFF59D6E6).withValues(alpha: transcribing ? 0.26 : 0.16),
     );
     _accent(
       canvas,
       center + Offset(r * 0.34 * math.cos(drift + 2.4), r * 0.34 * math.sin(drift + 2.4)),
       r * 0.80,
-      const Color(0xFFE08BC0).withValues(alpha: 0.13),
+      const Color(0xFFE08BC0).withValues(alpha: transcribing ? 0.22 : 0.13),
     );
     _accent(
       canvas,
       center + Offset(0, -r * 0.42),
       r * 0.90,
-      const Color(0xFF8F7BEE).withValues(alpha: 0.20),
+      const Color(0xFF8F7BEE).withValues(alpha: transcribing ? 0.32 : 0.20),
     );
     // Inner depth: darker toward the rim, luminous toward the core.
     canvas.drawCircle(
@@ -209,11 +226,15 @@ class _OrbPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12)
-        ..color = const Color(0xFF8F7BEE).withValues(alpha: 0.28),
+        ..color = const Color(0xFF8F7BEE)
+            .withValues(alpha: transcribing ? 0.45 : 0.28),
     );
   }
 
   @override
   bool shouldRepaint(covariant _OrbPainter old) =>
-      old.t != t || old.level != level || old.listening != listening;
+      old.t != t ||
+      old.level != level ||
+      old.listening != listening ||
+      old.transcribing != transcribing;
 }

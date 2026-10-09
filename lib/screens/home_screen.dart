@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,11 +7,11 @@ import '../models/conversation.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
-import '../screens/chat_screen.dart';
+import 'chat_screen.dart';
 import '../widgets/ai_presence_orb.dart';
 import '../widgets/device_picker_sheet.dart';
-import '../widgets/device_status_controls.dart';
-import '../widgets/page_header.dart';
+import '../widgets/home_chat_bar.dart';
+import '../widgets/pinned_header.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -105,306 +104,110 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
 
-    // Bottom cushion clears the floating nav dock (no chat bar anymore).
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
+    // While a conversation is happening the bottom bar and hero copy get
+    // out of the way: orb + live transcription only. The bar returns the
+    // moment capture is idle so a new session can always start.
+    final capturing = status.isConnected &&
+        (conversation.isListening || conversation.active != null);
     final bottomPadding =
         MediaQuery.paddingOf(context).bottom + (isDesktop ? 16 : 96);
+    final bottomInset = capturing ? bottomPadding + 24 : bottomPadding + 62 + 16;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: RefreshIndicator(
-        onRefresh: () async =>
-            ref.read(conversationProvider.notifier).reloadFromStorage(),
-        child: CustomScrollView(
-          controller: _scroll,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: [
-            // Consistent page header: logo top-left, status top-right,
-            // heading below. UI only: reads existing status, opens the
-            // existing picker.
-            SliverToBoxAdapter(
-              child: PageHeader(
-                title: 'Capture',
-                actions: [
-                  DeviceStatusActions(
-                    status: status,
-                    onBluetoothTap: _openDevicePicker,
-                  ),
-                ],
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async =>
+                ref.read(conversationProvider.notifier).reloadFromStorage(),
+            child: CustomScrollView(
+              controller: _scroll,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Calm AI presence. Pure visual: only reads the
-                    // already-watched mic level / listening flag.
-                    AiPresenceOrb(
-                      level: conversation.micLevel,
-                      listening: conversation.isListening,
-                    ),
-                    // Live transcription: always visible (placeholder when
-                    // idle), capped height with internal scrolling.
-                    _LiveCaptureCard(
+              slivers: [
+                PinnedHeader(
+                  title: 'Capture',
+                  actions: [
+                    if (status.isConnected &&
+                        status.batteryPercent != null)
+                      _BatteryPill(
+                        percent: status.batteryPercent!,
+                      ),
+                    _PendantButton(
                       status: status,
-                      conversation: conversation,
+                      onTap: _openDevicePicker,
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveCaptureCard extends ConsumerWidget {
-  const _LiveCaptureCard({required this.status, required this.conversation});
-
-  final PendantStatus status;
-  final ConversationState conversation;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final words = conversation.liveTranscript.trim();
-    final active = conversation.active;
-    // The one existing capture flag: STT session live or not. Nothing else
-    // drives this badge, and nothing here writes any backend state.
-    final capturing = conversation.isListening;
-    final label = switch (conversation.sttEvent) {
-      'stt unavailable' => 'Transcription unavailable',
-      'Model missing. Download in Settings.' =>
-        'Model missing. Download in Settings.',
-      _ => capturing ? 'Capturing...' : 'Ready',
-    };
-
-    final preview = words.isNotEmpty
-        ? words
-        : (active != null && active.segments.isNotEmpty
-              ? active.segments.last.text.trim()
-              : '');
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final listening = conversation.isListening;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          HapticFeedback.selectionClick();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              fullscreenDialog: true,
-              builder: (_) => const ChatPage(),
-            ),
-          );
-        },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.05)
-                : const Color(0xFFFFFFFF),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : const Color(0xFFE5E5E5),
-              width: 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  _Equalizer(
-                    color: Theme.of(context).primaryColor,
-                    level: conversation.micLevel,
-                  ),
-                  const SizedBox(width: 12),
-                  // Status badge: fades between Capturing... (pulsing accent
-                  // dot) and muted Ready as the existing capture flag flips.
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      child: Row(
-                        key: ValueKey<bool>(capturing),
-                        children: [
-                          if (capturing) ...[
-                            _BlinkDot(
-                              color: Theme.of(context).primaryColor,
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Expanded(
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: capturing
-                                    ? null
-                                    : const Color(0xFF888888),
-                              ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 8, bottom: bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AiPresenceOrb(
+                          level: conversation.micLevel,
+                          listening: conversation.isListening,
+                          transcribing: conversation.liveTranscript
+                              .trim()
+                              .isNotEmpty,
+                        ),
+                        _LiveCaptureStrip(
+                          conversation: conversation,
+                          onOpenTranscript: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              fullscreenDialog: true,
+                              builder: (_) => const ChatPage(),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Text(
-                    status.deviceName ?? 'Pendant',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF888888),
-                    ),
-                  ),
-                ],
-              ),
-              if (active != null && active.segments.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      ref.read(conversationProvider.notifier).forceEndSession();
-                    },
-                    icon: const Icon(Icons.add_circle_outline, size: 18),
-                    label: const Text(
-                      'New memory',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (!capturing)
+                          _CaptureHero(
+                            micLevel: conversation.micLevel,
+                            isConnected: status.isConnected,
+                            deviceName: status.deviceName,
+                          ),
+                      ],
                     ),
                   ),
                 ),
               ],
-              const SizedBox(height: 16),
-              // Capped transcript area: placeholder when idle, internal
-              // scroll when the stream grows long.
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 220),
-                child: SingleChildScrollView(
-                  child: preview.isNotEmpty
-                      ? Text(
-                          preview,
-                          style: TextStyle(
-                            fontStyle: words.isNotEmpty
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                            color: (isDark ? Colors.white : Colors.black)
-                                .withValues(alpha: 0.85),
-                            fontSize: 16,
-                            height: 1.4,
-                          ),
-                        )
-                      : Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                listening
-                                    ? 'Listening…'
-                                    : 'Transcription will appear here…',
-                                style: const TextStyle(
-                                  fontStyle: FontStyle.italic,
-                                  color: Color(0xFF888888),
-                                  fontSize: 15,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                            if (listening) ...[
-                              const SizedBox(width: 8),
-                              _BlinkDot(
-                                color: Theme.of(context).primaryColor,
-                              ),
-                            ],
-                          ],
-                        ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          if (!capturing)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: bottomPadding,
+              child: const Center(child: HomeChatBar()),
+            ),
+        ],
       ),
     );
   }
 }
 
-/// Subtle blinking cursor dot shown while transcription is live.
-class _BlinkDot extends StatefulWidget {
-  const _BlinkDot({this.color = const Color(0xFFE5484D)});
+/// Solid pendant status button with a live pulse while disconnected.
+/// Connected: solid green, white icon. Otherwise: solid dark body, red glow
+/// and an expanding pulse ring (rotating sync while reconnecting). Opens the
+/// existing device picker; all BLE logic lives elsewhere and is untouched.
+class _PendantButton extends StatefulWidget {
+  const _PendantButton({
+    required this.status,
+    required this.onTap,
+  });
 
-  final Color color;
+  final PendantStatus status;
+  final VoidCallback onTap;
 
   @override
-  State<_BlinkDot> createState() => _BlinkDotState();
+  State<_PendantButton> createState() => _PendantButtonState();
 }
 
-class _BlinkDotState extends State<_BlinkDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _blink;
-
-  @override
-  void initState() {
-    super.initState();
-    _blink = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _blink.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: Tween<double>(begin: 1, end: 0.25).animate(_blink),
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.color,
-        ),
-      ),
-    );
-  }
-}
-
-/// Animated 4-bar voice meter.
-class _Equalizer extends StatefulWidget {
-  const _Equalizer({required this.color, required this.level});
-
-  final Color color;
-  final double level;
-
-  @override
-  State<_Equalizer> createState() => _EqualizerState();
-}
-
-class _EqualizerState extends State<_Equalizer>
+class _PendantButtonState extends State<_PendantButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
 
@@ -413,7 +216,7 @@ class _EqualizerState extends State<_Equalizer>
     super.initState();
     _pulse = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 1600),
     )..repeat();
   }
 
@@ -425,39 +228,231 @@ class _EqualizerState extends State<_Equalizer>
 
   @override
   Widget build(BuildContext context) {
-    const barCount = 4;
-    final frequencies = [0.9, 1.4, 1.1, 0.7];
-    final phases = [0.0, 1.7, 0.9, 2.6];
+    final status = widget.status;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final connected = status.isConnected;
+    final reconnecting = status.state == PendantState.reconnecting ||
+        status.state == PendantState.scanning ||
+        status.state == PendantState.connecting;
 
-    return AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, _) {
-        final t = _pulse.value * 2 * math.pi;
-        final amp = 0.3 + 0.7 * widget.level.clamp(0.0, 1.0);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (var i = 0; i < barCount; i++)
-              Container(
-                width: 3.5,
-                height:
-                    12 +
-                    (16 * amp) *
-                        (0.5 +
-                            0.5 *
-                                math.sin(
-                                  i * 0.9 + t * frequencies[i] + phases[i],
-                                )),
-                margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                decoration: BoxDecoration(
-                  color: widget.color,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-          ],
-        );
+    final IconData icon;
+    final Color body;
+    final Color iconColor;
+    if (connected) {
+      icon = Icons.bluetooth_connected;
+      body = const Color(0xFF2E7D32);
+      iconColor = Colors.white;
+    } else if (reconnecting) {
+      icon = Icons.sync;
+      body = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE2E2E2);
+      iconColor = Colors.orange;
+    } else {
+      // Same solid treatment as the connected state, in red.
+      icon = Icons.bluetooth_disabled;
+      body = const Color(0xFFC62828);
+      iconColor = Colors.white;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        widget.onTap();
       },
+      child: SizedBox(
+        width: 52,
+        height: 52,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (!connected)
+              AnimatedBuilder(
+                animation: _pulse,
+                builder: (context, _) {
+                  final t = _pulse.value;
+                  return Container(
+                    width: 44 + 8 * t,
+                    height: 44 + 8 * t,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.5 * (1 - t)),
+                        width: 2,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: body,
+                boxShadow: [
+                  if (!connected)
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.35),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    )
+                  else
+                    BoxShadow(
+                      color: const Color(0xFF2E7D32).withValues(alpha: 0.45),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                ],
+              ),
+              child: reconnecting
+                  ? RotationTransition(
+                      turns: _pulse,
+                      child: Icon(icon, size: 20, color: iconColor),
+                    )
+                  : Icon(icon, size: 20, color: iconColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Live transcription strip under the orb: the in-progress words stream
+/// here while capturing, the last captured line stays visible when idle.
+/// Display only — capture controls live in the chat bar as before.
+class _LiveCaptureStrip extends StatelessWidget {
+  const _LiveCaptureStrip({
+    required this.conversation,
+    required this.onOpenTranscript,
+  });
+
+  final ConversationState conversation;
+  final VoidCallback onOpenTranscript;
+
+  @override
+  Widget build(BuildContext context) {
+    final words = conversation.liveTranscript.trim();
+    final active = conversation.active;
+    final preview = words.isNotEmpty
+        ? words
+        : (active != null && active.segments.isNotEmpty
+              ? active.segments.last.text.trim()
+              : '');
+    final idle = preview.isEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, left: 32, right: 32),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onOpenTranscript();
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 110),
+          child: SingleChildScrollView(
+            child: Text(
+              idle ? 'Transcription will appear here…' : preview,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                fontSize: 15,
+                height: 1.45,
+                color: idle
+                    ? const Color(0xFF888888)
+                    : Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Battery pill from the shared header language. Display only.
+class _BatteryPill extends StatelessWidget {
+  const _BatteryPill({required this.percent});
+
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.battery_std, size: 18, color: Color(0xFF888888)),
+          const SizedBox(width: 6),
+          Text(
+            '$percent%',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF888888),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaptureHero extends StatelessWidget {
+  const _CaptureHero({
+    required this.micLevel,
+    required this.isConnected,
+    required this.deviceName,
+  });
+
+  final double micLevel;
+  final bool isConnected;
+  final String? deviceName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          isConnected
+              ? 'Listening for your thoughts'
+              : 'Connect your pendant to begin',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isConnected
+              ? 'Tap the control below when you are ready'
+              : 'Your conversations stay on this device',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
+        ),
+        if (isConnected && deviceName != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            deviceName!,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: const Color(0xFF888888),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

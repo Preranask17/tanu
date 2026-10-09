@@ -16,11 +16,16 @@ const String kPendantName = 'Omi';
 
 /// ---- Whisper Small (multilingual) on-device bundle ---------------------
 /// Multilingual speech recognition (English + Kannada/Tamil/Telugu/Malayalam
-/// and 90+ more), ~375 MB download. `sherpa_onnx` ships the runtime; this is
-/// just int8 weights + tokens. Extracts into
+/// and 90+ more), 375 MB total. The three int8 files are streamed straight
+/// to disk from the Hugging Face mirror with range-resume — never as one
+/// archive: the GitHub `.tar.bz2` is 610 MB and unpacks to ~1.3 GB in RAM,
+/// which Android kills mid-extract. Files land in
 /// `appSupport/<kWhisperSmallDirName>/`.
-const String kWhisperSmallTarUrl =
-    'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2';
+const String kWhisperSmallFilesBaseUrl =
+    'https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small/resolve/main';
+
+/// Legacy GitHub bundle archive name (610 MB). Kept only so downloads can
+/// purge the leftover archive and `.part` from older builds.
 const String kWhisperSmallTarFileName = 'sherpa-onnx-whisper-small.tar.bz2';
 const String kWhisperSmallDirName = 'sherpa-onnx-whisper-small';
 
@@ -29,12 +34,13 @@ const String kSileroVadUrl =
     'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx';
 const String kSileroVadFileName = 'silero_vad.onnx';
 
-/// Files the Whisper Small recognizer loads from the model directory.
+/// Files the Whisper Small recognizer loads from the model directory, with
+/// their exact byte sizes (used for progress totals and integrity checks).
 /// `silero_vad.onnx` is fetched separately via [kSileroVadUrl].
 const List<({String name, int bytes})> kWhisperSmallBundleFiles = [
-  (name: 'small-encoder.int8.onnx', bytes: 0),
-  (name: 'small-decoder.int8.onnx', bytes: 0),
-  (name: 'small-tokens.txt', bytes: 0),
+  (name: 'small-encoder.int8.onnx', bytes: 112442483),
+  (name: 'small-decoder.int8.onnx', bytes: 262226114),
+  (name: 'small-tokens.txt', bytes: 816730),
 ];
 
 
@@ -90,3 +96,40 @@ const String kPostHogHost = String.fromEnvironment(
   'POSTHOG_HOST',
   defaultValue: 'https://us.i.posthog.com',
 );
+
+/// ---- Gemini (agent brain) -------------------------------------------------
+/// Cloud agent used for memory processing and in-memory chat.
+const String kGeminiApiKey = String.fromEnvironment('GEMINI_API_KEY');
+const String kGeminiModel = 'gemini-3.5-flash-lite';
+const String kGeminiEndpoint =
+    'https://generativelanguage.googleapis.com/v1beta/models/$kGeminiModel:generateContent';
+
+/// Gemini embeddings used by the RAG pipeline.
+const String kGeminiEmbeddingModel = 'gemini-embedding-001';
+const int kEmbeddingDims = 768;
+const int kRagChunkMaxChars = 1000;
+const int kRagTopK = 8;
+const int kRagTopKSession = 6;
+const int kRagEmbedBatchSize = 10;
+const int kRagChunkOverlapChars = 150;
+const int kRagContextMaxChars = 2000;
+const int kRagMinSliceChars = 20;
+const int kRagQueryCacheTtlSeconds = 300;
+const double kRagMinDistance = 0.6;
+const int kGeminiMinGapEmbedMs = 500;
+const int kGeminiMinGapChatMs = 2000;
+
+/// Chat-path retry policy: transient failures (429/5xx/timeout) only,
+/// this many retries max. Deterministic failures never retry.
+const int kGeminiChatMaxRetries = 2;
+
+/// Single-prompt token budget: transcripts longer than this are head/tail
+/// capped (see capPromptTranscript) instead of sent whole every attempt.
+const int kGeminiPromptMaxChars = 12000;
+const int kGeminiPromptHeadChars = 8000;
+const int kGeminiPromptTailChars = 4000;
+
+/// Structuring result cache: identical transcripts (queue re-runs,
+/// reprocessing) return without an API call. Memory-only, bounded.
+const int kGeminiResultCacheSize = 20;
+const int kGeminiResultCacheTtlMinutes = 60;

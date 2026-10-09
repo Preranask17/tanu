@@ -111,6 +111,12 @@ class FakeSttEngine implements ContinuousSttEngine {
   Future<bool> isAvailable() async => true;
 
   @override
+
+  @override
+  Future<void> flushUtterance() async {
+    // No worker-side audio held: nothing to salvage.
+  }
+
   Future<void> stop() async {}
 }
 

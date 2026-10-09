@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:android_intent_plus/android_intent.dart';
 
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
 import '../providers/commitment_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/dev_capture_provider.dart';
+import '../providers/proactive_provider.dart';
 import '../providers/settings_provider.dart';
+import '../config/stt_config.dart';
 import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../widgets/device_picker_sheet.dart';
-import '../widgets/device_status_controls.dart';
-import '../widgets/page_header.dart';
+import '../widgets/page_layout.dart';
+import '../widgets/pinned_header.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -23,15 +26,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _developerOpen = false;
-
-  void _openDevicePicker() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const DevicePickerSheet(),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,22 +38,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          // Consistent page header (logo top-left, status top-right,
-          // heading below). Sections below are untouched and functional.
-          SliverToBoxAdapter(
-            child: PageHeader(
-              title: 'Settings',
-              actions: [
-                DeviceStatusActions(
-                  status: status,
-                  onBluetoothTap: _openDevicePicker,
-                ),
-              ],
-            ),
+          const PinnedHeader(
+            title: 'Settings',
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: TanuPageRail(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -84,6 +67,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   const _SttModelDashboard(),
+                  const SizedBox(height: 16),
+                  const _SttLanguagePicker(),
 
                   const SizedBox(height: 36),
 
@@ -94,6 +79,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   const _WipeMemoryButton(),
+
+                  const SizedBox(height: 36),
+
+                  // ── Gemini API key ──
+                  const _SectionHeader(
+                    title: 'Gemini API Key',
+                    subtitle: 'Used for memory processing, chat & RAG embeddings',
+                  ),
+                  const SizedBox(height: 16),
+                  const _GeminiKeyField(),
+
+                  const SizedBox(height: 36),
+
+                  const _SectionHeader(
+                    title: 'Notifications',
+                    subtitle: 'Important moments, not noise',
+                  ),
+                  const SizedBox(height: 16),
+                  const _NotificationSettings(),
 
                   const SizedBox(height: 36),
 
@@ -122,10 +126,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 16),
                     _DeveloperConsole(capture: capture, stats: stats),
                   ],
-
-                  // Bottom cushion: clears the floating nav dock (64 tall,
-                  // offset safeArea + 16) on every screen size, so the last
-                  // card scrolls fully into view and stays tappable.
+                  // Clearance above the floating dock so the last section
+                  // scrolls fully into view on every screen size.
                   SizedBox(
                     height: MediaQuery.paddingOf(context).bottom + 112,
                   ),
@@ -142,6 +144,222 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Components
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+/// Notification preferences: master switch, morning digest + hour.
+/// Display only — the proactive service reads the persisted values.
+class _NotificationSettings extends ConsumerWidget {
+  const _NotificationSettings();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('Important notifications'),
+          subtitle: const Text('Commitments and highlights'),
+          value: settings.notifyEnabled,
+          onChanged: (v) =>
+              ref.read(settingsProvider.notifier).setNotificationsEnabled(v),
+        ),
+        SwitchListTile(
+          title: const Text('Morning digest'),
+          subtitle: const Text('Top stashed memories, once daily'),
+          value: settings.digestEnabled,
+          onChanged: settings.notifyEnabled
+              ? (v) =>
+                  ref.read(settingsProvider.notifier).setDigestEnabled(v)
+              : null,
+        ),
+        const Divider(height: 24),
+        const _BackgroundProtection(),
+        ListTile(
+          title: const Text('Digest hour'),
+          trailing: DropdownButton<int>(
+            value: settings.digestHour,
+            underline: const SizedBox.shrink(),
+            onChanged: settings.notifyEnabled && settings.digestEnabled
+                ? (v) {
+                    if (v != null) {
+                      ref.read(settingsProvider.notifier).setDigestHour(v);
+                    }
+                  }
+                : null,
+            items: [
+              for (var h = 6; h <= 10; h++)
+                DropdownMenuItem(
+                  value: h,
+                  child: Text('$h am'),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Background protection: one-tap routes to the system screens that
+/// decide whether the digest worker survives app kill on aggressive OEM
+/// skins (Oppo/Realme/Vivo/Xiaomi). Fired via plain Android intents — no
+/// native plugin, nothing to break the Gradle build. All launches guarded.
+class _BackgroundProtection extends StatelessWidget {
+  const _BackgroundProtection();
+
+  static const _package = 'com.tanu.tanu_app';
+
+  Future<void> _launch(AndroidIntent intent) async {
+    try {
+      await intent.launch();
+    } catch (e) {
+      debugPrint('[tanu] settings intent failed: $e');
+    }
+  }
+
+  /// Battery exemption request for this exact package (falls back to the
+  /// optimization list when the request screen is unavailable).
+  Future<void> _requestExemption() async {
+    try {
+      await const AndroidIntent(
+        action: 'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+        data: 'package:$_package',
+      ).launch();
+      return;
+    } catch (_) {}
+    await _launch(
+      const AndroidIntent(
+        action: 'android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS',
+      ),
+    );
+  }
+
+  /// OEM autostart managers move between releases: try known ColorOS
+  /// entries, then the app-details page as a guaranteed fallback.
+  Future<void> _openAutostart() async {
+    const candidates = [
+      ('com.coloros.safecenter',
+          'com.coloros.safecenter.startupapp.StartupAppListActivity'),
+      ('com.oppo.safe', 'com.oppo.safe.permission.startup.StartupAppListActivity'),
+      ('com.coloros.safecenter',
+          'com.coloros.safecenter.permission.startup.StartupAppListActivity'),
+    ];
+    for (final c in candidates) {
+      try {
+        await AndroidIntent(
+          action: 'android.intent.action.MAIN',
+          package: c.$1,
+          componentName: c.$2,
+        ).launch();
+        return;
+      } catch (_) {}
+    }
+    await _launch(
+      const AndroidIntent(
+        action: 'android.settings.APPLICATION_DETAILS_SETTINGS',
+        data: 'package:$_package',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const ListTile(
+          leading: Icon(Icons.shield_outlined, color: Color(0xFF888888)),
+          title: Text('Background protection'),
+          subtitle: Text(
+            'Aggressive skins kill background apps. Exempt Tanu so the '
+            'morning digest arrives with the app closed.',
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Wrap(
+            spacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: _requestExemption,
+                icon: const Icon(Icons.battery_saver_outlined, size: 16),
+                label: const Text('Battery exemption'),
+              ),
+              TextButton.icon(
+                onPressed: _openAutostart,
+                icon: const Icon(Icons.play_circle_outline, size: 16),
+                label: const Text('Autostart'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GeminiKeyField extends ConsumerStatefulWidget {
+  const _GeminiKeyField();
+
+  @override
+  ConsumerState<_GeminiKeyField> createState() => _GeminiKeyFieldState();
+}
+
+class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
+  final _ctrl = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.text = ref.read(settingsProvider).geminiApiKey;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _ctrl,
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              hintText: 'AIza...',
+              filled: true,
+              fillColor: isDark
+                  ? const Color(0xFF1C1C1E)
+                  : const Color(0xFFF2F2F7),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        FilledButton(
+          onPressed: () {
+            ref.read(settingsProvider.notifier).setGeminiApiKey(_ctrl.text);
+            FocusScope.of(context).unfocus();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Gemini API key saved')),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
 
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -208,13 +426,52 @@ class _PendantDashboard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                  child: Text(
-                    isConnected ? 'Tanu is\nConnected' : 'Tanu is\nOffline',
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      height: 1.1,
-                      fontSize: 32,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isConnected
+                            ? Icons.bluetooth_connected
+                            : Icons.bluetooth_disabled,
+                        color: accent,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isConnected
+                                ? 'Pendant connected'
+                                : 'Pendant offline',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isConnected
+                                ? (status.deviceName ?? 'Tanu pendant')
+                                : 'Connect a pendant to start capturing',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               if (isConnected && status.batteryPercent != null)
                 _BatteryBadge(percent: status.batteryPercent!),
@@ -448,6 +705,83 @@ class _ThemePill extends StatelessWidget {
   }
 }
 
+/// Speech-language picker. Auto-detect (default Whisper engine) or one
+/// explicit Indic language (same on-device bundle driven through the Indic
+/// engine core with a fixed language hint). Pure selection UI: the engine
+/// factory rebuilds the recognizer when the persisted code changes.
+class _SttLanguagePicker extends ConsumerWidget {
+  const _SttLanguagePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final code = ref.watch(
+      settingsProvider.select((s) => s.sttLanguageCode),
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF111111) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.translate_rounded,
+            size: 20,
+            color: Color(0xFF888888),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Speech language',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  'Same offline model, fixed hint',
+                  style: TextStyle(
+                    color: Color(0xFF888888),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          DropdownButton<String>(
+            value: code.isEmpty ? '' : code,
+            underline: const SizedBox.shrink(),
+            onChanged: (next) {
+              if (next != null) {
+                ref.read(settingsProvider.notifier).setSttLanguageCode(next);
+              }
+            },
+            items: [
+              const DropdownMenuItem(
+                value: '',
+                child: Text('Auto-detect'),
+              ),
+              for (final lang in SttConfig.indicLanguages)
+                DropdownMenuItem(
+                  value: lang.code,
+                  child: Text(lang.label),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SttModelDashboard extends ConsumerWidget {
   const _SttModelDashboard();
 
@@ -478,6 +812,10 @@ class _SttModelDashboard extends ConsumerWidget {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Active recognizer core: identical to the bundle title by default,
+    // "Whisper Small · Hindi"-style only when an Indic language is fixed.
+    final engineLabel = ref.watch(sttEngineProvider).modelLabel;
+    final showEngineLabel = engineLabel != kOfflineModelLabel;
 
     return Container(
       width: double.infinity,
@@ -512,6 +850,14 @@ class _SttModelDashboard extends ConsumerWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (showEngineLabel)
+                      Text(
+                        engineLabel,
+                        style: const TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 12,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -761,6 +1107,37 @@ class _DeveloperConsole extends ConsumerWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.notifications_outlined, size: 16),
+            label: const Text('SEND TEST NOTIFICATION'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF353535),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            onPressed: () async {
+              final ok = await ref
+                  .read(proactiveServiceProvider.future)
+                  .then((svc) => svc.showTestNotification())
+                  .catchError((_) => false);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? 'Test notification sent — check the shade'
+                          : 'Test notification failed — check permission',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
         ],
       ),
     );

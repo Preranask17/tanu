@@ -35,7 +35,7 @@ void main() {
 
     // 1. Top header: wordmark left, disconnected BT control right.
     expect(find.byType(TanuWordmark), findsOneWidget);
-    expect(find.byIcon(Icons.bluetooth), findsOneWidget);
+    expect(find.byIcon(Icons.bluetooth_disabled), findsOneWidget);
     // No battery pill while disconnected with no known value.
     expect(find.textContaining('%'), findsNothing);
     // Section headline below the header.
@@ -45,8 +45,8 @@ void main() {
     expect(find.text('Transcription will appear here…'), findsOneWidget);
     // Capture carries zero search bars.
     expect(find.byType(TextField), findsNothing);
-    // Idle capture flag: badge reads Ready, never Capturing...
-    expect(find.text('Ready'), findsOneWidget);
+    // Idle capture: hero invites pendant connect, never a live state.
+    expect(find.text('Connect your pendant to begin'), findsOneWidget);
     expect(find.text('Capturing...'), findsNothing);
 
     // 4. Memories section is gone: no empty-state text, no cards.

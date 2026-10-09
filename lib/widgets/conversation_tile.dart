@@ -19,6 +19,9 @@ class ConversationTile extends StatefulWidget {
     this.isTrash = false,
     this.onRestore,
     this.onDeletePermanently,
+    this.isProcessing = false,
+    this.isFailed = false,
+    this.onRetry,
   });
 
   final ConversationSession session;
@@ -28,6 +31,15 @@ class ConversationTile extends StatefulWidget {
   final bool isTrash;
   final VoidCallback? onRestore;
   final VoidCallback? onDeletePermanently;
+
+  /// AI title/summary still generating: shows the shimmer row.
+  final bool isProcessing;
+
+  /// Last AI attempt failed or never ran: shows tap-to-retry.
+  final bool isFailed;
+
+  /// Single-shot AI retry for [isFailed]. Ignored while processing.
+  final VoidCallback? onRetry;
 
   @override
   State<ConversationTile> createState() => _ConversationTileState();
@@ -66,12 +78,12 @@ class _ConversationTileState extends State<ConversationTile> {
           color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2C).withValues(alpha: 0.5) : const Color(0xFFE9ECEF).withValues(alpha: 0.8),
+            color: isDark ? const Color(0xFF2A2A2C).withOpacity(0.5) : const Color(0xFFE9ECEF).withOpacity(0.8),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.03),
+              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.03),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -154,34 +166,24 @@ class _ConversationTileState extends State<ConversationTile> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 48,
               height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _getAvatarGradients(session.id),
-                ),
+                color: isDark
+                    ? const Color(0xFF2A2A2A)
+                    : const Color(0xFFE5E5E5),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _getAvatarGradients(session.id).last.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
               child: Text(
                 title.isEmpty ? 'M' : title.characters.first.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF666666),
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  shadows: [Shadow(color: Colors.black26, blurRadius: 2, offset: Offset(0, 1))],
                 ),
               ),
             ),
@@ -221,6 +223,63 @@ class _ConversationTileState extends State<ConversationTile> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  if (widget.isProcessing)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Writing summary…',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (widget.isFailed && widget.onRetry != null)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        widget.onRetry!();
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.refresh_rounded,
+                            size: 14,
+                            color: Color(0xFF888888),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'AI paused — tap to retry',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF888888),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (widget.isProcessing ||
+                      (widget.isFailed && widget.onRetry != null))
+                    const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(
@@ -232,11 +291,15 @@ class _ConversationTileState extends State<ConversationTile> {
                       ),
                       if (session.segmentCount > 0) ...[
                         const SizedBox(width: 8),
-                        Text(
-                          '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                            color: Color(0xFF888888),
-                            fontSize: 14,
+                        Flexible(
+                          child: Text(
+                            '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF888888),
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
@@ -276,7 +339,7 @@ class _ConversationTileState extends State<ConversationTile> {
               const SizedBox(width: 4),
               IconButton(
                 onPressed: widget.onDeletePermanently,
-                style: IconButton.styleFrom(backgroundColor: Colors.red.withValues(alpha: 0.1)),
+                style: IconButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.1)),
                 icon: const Icon(Icons.delete_forever, size: 20, color: Colors.red),
               ),
             ] else ...[
@@ -301,19 +364,4 @@ class _ConversationTileState extends State<ConversationTile> {
     );
   }
 
-  List<Color> _getAvatarGradients(String id) {
-    // Deterministically pick a beautiful gradient based on the session ID
-    final palettes = [
-      [const Color(0xFFFF9A9E), const Color(0xFFFECFEF)],
-      [const Color(0xFFa18cd1), const Color(0xFFfbc2eb)],
-      [const Color(0xFF84fab0), const Color(0xFF8fd3f4)],
-      [const Color(0xFFfccb90), const Color(0xFFd57eeb)],
-      [const Color(0xFFe0c3fc), const Color(0xFF8ec5fc)],
-      [const Color(0xFF4facfe), const Color(0xFF00f2fe)],
-      [const Color(0xFF43e97b), const Color(0xFF38f9d7)],
-      [const Color(0xFFfa709a), const Color(0xFFfee140)],
-    ];
-    final hash = id.hashCode.abs();
-    return palettes[hash % palettes.length];
-  }
 }

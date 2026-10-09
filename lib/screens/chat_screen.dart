@@ -6,6 +6,7 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/ble_provider.dart';
 import '../providers/agent_provider.dart';
+import '../providers/rag_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
 import '../widgets/audio_waveform.dart';
@@ -164,6 +165,39 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
     });
     _scrollToBottom();
 
+    // RAG first (session-scoped), one retry on transient failure, then
+    // direct-transcript fallback tagged so RAG outages are visible.
+    try {
+      final rag = await ref.read(ragServiceProvider.future);
+      try {
+        final result =
+            await rag.answer(text, sessionId: widget.session.id);
+        if (mounted && result.sources.isNotEmpty) {
+          setState(() {
+            _messages.add(ChatMessage(role: 'assistant', content: result.answer));
+            _isGenerating = false;
+          });
+          _scrollToBottom();
+          return;
+        }
+      } catch (_) {
+        // Single retry before falling back.
+        try {
+          final retry =
+              await rag.answer(text, sessionId: widget.session.id);
+          if (mounted && retry.sources.isNotEmpty) {
+            setState(() {
+              _messages.add(
+                  ChatMessage(role: 'assistant', content: retry.answer));
+              _isGenerating = false;
+            });
+            _scrollToBottom();
+            return;
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
     final engine = ref.read(geminiEngineProvider);
     try {
       final reply = await engine.prompt(
@@ -181,7 +215,8 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
       );
       if (mounted) {
         setState(() {
-          _messages.add(ChatMessage(role: 'assistant', content: reply));
+          _messages.add(ChatMessage(
+              role: 'assistant', content: '$reply\n\n(direct context)'));
           _isGenerating = false;
         });
         _scrollToBottom();
@@ -235,7 +270,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
             Expanded(
               child: ListView(
                 controller: _scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 children: [
                   if (session.summary != null &&
                       session.summary!.isNotEmpty) ...[
@@ -275,10 +310,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            session.summary!,
-                            style: const TextStyle(height: 1.4, fontSize: 15),
-                          ),
+                          _SummaryBody(text: session.summary!),
                         ],
                       ),
                     ),
@@ -371,64 +403,81 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              margin: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                12 + MediaQuery.paddingOf(context).bottom,
+              ),
+              padding: const EdgeInsets.only(left: 20, right: 6, top: 6, bottom: 6),
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                border: Border(
-                  top: BorderSide(
-                    color: isDark
-                        ? const Color(0xFF2A2A2A)
-                        : const Color(0xFFE5E5E5),
+                color: isDark
+                    ? const Color(0xFF1C1C1E)
+                    : const Color(0xFFF2F2F7),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context)
+                        .primaryColor
+                        .withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    spreadRadius: 1,
                   ),
-                ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _chatCtrl,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         hintText: 'Ask about this memory...',
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                        hintStyle: TextStyle(
+                          color: Color(0xFF888888),
+                          fontSize: 15,
                         ),
-                        filled: true,
-                        fillColor: isDark
-                            ? const Color(0xFF1C1C1E)
-                            : const Color(0xFFF2F2F7),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(
-                            color:
-                                Theme.of(context).dividerTheme.color ??
-                                Colors.transparent,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(
-                            color:
-                                Theme.of(context).dividerTheme.color ??
-                                Colors.transparent,
-                          ),
-                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontSize: 15,
                       ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _isGenerating ? null : _send,
-                    style: IconButton.styleFrom(
-                      backgroundColor: _isGenerating
-                          ? const Color(0xFF888888)
-                          : Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(12),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _isGenerating ? null : _send,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isGenerating
+                            ? const Color(0xFF888888)
+                            : Theme.of(context).primaryColor,
+                      ),
+                      child: _isGenerating
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.arrow_upward,
+                              size: 20,
+                              color: Colors.white,
+                            ),
                     ),
-                    icon: const Icon(Icons.arrow_upward, size: 20),
                   ),
                 ],
               ),
@@ -436,6 +485,67 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Structured summary: the AI paragraph rendered as clean bullet
+/// points (one per sentence). Pure presentation of the stored text —
+/// the summary itself is untouched.
+/// Splits a stored summary into bullet points (one per sentence).
+/// Pure text shaping, unit-tested; the summary itself is untouched.
+List<String> splitSummaryPoints(String text) {
+  return text
+      .split(RegExp(r'(?<=[.!?])\s+'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+}
+
+class _SummaryBody extends StatelessWidget {
+  const _SummaryBody({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = splitSummaryPoints(text);
+    if (points.length < 2) {
+      return Text(
+        text,
+        style: const TextStyle(height: 1.4, fontSize: 15),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < points.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  points[i],
+                  style: const TextStyle(height: 1.45, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
