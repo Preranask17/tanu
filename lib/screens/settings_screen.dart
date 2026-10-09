@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:disable_battery_optimization/disable_battery_optimization.dart';
+import 'package:android_intent_plus/android_intent.dart';
 
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
@@ -199,90 +199,99 @@ class _NotificationSettings extends ConsumerWidget {
   }
 }
 
-/// Background protection: battery-optimization + autostart status with
-/// a one-tap fix. Oppo/Vivo/Xiaomi kill background apps (including the
-/// digest worker) unless the user exempts Tanu. All plugin calls are
-/// guarded: non-Android devices report unknown instead of crashing.
-class _BackgroundProtection extends StatefulWidget {
+/// Background protection: one-tap routes to the system screens that
+/// decide whether the digest worker survives app kill on aggressive OEM
+/// skins (Oppo/Realme/Vivo/Xiaomi). Fired via plain Android intents — no
+/// native plugin, nothing to break the Gradle build. All launches guarded.
+class _BackgroundProtection extends StatelessWidget {
   const _BackgroundProtection();
 
-  @override
-  State<_BackgroundProtection> createState() => _BackgroundProtectionState();
-}
+  static const _package = 'com.tanu.tanu_app';
 
-class _BackgroundProtectionState extends State<_BackgroundProtection> {
-  Future<(bool?, bool?)>? _status;
-
-  @override
-  void initState() {
-    super.initState();
-    _status = _check();
+  Future<void> _launch(AndroidIntent intent) async {
+    try {
+      await intent.launch();
+    } catch (e) {
+      debugPrint('[tanu] settings intent failed: $e');
+    }
   }
 
-  Future<(bool?, bool?)> _check() async {
-    bool? batteryOk;
-    bool? autoStartOk;
+  /// Battery exemption request for this exact package (falls back to the
+  /// optimization list when the request screen is unavailable).
+  Future<void> _requestExemption() async {
     try {
-      batteryOk =
-          await DisableBatteryOptimization.isBatteryOptimizationDisabled;
+      await const AndroidIntent(
+        action: 'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+        data: 'package:$_package',
+      ).launch();
+      return;
     } catch (_) {}
-    try {
-      autoStartOk = await DisableBatteryOptimization.isAutoStartEnabled;
-    } catch (_) {}
-    return (batteryOk, autoStartOk);
+    await _launch(
+      const AndroidIntent(
+        action: 'android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS',
+      ),
+    );
+  }
+
+  /// OEM autostart managers move between releases: try known ColorOS
+  /// entries, then the app-details page as a guaranteed fallback.
+  Future<void> _openAutostart() async {
+    const candidates = [
+      ('com.coloros.safecenter',
+          'com.coloros.safecenter.startupapp.StartupAppListActivity'),
+      ('com.oppo.safe', 'com.oppo.safe.permission.startup.StartupAppListActivity'),
+      ('com.coloros.safecenter',
+          'com.coloros.safecenter.permission.startup.StartupAppListActivity'),
+    ];
+    for (final c in candidates) {
+      try {
+        await AndroidIntent(
+          action: 'android.intent.action.MAIN',
+          package: c.$1,
+          componentName: c.$2,
+        ).launch();
+        return;
+      } catch (_) {}
+    }
+    await _launch(
+      const AndroidIntent(
+        action: 'android.settings.APPLICATION_DETAILS_SETTINGS',
+        data: 'package:$_package',
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<(bool?, bool?)>(
-      future: _status,
-      builder: (context, snapshot) {
-        final data = snapshot.data;
-        final known = data != null && (data.$1 != null || data.$2 != null);
-        final protected =
-            known && (data.$1 ?? true) && (data.$2 ?? true);
-        return Column(
-          children: [
-            ListTile(
-              leading: Icon(
-                protected
-                    ? Icons.shield_outlined
-                    : Icons.shield_outlined,
-                color: !known
-                    ? const Color(0xFF888888)
-                    : (protected ? Colors.green : Colors.orange),
+    return Column(
+      children: [
+        const ListTile(
+          leading: Icon(Icons.shield_outlined, color: Color(0xFF888888)),
+          title: Text('Background protection'),
+          subtitle: Text(
+            'Aggressive skins kill background apps. Exempt Tanu so the '
+            'morning digest arrives with the app closed.',
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Wrap(
+            spacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: _requestExemption,
+                icon: const Icon(Icons.battery_saver_outlined, size: 16),
+                label: const Text('Battery exemption'),
               ),
-              title: const Text('Background protection'),
-              subtitle: Text(
-                !known
-                    ? 'Status unknown on this device'
-                    : (protected
-                        ? 'On: digest arrives with the app closed'
-                        : 'Off: the system may kill background digest'),
+              TextButton.icon(
+                onPressed: _openAutostart,
+                icon: const Icon(Icons.play_circle_outline, size: 16),
+                label: const Text('Autostart'),
               ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () async {
-                  try {
-                    await DisableBatteryOptimization
-                        .showDisableAllOptimizationsSettings(
-                      'Background activity',
-                      'Let Tanu run in the background so morning digest arrives.',
-                      'Battery optimization',
-                      'Exempt Tanu so the digest survives overnight.',
-                    );
-                  } catch (_) {}
-                  if (mounted) setState(() => _status = _check());
-                },
-                icon: const Icon(Icons.settings_outlined, size: 16),
-                label: const Text('Fix'),
-              ),
-            ),
-          ],
-        );
-      },
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
