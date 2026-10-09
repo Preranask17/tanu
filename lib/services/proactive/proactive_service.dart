@@ -215,6 +215,56 @@ class ProactiveService {
     return true;
   }
 
+  /// Whether a closed memory gets the "it ended" ping: speech was
+  /// captured, master switch on, outside quiet hours. No AI, no caps.
+  static bool shouldNotifyEnded({
+    required bool hasSegments,
+    required bool quietNow,
+    required bool enabled,
+  }) {
+    if (!enabled) return false;
+    if (!hasSegments) return false;
+    if (quietNow) return false;
+    return true;
+  }
+
+  /// "Memory saved" ping at close time: duration + segment count only, no
+  /// transcript or summary in the shade. Works with no API key and no
+  /// network. Fire-and-forget; all failures are silent by design.
+  Future<void> notifySessionEnded({
+    required String sessionId,
+    required int segmentCount,
+    required int durationMin,
+    bool enabled = true,
+  }) async {
+    if (!shouldNotifyEnded(
+      hasSegments: segmentCount > 0,
+      quietNow: inQuietHours(now: DateTime.now()),
+      enabled: enabled,
+    )) {
+      return;
+    }
+    try {
+      await _plugin.show(
+        id: sessionId.hashCode ^ 0x9e37,
+        title: 'Memory saved',
+        body: '$durationMin min · $segmentCount segment${segmentCount == 1 ? '' : 's'}',
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: const DarwinNotificationDetails(),
+        ),
+        payload: sessionId,
+      );
+    } catch (e) {
+      debugPrint('[tanu] ended ping failed: $e');
+    }
+  }
+
   Future<ProactiveKind?> maybeNotify({
     required ConversationSession session,
     required MemoryResult result,

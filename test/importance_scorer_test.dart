@@ -17,6 +17,7 @@ AgentCommitment commitment(
 
 void main() {
   immediateDecisionTests();
+  endedPingTests();
 
   group('scoreMemoryImportance', () {
     test('dated commitment to a new person scores immediate', () {
@@ -151,6 +152,48 @@ void immediateDecisionTests() {
           alreadyNotified: false,
           quietNow: false,
           enabled: true,
+        ),
+        isFalse,
+      );
+    });
+  });
+}
+
+void endedPingTests() {
+  group('shouldNotifyEnded: every close pings', () {
+    test('captured session outside quiet hours pings', () {
+      expect(
+        ProactiveService.shouldNotifyEnded(
+          hasSegments: true,
+          quietNow: false,
+          enabled: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('empty, quiet, or disabled stays silent', () {
+      expect(
+        ProactiveService.shouldNotifyEnded(
+          hasSegments: false,
+          quietNow: false,
+          enabled: true,
+        ),
+        isFalse,
+      );
+      expect(
+        ProactiveService.shouldNotifyEnded(
+          hasSegments: true,
+          quietNow: true,
+          enabled: true,
+        ),
+        isFalse,
+      );
+      expect(
+        ProactiveService.shouldNotifyEnded(
+          hasSegments: true,
+          quietNow: false,
+          enabled: false,
         ),
         isFalse,
       );

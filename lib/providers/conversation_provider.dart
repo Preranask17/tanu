@@ -294,6 +294,26 @@ class ConversationNotifier extends Notifier<ConversationState> {
   ///
   /// [reason] is only used to label the `session ended` analytics event; it
   /// defaults to `manual` so existing call sites keep working.
+  /// End-of-conversation ping: fires at close time from every path that
+  /// completes a memory (end-phrase, idle, manual, button, disconnect).
+  /// Needs no AI, key, or network — speech captured is enough. Fire-and-
+  /// forget; the service silences itself on master-off, quiet hours, and
+  /// empty sessions.
+  Future<void> _notifyEnded(ConversationSession session) async {
+    if (session.segments.isEmpty) return;
+    try {
+      final svc = await ref.read(proactiveServiceProvider.future);
+      final end = session.finishedAt ?? DateTime.now();
+      final seconds = end.difference(session.startedAt).inSeconds;
+      await svc.notifySessionEnded(
+        sessionId: session.id,
+        segmentCount: session.segments.length,
+        durationMin: seconds < 60 ? 1 : seconds ~/ 60,
+        enabled: ref.read(settingsProvider).notifyEnabled,
+      );
+    } catch (_) {}
+  }
+
   void forceEndSession([String reason = 'manual']) {
     final session = state.active;
     if (session != null && session.segments.isNotEmpty) {
@@ -308,6 +328,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
       _trackSessionEnded(finished, reason);
       _processMemoryAsync(finished);
+      unawaited(_notifyEnded(finished));
     } else {
       state = state.copyWith(clearActive: true, liveTranscript: '');
     }
@@ -415,6 +436,7 @@ class ConversationNotifier extends Notifier<ConversationState> {
       );
       _trackSessionEnded(finished, 'disconnect');
       _processMemoryAsync(finished);
+      unawaited(_notifyEnded(finished));
     } else {
       state = state.copyWith(
         clearActive: true,
