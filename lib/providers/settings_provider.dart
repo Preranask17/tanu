@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../constants.dart';
 import '../config/stt_config.dart';
+import '../services/proactive/digest_task.dart';
 import '../services/storage_service.dart';
 import 'analytics_provider.dart';
 
@@ -148,6 +151,8 @@ class SettingsNotifier extends Notifier<AppSettings> {
     if (normalized == state.digestHour) return;
     state = state.copyWith(digestHour: normalized);
     _save();
+    // Keep the closed-app worker aligned with the new hour (best effort).
+    unawaited(scheduleDigestWorker(digestHour: normalized));
   }
 
   void setSttLanguageCode(String code) {

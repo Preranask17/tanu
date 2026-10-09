@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:disable_battery_optimization/disable_battery_optimization.dart';
 
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
@@ -170,6 +171,8 @@ class _NotificationSettings extends ConsumerWidget {
                   ref.read(settingsProvider.notifier).setDigestEnabled(v)
               : null,
         ),
+        const Divider(height: 24),
+        const _BackgroundProtection(),
         ListTile(
           title: const Text('Digest hour'),
           trailing: DropdownButton<int>(
@@ -192,6 +195,94 @@ class _NotificationSettings extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Background protection: battery-optimization + autostart status with
+/// a one-tap fix. Oppo/Vivo/Xiaomi kill background apps (including the
+/// digest worker) unless the user exempts Tanu. All plugin calls are
+/// guarded: non-Android devices report unknown instead of crashing.
+class _BackgroundProtection extends StatefulWidget {
+  const _BackgroundProtection();
+
+  @override
+  State<_BackgroundProtection> createState() => _BackgroundProtectionState();
+}
+
+class _BackgroundProtectionState extends State<_BackgroundProtection> {
+  Future<(bool?, bool?)>? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = _check();
+  }
+
+  Future<(bool?, bool?)> _check() async {
+    bool? batteryOk;
+    bool? autoStartOk;
+    try {
+      batteryOk =
+          await DisableBatteryOptimization.isBatteryOptimizationDisabled;
+    } catch (_) {}
+    try {
+      autoStartOk = await DisableBatteryOptimization.isAutoStartEnabled;
+    } catch (_) {}
+    return (batteryOk, autoStartOk);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<(bool?, bool?)>(
+      future: _status,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final known = data != null && (data.$1 != null || data.$2 != null);
+        final protected =
+            known && (data.$1 ?? true) && (data.$2 ?? true);
+        return Column(
+          children: [
+            ListTile(
+              leading: Icon(
+                protected
+                    ? Icons.shield_outlined
+                    : Icons.shield_outlined,
+                color: !known
+                    ? const Color(0xFF888888)
+                    : (protected ? Colors.green : Colors.orange),
+              ),
+              title: const Text('Background protection'),
+              subtitle: Text(
+                !known
+                    ? 'Status unknown on this device'
+                    : (protected
+                        ? 'On: digest arrives with the app closed'
+                        : 'Off: the system may kill background digest'),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  try {
+                    await DisableBatteryOptimization
+                        .showDisableAllOptimizationsSettings(
+                      'Background activity',
+                      'Let Tanu run in the background so morning digest arrives.',
+                      'Battery optimization',
+                      'Exempt Tanu so the digest survives overnight.',
+                    );
+                  } catch (_) {}
+                  if (mounted) setState(() => _status = _check());
+                },
+                icon: const Icon(Icons.settings_outlined, size: 16),
+                label: const Text('Fix'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

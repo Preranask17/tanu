@@ -100,10 +100,12 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     final active = next.isListening;
     if (active && !_fgStarted) {
       _fgStarted = true;
+      debugPrint('[tanu] foreground service: start (listening)');
       unawaited(_startForegroundTask());
     } else if (!active && _fgStarted) {
       _fgStarted = false;
       _fgNotice = '';
+      debugPrint('[tanu] foreground service: stop (idle)');
       unawaited(FlutterForegroundTask.stopService());
     } else if (active) {
       final notice = 'Listening...';
