@@ -33,105 +33,75 @@ class SettingsScreen extends ConsumerWidget {
           const PinnedHeader(title: 'Settings'),
           SliverToBoxAdapter(
             child: TanuPageRail(
+              bottom: 0,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Pendant status
                   _PendantDashboard(status: status),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
-                  const _SettingsCard(
-                    title: 'Appearance',
-                    subtitle: 'How Tanu looks',
-                    child: _AppearanceSelector(),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _SettingsCard(
-                    title: 'Speech Engine',
-                    subtitle: 'On-device transcription',
-                    padding: EdgeInsets.zero,
-                    child: _SettingsActionTile(
-                      icon: Icons.graphic_eq_rounded,
-                      title: 'Manage speech model',
-                      subtitle: 'Download or choose a language',
-                      onTap: () => _showSettingsSheet(
-                        context,
+                  _SettingsGroupCard(
+                    title: 'Preferences',
+                    children: [
+                      const _AppearanceTile(),
+                      _SettingsActionTile(
+                        icon: Icons.graphic_eq_rounded,
                         title: 'Speech Engine',
-                        subtitle:
-                            'Offline AI model for transcription on this device',
-                        child: const _SpeechEngineControls(),
+                        subtitle: 'Offline model & language',
+                        onTap: () => _showSettingsSheet(
+                          context,
+                          title: 'Speech Engine',
+                          subtitle:
+                              'Offline AI model for transcription on this device',
+                          child: const _SpeechEngineControls(),
+                        ),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _SettingsCard(
-                    title: 'Memory',
-                    subtitle: 'All your data stays on this device',
-                    padding: EdgeInsets.zero,
-                    child: _SettingsActionTile(
-                      icon: Icons.inventory_2_outlined,
-                      title: 'Manage local memory',
-                      subtitle: 'Review or permanently wipe local data',
-                      onTap: () => _showSettingsSheet(
-                        context,
+                      _SettingsActionTile(
+                        icon: Icons.inventory_2_outlined,
                         title: 'Memory',
-                        subtitle: 'Stored locally on this device',
-                        child: const _MemoryControls(),
+                        subtitle: 'Review or permanently wipe local data',
+                        onTap: () => _showSettingsSheet(
+                          context,
+                          title: 'Memory',
+                          subtitle: 'Stored locally on this device',
+                          child: const _MemoryControls(),
+                        ),
                       ),
-                    ),
+                      const _NotificationSettings(),
+                    ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  _SettingsCard(
-                    title: 'Gemini API Key',
-                    subtitle: 'AI processing & embeddings',
-                    padding: EdgeInsets.zero,
-                    child: _SettingsActionTile(
-                      icon: Icons.key_outlined,
-                      title: 'Configure API key',
-                      subtitle: 'For memory, chat & RAG embeddings',
-                      onTap: () => _showSettingsSheet(
-                        context,
+                  _SettingsGroupCard(
+                    title: 'System & AI',
+                    children: [
+                      _SettingsActionTile(
+                        icon: Icons.key_outlined,
                         title: 'Gemini API Key',
-                        subtitle:
-                            'Used for memory processing, chat & RAG embeddings',
-                        child: const _GeminiKeyField(),
+                        subtitle: 'For memory, chat & RAG embeddings',
+                        onTap: () => _showSettingsSheet(
+                          context,
+                          title: 'Gemini API Key',
+                          subtitle:
+                              'Used for memory processing, chat & RAG embeddings',
+                          child: const _GeminiKeyField(),
+                        ),
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  const _SettingsCard(
-                    title: 'Notifications',
-                    subtitle: 'Important moments, not noise',
-                    padding: EdgeInsets.zero,
-                    child: _NotificationSettings(),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _SettingsCard(
-                    title: 'Under the Hood',
-                    subtitle: 'Diagnostic tools',
-                    padding: EdgeInsets.zero,
-                    child: _SettingsActionTile(
-                      icon: Icons.terminal_rounded,
-                      title: 'Open console',
-                      subtitle: 'Telemetry, mic tests, and raw capture',
-                      onTap: () => _showSettingsSheet(
-                        context,
+                      _SettingsActionTile(
+                        icon: Icons.terminal_rounded,
                         title: 'Under the Hood',
-                        subtitle: 'Live pendant and capture diagnostics',
-                        child: const _UnderTheHoodControls(),
+                        subtitle: 'Telemetry, mic tests, and raw capture',
+                        onTap: () => _showSettingsSheet(
+                          context,
+                          title: 'Under the Hood',
+                          subtitle: 'Live pendant and capture diagnostics',
+                          child: const _UnderTheHoodControls(),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                   // Clearance above the floating dock so the last section
                   // scrolls fully into view on every screen size.
@@ -159,12 +129,18 @@ Future<void> _showSettingsSheet(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: c.surface,
-    barrierColor: Colors.black.withValues(alpha: 0.35),
-    showDragHandle: true,
+    barrierColor: Colors.black.withValues(alpha: 0.32),
+    showDragHandle: false,
     constraints: const BoxConstraints(maxWidth: 560),
     clipBehavior: Clip.antiAlias,
+    sheetAnimationStyle: const AnimationStyle(
+      duration: Duration(milliseconds: 220),
+      reverseDuration: Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
     ),
     builder: (_) =>
         _SettingsSheet(title: title, subtitle: subtitle, child: child),
@@ -191,30 +167,83 @@ class _SettingsSheet extends StatelessWidget {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                title,
-                style: textTheme.titleLarge?.copyWith(color: c.heading),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 5),
-                Text(
-                  subtitle!,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: c.heading.withValues(alpha: 0.72),
-                    fontSize: 13,
-                    height: 1.35,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              child: Center(
+                child: Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: c.textMuted.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
-              ],
-              const SizedBox(height: 20),
-              child,
-            ],
-          ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: textTheme.titleLarge?.copyWith(
+                        color: c.heading,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    tooltip: 'Close',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 30,
+                      height: 30,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    style: IconButton.styleFrom(
+                      foregroundColor: c.heading,
+                      backgroundColor: c.surfaceMuted,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      minimumSize: const Size(30, 30),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (subtitle != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 3, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    subtitle!,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: c.heading.withValues(alpha: 0.68),
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: child,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -241,58 +270,71 @@ class _SettingsActionTile extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-      leading: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: c.primary.withValues(alpha: c.isDark ? 0.18 : 0.08),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 20, color: c.heading),
-      ),
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      horizontalTitleGap: 12,
+      minLeadingWidth: 32,
+      minVerticalPadding: 2,
+      leading: _SettingsIcon(icon),
       title: Text(
         title,
         style: textTheme.bodyLarge?.copyWith(
           color: c.heading,
-          fontSize: 15,
+          fontSize: 14.5,
           fontWeight: FontWeight.w600,
+          height: 1.25,
         ),
       ),
       subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
+        padding: const EdgeInsets.only(top: 1),
         child: Text(
           subtitle,
           style: textTheme.bodySmall?.copyWith(
-            color: c.heading.withValues(alpha: 0.72),
-            fontSize: 13,
-            height: 1.35,
+            color: c.heading.withValues(alpha: 0.68),
+            fontSize: 12.5,
+            height: 1.25,
           ),
         ),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: c.heading.withValues(alpha: 0.72),
+        size: 20,
+        color: c.heading.withValues(alpha: 0.6),
       ),
+    );
+  }
+}
+
+class _SettingsIcon extends StatelessWidget {
+  const _SettingsIcon(this.icon);
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: c.primary.withValues(alpha: c.isDark ? 0.16 : 0.07),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Icon(icon, size: 18, color: c.heading),
     );
   }
 }
 
 // Components
 
-/// Elevated grouped settings surface with an Outfit header and Inter tiles.
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({
-    required this.title,
-    this.subtitle,
-    this.child,
-    this.padding = const EdgeInsets.fromLTRB(18, 16, 18, 18),
-  });
+/// Compact grouped settings surface with an Outfit header and Inter rows.
+class _SettingsGroupCard extends StatelessWidget {
+  const _SettingsGroupCard({required this.title, required this.children});
 
   final String title;
-  final String? subtitle;
-  final Widget? child;
-  final EdgeInsetsGeometry padding;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
@@ -301,43 +343,54 @@ class _SettingsCard extends StatelessWidget {
 
     return Material(
       color: c.surface,
-      elevation: c.isDark ? 1 : 1.5,
-      shadowColor: Colors.black.withValues(alpha: c.isDark ? 0.45 : 0.08),
+      elevation: c.isDark ? 0.5 : 1,
+      shadowColor: Colors.black.withValues(alpha: c.isDark ? 0.32 : 0.06),
       surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: c.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-            child: _SectionHeader(title: title, subtitle: subtitle),
+      child: ListTileTheme(
+        data: ListTileThemeData(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          horizontalTitleGap: 12,
+          minLeadingWidth: 32,
+          minVerticalPadding: 2,
+          iconColor: c.heading,
+          textColor: c.heading,
+          titleTextStyle: textTheme.bodyLarge?.copyWith(
+            color: c.heading,
+            fontSize: 14.5,
+            fontWeight: FontWeight.w600,
+            height: 1.25,
           ),
-          if (child != null) ...[
-            Divider(height: 1, color: c.borderSubtle),
-            ListTileTheme(
-              data: ListTileThemeData(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-                iconColor: c.heading,
-                textColor: c.heading,
-                titleTextStyle: textTheme.bodyLarge?.copyWith(
+          subtitleTextStyle: textTheme.bodySmall?.copyWith(
+            color: c.heading.withValues(alpha: 0.68),
+            fontSize: 12.5,
+            height: 1.25,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              child: Text(
+                title,
+                style: textTheme.titleMedium?.copyWith(
                   color: c.heading,
-                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
-                subtitleTextStyle: textTheme.bodySmall?.copyWith(
-                  color: c.heading.withValues(alpha: 0.72),
-                  fontSize: 13,
-                  height: 1.35,
-                ),
               ),
-              child: Padding(padding: padding, child: child!),
             ),
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: c.borderSubtle),
+              children[i],
+            ],
+            const SizedBox(height: 4),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -355,27 +408,34 @@ class _NotificationSettings extends ConsumerWidget {
     return Column(
       children: [
         SwitchListTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
           title: const Text('Important notifications'),
-          subtitle: const Text('Commitments and highlights'),
+          subtitle: const Text('Commitments & highlights'),
           value: settings.notifyEnabled,
           onChanged: (v) =>
               ref.read(settingsProvider.notifier).setNotificationsEnabled(v),
         ),
         SwitchListTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
           title: const Text('Morning digest'),
-          subtitle: const Text('Top stashed memories, once daily'),
+          subtitle: const Text('Once-daily memory recap'),
           value: settings.digestEnabled,
           onChanged: settings.notifyEnabled
               ? (v) => ref.read(settingsProvider.notifier).setDigestEnabled(v)
               : null,
         ),
         ListTile(
+          dense: true,
+          visualDensity: VisualDensity.compact,
           title: const Text('Digest hour'),
           trailing: DropdownButton<int>(
             value: settings.digestHour,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: c.heading,
               fontWeight: FontWeight.w600,
+              fontSize: 12.5,
             ),
             dropdownColor: c.surfaceElevated,
             underline: const SizedBox.shrink(),
@@ -490,25 +550,48 @@ class _BackgroundProtection extends StatelessWidget {
           'morning digest arrives with the app closed.',
           style: textTheme.bodyMedium?.copyWith(
             color: c.heading.withValues(alpha: 0.78),
-            height: 1.45,
+            fontSize: 13.5,
+            height: 1.4,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         Align(
           alignment: Alignment.centerRight,
           child: Wrap(
             alignment: WrapAlignment.end,
-            spacing: 4,
-            runSpacing: 4,
+            spacing: 2,
+            runSpacing: 2,
             children: [
               TextButton.icon(
                 onPressed: _requestExemption,
-                icon: const Icon(Icons.battery_saver_outlined, size: 16),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                icon: const Icon(Icons.battery_saver_outlined, size: 15),
                 label: const Text('Battery exemption'),
               ),
               TextButton.icon(
                 onPressed: _openAutostart,
-                icon: const Icon(Icons.play_circle_outline, size: 16),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                icon: const Icon(Icons.play_circle_outline, size: 15),
                 label: const Text('Autostart'),
               ),
             ],
@@ -553,24 +636,51 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
             obscureText: _obscure,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: c.heading),
+            ).textTheme.bodyMedium?.copyWith(color: c.heading, fontSize: 14.5),
             decoration: InputDecoration(
               hintText: 'AIza...',
+              isDense: true,
               filled: true,
               fillColor: c.surfaceMuted,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
               ),
+              suffixIconConstraints: const BoxConstraints.tightFor(
+                width: 36,
+                height: 36,
+              ),
               suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
+                icon: Icon(
+                  _obscure ? Icons.visibility_off : Icons.visibility,
+                  size: 18,
+                ),
                 onPressed: () => setState(() => _obscure = !_obscure),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                visualDensity: VisualDensity.compact,
               ),
             ),
           ),
         ),
         const SizedBox(width: 8),
         FilledButton(
+          style: FilledButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            minimumSize: const Size(0, 44),
+            textStyle: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           onPressed: () {
             final messenger = ScaffoldMessenger.of(context);
             final navigator = Navigator.of(context);
@@ -590,42 +700,6 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-
-  const _SectionHeader({required this.title, this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.tanuColors;
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: textTheme.titleLarge?.copyWith(
-            color: c.heading,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle!,
-            style: textTheme.bodyMedium?.copyWith(
-              color: c.heading.withValues(alpha: 0.72),
-              fontSize: 13,
-              height: 1.35,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 class _PendantDashboard extends StatelessWidget {
   final PendantStatus status;
 
@@ -639,7 +713,7 @@ class _PendantDashboard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(10),
@@ -649,9 +723,9 @@ class _PendantDashboard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: c.isDark ? 0.18 : 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -665,8 +739,8 @@ class _PendantDashboard extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: accent.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
@@ -676,9 +750,10 @@ class _PendantDashboard extends StatelessWidget {
                             ? Icons.bluetooth_connected
                             : Icons.bluetooth_disabled,
                         color: accent,
+                        size: 22,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,11 +762,16 @@ class _PendantDashboard extends StatelessWidget {
                             isConnected
                                 ? 'Pendant connected'
                                 : 'Pendant offline',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.titleLarge?.copyWith(color: c.heading),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: c.heading,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Text(
                             isConnected
                                 ? (status.deviceName ?? 'Tanu pendant')
@@ -699,8 +779,8 @@ class _PendantDashboard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: c.heading.withValues(alpha: 0.72),
-                              fontSize: 13,
+                              color: c.heading.withValues(alpha: 0.68),
+                              fontSize: 12.5,
                             ),
                           ),
                         ],
@@ -713,24 +793,24 @@ class _PendantDashboard extends StatelessWidget {
                 _BatteryBadge(percent: status.batteryPercent!),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: 7,
+                  height: 7,
                   decoration: BoxDecoration(
                     color: accent,
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     isConnected ? 'Ready to capture' : 'No pendant connected',
@@ -739,23 +819,23 @@ class _PendantDashboard extends StatelessWidget {
                     style: TextStyle(
                       color: accent,
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: isConnected ? c.surfaceMuted : c.primary,
                 foregroundColor: isConnected ? c.heading : c.onPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 elevation: 0,
               ),
@@ -775,8 +855,8 @@ class _PendantDashboard extends StatelessWidget {
               child: Text(
                 isConnected ? 'Disconnect' : 'Scan for Pendant',
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -796,22 +876,22 @@ class _BatteryBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.tanuColors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: c.success.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.battery_charging_full, color: c.success, size: 16),
-          const SizedBox(width: 4),
+          Icon(Icons.battery_charging_full, color: c.success, size: 14),
+          const SizedBox(width: 3),
           Text(
             '$percent%',
             style: TextStyle(
               color: c.success,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
             ),
           ),
         ],
@@ -820,46 +900,47 @@ class _BatteryBadge extends StatelessWidget {
   }
 }
 
-class _AppearanceSelector extends ConsumerWidget {
-  const _AppearanceSelector();
+class _AppearanceTile extends ConsumerWidget {
+  const _AppearanceTile();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentMode = ref.watch(settingsProvider).themeMode;
-    final c = context.tanuColors;
+    final mode = ref.watch(settingsProvider.select((s) => s.themeMode));
+    final label = switch (mode) {
+      ThemeMode.system => 'System theme',
+      ThemeMode.light => 'Light theme',
+      ThemeMode.dark => 'Dark theme',
+    };
 
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: c.surfaceMuted,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: c.border),
-      ),
-      child: Row(
+    void setMode(ThemeMode next) =>
+        ref.read(settingsProvider.notifier).setThemeMode(next);
+
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      leading: const _SettingsIcon(Icons.palette_outlined),
+      title: const Text('Appearance'),
+      subtitle: Text(label),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _ThemePill(
-            label: 'System',
+          _ThemeButton(
             icon: Icons.brightness_auto,
-            isSelected: currentMode == ThemeMode.system,
-            onTap: () => ref
-                .read(settingsProvider.notifier)
-                .setThemeMode(ThemeMode.system),
+            tooltip: 'System theme',
+            selected: mode == ThemeMode.system,
+            onTap: () => setMode(ThemeMode.system),
           ),
-          _ThemePill(
-            label: 'Light',
+          _ThemeButton(
             icon: Icons.light_mode,
-            isSelected: currentMode == ThemeMode.light,
-            onTap: () => ref
-                .read(settingsProvider.notifier)
-                .setThemeMode(ThemeMode.light),
+            tooltip: 'Light theme',
+            selected: mode == ThemeMode.light,
+            onTap: () => setMode(ThemeMode.light),
           ),
-          _ThemePill(
-            label: 'Dark',
+          _ThemeButton(
             icon: Icons.dark_mode,
-            isSelected: currentMode == ThemeMode.dark,
-            onTap: () => ref
-                .read(settingsProvider.notifier)
-                .setThemeMode(ThemeMode.dark),
+            tooltip: 'Dark theme',
+            selected: mode == ThemeMode.dark,
+            onTap: () => setMode(ThemeMode.dark),
           ),
         ],
       ),
@@ -867,56 +948,42 @@ class _AppearanceSelector extends ConsumerWidget {
   }
 }
 
-class _ThemePill extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ThemePill({
-    required this.label,
+class _ThemeButton extends StatelessWidget {
+  const _ThemeButton({
     required this.icon,
-    required this.isSelected,
+    required this.tooltip,
+    required this.selected,
     required this.onTap,
   });
+
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.tanuColors;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? c.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: isSelected && !c.isDark
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [],
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 20, color: isSelected ? c.primary : c.textMuted),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: c.heading.withValues(alpha: isSelected ? 1 : 0.65),
-                ),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.only(left: 2),
+      child: Tooltip(
+        message: tooltip,
+        child: IconButton(
+          onPressed: onTap,
+          icon: Icon(icon, size: 16),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+          visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(
+            foregroundColor: selected ? c.heading : c.textMuted,
+            backgroundColor: selected ? c.surfaceMuted : Colors.transparent,
+            side: selected ? BorderSide(color: c.border) : BorderSide.none,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(7),
+            ),
+            minimumSize: const Size(30, 30),
+            padding: EdgeInsets.zero,
           ),
         ),
       ),
@@ -954,11 +1021,11 @@ class _SttLanguagePicker extends ConsumerWidget {
     final c = context.tanuColors;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Icon(Icons.translate_rounded, size: 20, color: c.heading),
-          const SizedBox(width: 12),
+          Icon(Icons.translate_rounded, size: 18, color: c.heading),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -969,14 +1036,14 @@ class _SttLanguagePicker extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: c.heading,
                     fontWeight: FontWeight.w600,
-                    fontSize: 15,
+                    fontSize: 14.5,
                   ),
                 ),
                 Text(
                   'Same offline model, fixed hint',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: c.heading.withValues(alpha: 0.72),
-                    fontSize: 12,
+                    color: c.heading.withValues(alpha: 0.68),
+                    fontSize: 11.5,
                   ),
                 ),
               ],
@@ -984,9 +1051,11 @@ class _SttLanguagePicker extends ConsumerWidget {
           ),
           DropdownButton<String>(
             value: code.isEmpty ? '' : code,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: c.heading),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: c.heading,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
             dropdownColor: c.surfaceElevated,
             underline: const SizedBox.shrink(),
             onChanged: (next) {
@@ -1056,53 +1125,54 @@ class _SttModelDashboard extends ConsumerWidget {
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: c.heading,
                       fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                      fontSize: 14.5,
                     ),
                   ),
 
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
                     statusText,
                     style: TextStyle(
-                      color: c.heading.withValues(alpha: 0.72),
-                      fontSize: 12,
+                      color: c.heading.withValues(alpha: 0.68),
+                      fontSize: 11.5,
                     ),
                   ),
                   if (showEngineLabel)
                     Text(
                       engineLabel,
                       style: TextStyle(
-                        color: c.heading.withValues(alpha: 0.72),
-                        fontSize: 12,
+                        color: c.heading.withValues(alpha: 0.68),
+                        fontSize: 11.5,
                       ),
                     ),
                 ],
               ),
             ),
             if (state.phase == SttModelPhase.ready)
-              Icon(Icons.check_circle, color: c.success)
+              Icon(Icons.check_circle, color: c.success, size: 20)
             else if (state.busy)
               const SizedBox(
-                width: 20,
-                height: 20,
+                width: 18,
+                height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
           ],
         ),
         if (state.phase != SttModelPhase.ready && !state.busy) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: c.primary,
                 foregroundColor: c.onPrimary,
+                visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 12,
+                  vertical: 10,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 elevation: 0,
               ),
@@ -1111,8 +1181,8 @@ class _SttModelDashboard extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.download),
-                  SizedBox(width: 8),
+                  Icon(Icons.download, size: 18),
+                  SizedBox(width: 6),
                   Flexible(
                     child: Text(
                       'Download Offline Model (~375MB)',
@@ -1125,18 +1195,19 @@ class _SttModelDashboard extends ConsumerWidget {
           ),
         ],
         if (state.phase == SttModelPhase.ready && !state.busy) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.delete),
+              icon: const Icon(Icons.delete, size: 18),
               label: const Text('Delete Model'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: c.danger,
                 side: BorderSide(color: c.danger),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               onPressed: () async {
@@ -1188,10 +1259,11 @@ class _MemoryControls extends StatelessWidget {
           'be undone.',
           style: textTheme.bodyMedium?.copyWith(
             color: c.heading.withValues(alpha: 0.78),
-            height: 1.45,
+            fontSize: 13.5,
+            height: 1.4,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         const _WipeMemoryButton(),
       ],
     );
@@ -1207,15 +1279,18 @@ class _WipeMemoryButton extends ConsumerWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        icon: const Icon(Icons.delete_forever),
+        icon: const Icon(Icons.delete_forever, size: 18),
         label: const Text('WIPE TANU\'S MEMORY'),
         style: OutlinedButton.styleFrom(
           foregroundColor: c.danger,
-          side: BorderSide(color: c.danger, width: 2),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: c.danger, width: 1.5),
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          textStyle: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
           ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: () async {
           final confirmed = await showDialog<bool>(
@@ -1284,10 +1359,10 @@ class _DeveloperConsole extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: consoleBorder),
       ),
       child: Column(
@@ -1303,12 +1378,18 @@ class _DeveloperConsole extends ConsumerWidget {
                     color: consoleGreen,
                     fontFamily: 'Courier',
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                iconSize: 18,
                 icon: const Icon(Icons.mic, color: consoleGreen),
                 onPressed: () =>
                     ref.read(conversationProvider.notifier).microphoneTest(),
@@ -1316,7 +1397,7 @@ class _DeveloperConsole extends ConsumerWidget {
               ),
             ],
           ),
-          const Divider(color: consoleBorder, height: 16),
+          const Divider(color: consoleBorder, height: 12),
 
           ValueListenableBuilder<PendantStats>(
             valueListenable: stats,
@@ -1339,7 +1420,7 @@ class _DeveloperConsole extends ConsumerWidget {
             ),
           ),
 
-          const Divider(color: consoleBorder, height: 16),
+          const Divider(color: consoleBorder, height: 12),
 
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1347,11 +1428,12 @@ class _DeveloperConsole extends ConsumerWidget {
                   ? Colors.red.shade700
                   : const Color(0xFF353535),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(18),
               ),
-              textStyle: const TextStyle(fontSize: 12),
+              textStyle: const TextStyle(fontSize: 11.5),
             ),
             onPressed: () => ref.read(devCaptureProvider.notifier).toggle(),
             child: Row(
@@ -1362,9 +1444,9 @@ class _DeveloperConsole extends ConsumerWidget {
                   capture.recording
                       ? Icons.stop_rounded
                       : Icons.fiber_manual_record,
-                  size: 16,
+                  size: 15,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     capture.recording
@@ -1378,26 +1460,27 @@ class _DeveloperConsole extends ConsumerWidget {
           ),
           if (capture.path != null && !capture.recording)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
                 'Dumped: ${capture.path!.split('/').last}',
                 style: const TextStyle(
                   color: Colors.white54,
                   fontFamily: 'Courier',
-                  fontSize: 10,
+                  fontSize: 9.5,
                 ),
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF353535),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(18),
               ),
-              textStyle: const TextStyle(fontSize: 12),
+              textStyle: const TextStyle(fontSize: 11.5),
             ),
             onPressed: () async {
               final ok = await ref
@@ -1420,8 +1503,8 @@ class _DeveloperConsole extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.notifications_outlined, size: 16),
-                SizedBox(width: 8),
+                Icon(Icons.notifications_outlined, size: 15),
+                SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     'SEND TEST NOTIFICATION',
@@ -1446,14 +1529,14 @@ class _ConsoleMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
       child: Text(
         '$label: $value',
         style: const TextStyle(
           color: Colors.white70,
           fontFamily: 'Courier',
-          fontSize: 12,
-          height: 1.35,
+          fontSize: 11.5,
+          height: 1.3,
         ),
       ),
     );
