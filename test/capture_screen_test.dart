@@ -9,12 +9,12 @@ import 'package:tanu_app/screens/welcome/tanu_wordmark.dart';
 import 'package:tanu_app/services/storage_service.dart';
 
 /// Proves the Capture sequence renders with the real widgets, disconnected
-/// and empty: [wordmark + BT/battery header] -> [hero orb] ->
-/// [live transcription box] -> [empty memories placeholder].
+/// and empty: [wordmark + greeting header] -> [pendant status strip] ->
+/// [waveform] -> [live transcription box] -> [connect-pendant hero].
 /// Filesystem work runs in runAsync (async dart:io stalls in this
 /// environment's FakeAsync test zone). No backend is exercised.
 void main() {
-  testWidgets('capture: header, orb, transcription, empty state', (
+  testWidgets('capture: greeting, status, waveform, transcription', (
     tester,
   ) async {
     await tester.runAsync(() async {
@@ -38,8 +38,9 @@ void main() {
     expect(find.byIcon(Icons.bluetooth_disabled), findsOneWidget);
     // No battery pill while disconnected with no known value.
     expect(find.textContaining('%'), findsNothing);
-    // Section headline below the header.
-    expect(find.text('Capture'), findsOneWidget);
+    // Section headline below the header is now the time-based greeting, and
+    // the pendant status lives in a strip directly above the waveform.
+    expect(find.text('Connect Pendant'), findsOneWidget);
 
     // 2 + 3. Hero orb and persistent transcription box with idle placeholder.
     expect(find.text('Transcription will appear here…'), findsOneWidget);

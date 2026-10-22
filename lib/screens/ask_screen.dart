@@ -91,7 +91,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Ask Tanu')),
+      appBar: AppBar(title: const Text('Recall')),
       body: Column(
         children: [
           Expanded(

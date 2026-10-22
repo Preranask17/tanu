@@ -184,7 +184,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
           ),
           slivers: [
             PinnedHeader(
-              title: 'Memories',
+              title: 'Library',
               actions: [
                 _HeaderCircleButton(
                   icon: Icons.delete_outline,

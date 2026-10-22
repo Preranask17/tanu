@@ -32,7 +32,7 @@ void main() {
 
     // Shared header: wordmark + headline + trash action.
     expect(find.byType(TanuWordmark), findsOneWidget);
-    expect(find.text('Memories'), findsOneWidget);
+    expect(find.text('Library'), findsOneWidget);
     expect(find.byIcon(Icons.delete_outline), findsWidgets);
     // RAG search pill: magnifier + field only, no mic affordance.
     expect(find.byType(TextField), findsOneWidget);

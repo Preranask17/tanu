@@ -63,12 +63,13 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 1));
-    // Main tab scaffold: Capture / Memories / Settings tabs with the
-    // pendant status visible. Matches the current UI copy.
+    // Main tab scaffold: Home / Recall / Library / Settings destinations with
+    // the pendant status visible. Matches the current UI copy.
     // The fake pendant reports connected as "Omi".
     expect(find.text('Omi'), findsWidgets);
-    expect(find.text('Capture'), findsWidgets);
-    expect(find.text('Memories'), findsWidgets);
+    expect(find.text('Home'), findsWidgets);
+    expect(find.text('Recall'), findsWidgets);
+    expect(find.text('Library'), findsWidgets);
     expect(find.text('Settings'), findsWidgets);
     expect(find.byIcon(Icons.bluetooth_connected), findsWidgets);
   });

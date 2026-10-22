@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/welcome/tanu_wordmark.dart';
+import '../theme/tanu_colors.dart';
 
 /// Pinned variant of the shared page header: logo top-left with status
 /// actions top-right, page heading below — all pinned so it stays fixed
@@ -10,10 +11,12 @@ class PinnedHeader extends StatelessWidget {
   const PinnedHeader({
     super.key,
     required this.title,
+    this.subtitle,
     this.actions = const [],
   });
 
   final String title;
+  final String? subtitle;
   final List<Widget> actions;
 
   @override
@@ -38,16 +41,35 @@ class PinnedHeader extends StatelessWidget {
         const SizedBox(width: 20),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(68),
+        preferredSize: Size.fromHeight(
+          subtitle == null || subtitle!.isEmpty ? 68 : 78,
+        ),
         child: Align(
           alignment: Alignment.centerLeft,
           child: Padding(
             padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8),
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.displayMedium,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.displayMedium,
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.tanuColors.textMuted,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),

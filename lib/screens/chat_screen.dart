@@ -14,7 +14,7 @@ import '../widgets/audio_waveform.dart';
 
 /// Live memory page: the in-progress session's timestamped transcript streams
 /// here, partial words in italic, locked lines in place — Omi's chat. Pushed
-/// from the home capture card and the home chat bar.
+/// from the home live-session status banner and the transcript preview.
 class ChatPage extends ConsumerWidget {
   const ChatPage({super.key});
 
