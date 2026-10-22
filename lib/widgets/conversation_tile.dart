@@ -79,7 +79,7 @@ class _ConversationTileState extends State<ConversationTile> {
         child: Container(
           decoration: BoxDecoration(
             color: c.surface,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: c.border, width: 1),
             boxShadow: [
               BoxShadow(
@@ -90,7 +90,7 @@ class _ConversationTileState extends State<ConversationTile> {
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(10),
             child: _withMemoryActions(context, _noteBody(context)),
           ),
         ),
@@ -368,7 +368,7 @@ class _ConversationTileState extends State<ConversationTile> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: c.primary,
+                color: c.heading,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.1,
               ),
@@ -435,7 +435,7 @@ class _ConversationTileState extends State<ConversationTile> {
               child: Text(
                 title.isEmpty ? 'M' : title.characters.first.toUpperCase(),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: c.primary,
+                  color: c.heading,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),

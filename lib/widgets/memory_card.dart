@@ -7,31 +7,23 @@ class MemoryCard extends StatelessWidget {
   final String summary;
   final String time;
 
-  /// When true, the single sharp corner mirrors to the other side so
-  /// neighbouring cards in the grid alternate and stay visually balanced.
-  final bool mirror;
-
   const MemoryCard({
     super.key,
     required this.title,
     required this.summary,
     required this.time,
-    this.mirror = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(10),
-          topRight: const Radius.circular(10),
-          bottomLeft: Radius.circular(mirror ? 10 : 0),
-          bottomRight: Radius.circular(mirror ? 0 : 10),
-        ),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: c.border, width: 1),
         boxShadow: [
           BoxShadow(
@@ -46,8 +38,8 @@ class MemoryCard extends StatelessWidget {
         children: [
           Text(
             title.isNotEmpty ? title : 'Untitled Memory',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
               fontSize: 16,
               color: c.heading,
             ),
@@ -58,7 +50,7 @@ class MemoryCard extends StatelessWidget {
           Expanded(
             child: Text(
               summary.isNotEmpty ? summary : 'No transcript recorded.',
-              style: TextStyle(
+              style: textTheme.bodySmall?.copyWith(
                 color: c.textMuted,
                 fontSize: 13,
                 height: 1.3,
@@ -70,7 +62,7 @@ class MemoryCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             time,
-            style: TextStyle(
+            style: textTheme.labelSmall?.copyWith(
               fontSize: 11,
               color: c.textMuted,
             ),

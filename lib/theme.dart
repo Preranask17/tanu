@@ -197,7 +197,7 @@ class TanuTheme {
           return GoogleFonts.inter(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: selected ? colors.primary : colors.textMuted,
+            color: selected ? colors.heading : colors.textMuted,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {

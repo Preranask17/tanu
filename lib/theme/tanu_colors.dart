@@ -125,8 +125,8 @@ class TanuColors extends ThemeExtension<TanuColors> {
   final Color textSecondary;
   final Color textMuted;
 
-  /// Headlines, page titles and card titles. This is the midnight-blue accent
-  /// used for primary typography, separate from body copy.
+  /// Headlines, page titles and card titles. Midnight blue in light mode and
+  /// warm beige in dark mode so primary type stays crisp on navy surfaces.
   final Color heading;
 
   final Color success;
@@ -173,7 +173,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
     primary: TanuPalette.blue300,
     onPrimary: TanuPalette.navy950,
     primaryContainer: TanuPalette.blue900,
-    onPrimaryContainer: TanuPalette.blue100,
+    onPrimaryContainer: TanuPalette.sand100,
     secondary: TanuPalette.beige400,
     onSecondary: TanuPalette.ink900,
     secondaryContainer: TanuPalette.ink900,
@@ -187,7 +187,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
     textPrimary: TanuPalette.sand100,
     textSecondary: TanuPalette.sand300,
     textMuted: TanuPalette.sand400,
-    heading: TanuPalette.blue300,
+    heading: TanuPalette.sand100,
     success: TanuPalette.green300,
     warning: TanuPalette.amber300,
     danger: TanuPalette.red300,

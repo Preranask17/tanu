@@ -14,6 +14,17 @@ import '../widgets/pinned_header.dart';
 import 'chat_screen.dart';
 import 'trash_screen.dart';
 
+enum _LibraryFilter {
+  all('All'),
+  notes('Notes'),
+  transcripts('Transcripts'),
+  favorites('Favorites');
+
+  const _LibraryFilter(this.label);
+
+  final String label;
+}
+
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
 
@@ -25,6 +36,8 @@ class ConversationsScreen extends ConsumerStatefulWidget {
 class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _query = TextEditingController();
+  _LibraryFilter _filter = _LibraryFilter.all;
+  bool _searchOpen = false;
 
   /// Structured RAG reply for the submitted question. Same pipeline calls as
   /// the Ask screen (backfill + rag.answer) — no new backend, new UI only.
@@ -61,7 +74,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       }
       final rag = await ref.read(ragServiceProvider.future);
       final result = await rag.answer(question);
-      if (!mounted) return;
+      if (!mounted || !_searchOpen) return;
       final seen = <String>{};
       final ordered = <String>[];
       for (final source in result.sources) {
@@ -75,7 +88,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
         _ragBusy = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_searchOpen) return;
       setState(() {
         _ragError = '$e';
         _ragBusy = false;
@@ -91,6 +104,32 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       _ragError = null;
       _ragBusy = false;
     });
+  }
+
+  void _toggleSearch() {
+    if (_searchOpen) {
+      _query.clear();
+      setState(() {
+        _searchOpen = false;
+        _ragAnswer = null;
+        _ragSourceIds = const [];
+        _ragError = null;
+        _ragBusy = false;
+      });
+    } else {
+      setState(() => _searchOpen = true);
+    }
+  }
+
+  bool _matchesFilter(ConversationSession session) {
+    return switch (_filter) {
+      _LibraryFilter.all => true,
+      _LibraryFilter.notes => session.summary?.trim().isNotEmpty ?? false,
+      _LibraryFilter.transcripts =>
+        session.segments.isNotEmpty ||
+            (session.cleanedTranscript?.trim().isNotEmpty ?? false),
+      _LibraryFilter.favorites => session.isPinned,
+    };
   }
 
   void scrollToTop() {
@@ -139,7 +178,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final query = _query.text.trim().toLowerCase();
 
     final visible = sessions.where((s) {
-      if (s.isDeleted) return false;
+      if (s.isDeleted || !_matchesFilter(s)) return false;
       if (query.isEmpty) return true;
       if (s.title.toLowerCase().contains(query)) return true;
       if (s.summary != null && s.summary!.toLowerCase().contains(query)) {
@@ -235,68 +274,93 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 980),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => _askRag(),
-                      child: Container(
-                        padding: const EdgeInsets.only(
-                          left: 8,
-                          right: 16,
-                          top: 8,
-                          bottom: 8,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final filter in _LibraryFilter.values) ...[
+                                  _LibraryFilterChip(
+                                    label: filter.label,
+                                    selected: _filter == filter,
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      setState(() => _filter = filter);
+                                    },
+                                  ),
+                                  if (filter != _LibraryFilter.values.last)
+                                    const SizedBox(width: 6),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
+                        const SizedBox(width: 8),
+                        _HeaderCircleButton(
+                          icon: _searchOpen
+                              ? Icons.close_rounded
+                              : Icons.search_rounded,
+                          tooltip: _searchOpen
+                              ? 'Close search'
+                              : 'Search memories',
+                          onTap: _toggleSearch,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_searchOpen)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 980),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           color: c.surface,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha: c.isDark ? 0.35 : 0.06,
-                              ),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: c.border),
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: c.primary.withValues(alpha: 0.12),
-                              ),
-                              child: Icon(
-                                Icons.search_rounded,
-                                size: 20,
-                                color: c.primary,
-                              ),
+                            Icon(
+                              Icons.search_rounded,
+                              size: 18,
+                              color: c.textMuted,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: TextField(
                                 controller: _query,
+                                autofocus: true,
                                 textInputAction: TextInputAction.search,
                                 onSubmitted: (_) => _askRag(),
                                 decoration: InputDecoration(
-                                  hintText: 'Ask anything about your day…',
+                                  hintText:
+                                      'Search or ask about your memories…',
                                   hintStyle: TextStyle(
                                     color: c.textMuted,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                   ),
                                   border: InputBorder.none,
+                                  isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 10,
+                                    vertical: 12,
                                   ),
                                 ),
                                 style: TextStyle(
                                   color: c.textPrimary,
-                                  fontSize: 16,
+                                  fontSize: 14,
                                 ),
                                 onChanged: (_) => setState(() {}),
                               ),
@@ -306,15 +370,15 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                 behavior: HitTestBehavior.opaque,
                                 onTap: _clearSearch,
                                 child: Container(
-                                  width: 32,
-                                  height: 32,
+                                  width: 28,
+                                  height: 28,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: c.surfaceMuted,
                                   ),
                                   child: Icon(
                                     Icons.clear_rounded,
-                                    size: 16,
+                                    size: 15,
                                     color: c.textMuted,
                                   ),
                                 ),
@@ -326,7 +390,6 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                   ),
                 ),
               ),
-            ),
             if (_ragBusy || _ragAnswer != null || _ragError != null)
               SliverToBoxAdapter(
                 child: Center(
@@ -357,8 +420,16 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                   right: 20,
                   bottom: bottomInset,
                 ),
-                sliver: visible.isEmpty && query.isNotEmpty
-                    ? const SliverToBoxAdapter(child: _NoMatches())
+                sliver:
+                    visible.isEmpty &&
+                        (query.isNotEmpty || _filter != _LibraryFilter.all)
+                    ? SliverToBoxAdapter(
+                        child: _NoMatches(
+                          message: query.isNotEmpty
+                              ? 'No matches for that search.'
+                              : 'No memories in this view yet.',
+                        ),
+                      )
                     : SliverToBoxAdapter(
                         child: Center(
                           child: ConstrainedBox(
@@ -372,6 +443,58 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                       ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact library view selector. Selected chips use a filled blue surface in
+/// light mode and a deep blue container with beige text in dark mode.
+class _LibraryFilterChip extends StatelessWidget {
+  const _LibraryFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final background = selected
+        ? (c.isDark ? c.primaryContainer : c.primary)
+        : Colors.transparent;
+    final foreground = selected
+        ? (c.isDark ? c.heading : c.onPrimary)
+        : c.textMuted;
+    final borderColor = selected ? c.primary : c.border;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: background,
+        shape: StadiumBorder(side: BorderSide(color: borderColor)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const StadiumBorder(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Text(
+              label,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: foreground,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -461,7 +584,7 @@ class _RagAnswerCard extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: c.border, width: 1.0),
       ),
       child: Column(
@@ -671,7 +794,9 @@ class _DayHeader extends StatelessWidget {
 }
 
 class _NoMatches extends StatelessWidget {
-  const _NoMatches();
+  const _NoMatches({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -679,7 +804,7 @@ class _NoMatches extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 80),
       child: Center(
         child: Text(
-          'No matches for that search.',
+          message,
           style: TextStyle(color: context.tanuColors.textMuted),
         ),
       ),
