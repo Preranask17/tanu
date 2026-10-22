@@ -150,8 +150,11 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
 
     // Group by calendar day, newest first. Pinned items get their own group at the top.
     final pinned = visible.where((s) => s.isPinned).toList();
-    final unpinned =
-        visible.where((s) => !s.isPinned).toList().reversed.toList();
+    final unpinned = visible
+        .where((s) => !s.isPinned)
+        .toList()
+        .reversed
+        .toList();
 
     final groups = <String, List<ConversationSession>>{};
     final order = <String>[];
@@ -171,6 +174,38 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     }
 
     final c = context.tanuColors;
+
+    final librarySections = <Widget>[
+      for (final label in order) ...[
+        _DayHeader(label: label),
+        _MasonryGrid(
+          children: [
+            for (final session in groups[label]!)
+              ConversationTile(
+                key: ValueKey('library_${session.id}'),
+                session: session,
+                noteLayout: true,
+                isProcessing: processingIds.contains(session.id),
+                isFailed:
+                    !processingIds.contains(session.id) &&
+                    notifier.isQueuedForRetry(session.id),
+                onRetry: () => notifier.retrySession(session.id),
+                isNew:
+                    session.status == ConversationStatus.completed &&
+                    (session.finishedAt ?? session.startedAt).isAfter(
+                      DateTime.now().subtract(const Duration(minutes: 1)),
+                    ),
+                onDelete: () => ref
+                    .read(conversationProvider.notifier)
+                    .removeSession(session.id),
+                onPin: () => ref
+                    .read(conversationProvider.notifier)
+                    .togglePin(session.id),
+              ),
+          ],
+        ),
+      ],
+    ];
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -192,9 +227,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const TrashScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const TrashScreen()),
                     );
                   },
                 ),
@@ -203,87 +236,92 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _askRag(),
-                  child: Container(
-                    padding: const EdgeInsets.only(
-                      left: 8,
-                      right: 16,
-                      top: 8,
-                      bottom: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: c.isDark ? 0.35 : 0.06,
-                          ),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 980),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _askRag(),
+                      child: Container(
+                        padding: const EdgeInsets.only(
+                          left: 8,
+                          right: 16,
+                          top: 8,
+                          bottom: 8,
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: c.primary.withValues(alpha: 0.12),
-                          ),
-                          child: Icon(
-                            Icons.search_rounded,
-                            size: 20,
-                            color: c.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: _query,
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (_) => _askRag(),
-                            decoration: InputDecoration(
-                              hintText: 'Ask anything about your day…',
-                              hintStyle: TextStyle(
-                                color: c.textMuted,
-                                fontSize: 16,
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(
+                                alpha: c.isDark ? 0.35 : 0.06,
                               ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                              ),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
-                            style: TextStyle(
-                              color: c.textPrimary,
-                              fontSize: 16,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
+                          ],
                         ),
-                        if (query.isNotEmpty)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: _clearSearch,
-                            child: Container(
-                              width: 32,
-                              height: 32,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: c.surfaceMuted,
+                                color: c.primary.withValues(alpha: 0.12),
                               ),
                               child: Icon(
-                                Icons.clear_rounded,
-                                size: 16,
-                                color: c.textMuted,
+                                Icons.search_rounded,
+                                size: 20,
+                                color: c.primary,
                               ),
                             ),
-                          ),
-                      ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _query,
+                                textInputAction: TextInputAction.search,
+                                onSubmitted: (_) => _askRag(),
+                                decoration: InputDecoration(
+                                  hintText: 'Ask anything about your day…',
+                                  hintStyle: TextStyle(
+                                    color: c.textMuted,
+                                    fontSize: 16,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
+                                ),
+                                style: TextStyle(
+                                  color: c.textPrimary,
+                                  fontSize: 16,
+                                ),
+                                onChanged: (_) => setState(() {}),
+                              ),
+                            ),
+                            if (query.isNotEmpty)
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _clearSearch,
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: c.surfaceMuted,
+                                  ),
+                                  child: Icon(
+                                    Icons.clear_rounded,
+                                    size: 16,
+                                    color: c.textMuted,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -291,14 +329,19 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             ),
             if (_ragBusy || _ragAnswer != null || _ragError != null)
               SliverToBoxAdapter(
-                child: _RagAnswerCard(
-                  busy: _ragBusy,
-                  answer: _ragAnswer,
-                  error: _ragError,
-                  sourceIds: _ragSourceIds,
-                  sessions: sessions,
-                  onRetry: _askRag,
-                  onClear: _clearSearch,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 980),
+                    child: _RagAnswerCard(
+                      busy: _ragBusy,
+                      answer: _ragAnswer,
+                      error: _ragError,
+                      sourceIds: _ragSourceIds,
+                      sessions: sessions,
+                      onRetry: _askRag,
+                      onClear: _clearSearch,
+                    ),
+                  ),
                 ),
               ),
             if (sessions.isEmpty)
@@ -316,48 +359,16 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                 ),
                 sliver: visible.isEmpty && query.isNotEmpty
                     ? const SliverToBoxAdapter(child: _NoMatches())
-                    : SliverList(
-                        delegate: SliverChildListDelegate([
-                          for (final label in order) ...[
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: 16,
-                                bottom: 4,
-                              ),
-                              child: _DayHeader(label: label),
+                    : SliverToBoxAdapter(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 980),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: librarySections,
                             ),
-                            for (final session in groups[label]!)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: ConversationTile(
-                                  session: session,
-                                  isProcessing:
-                                      processingIds.contains(session.id),
-                                  isFailed: !processingIds.contains(
-                                    session.id,
-                                  ) &&
-                                      notifier.isQueuedForRetry(session.id),
-                                  onRetry: () =>
-                                      notifier.retrySession(session.id),
-                                  isNew:
-                                      session.status ==
-                                          ConversationStatus.completed &&
-                                      (session.finishedAt ?? session.startedAt)
-                                          .isAfter(
-                                            DateTime.now().subtract(
-                                              const Duration(minutes: 1),
-                                            ),
-                                          ),
-                                  onDelete: () => ref
-                                      .read(conversationProvider.notifier)
-                                      .removeSession(session.id),
-                                  onPin: () => ref
-                                      .read(conversationProvider.notifier)
-                                      .togglePin(session.id),
-                                ),
-                              ),
-                          ],
-                        ]),
+                          ),
+                        ),
                       ),
               ),
           ],
@@ -458,21 +469,17 @@ class _RagAnswerCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.auto_awesome,
-                size: 14,
-                color: c.primary,
-              ),
+              Icon(Icons.auto_awesome, size: 14, color: c.primary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   busy
                       ? 'Recalling memories…'
                       : error != null
-                          ? 'Could not recall'
-                          : sourceIds.length == 1
-                              ? '1 memory found'
-                              : '${sourceIds.length} memories found',
+                      ? 'Could not recall'
+                      : sourceIds.length == 1
+                      ? '1 memory found'
+                      : '${sourceIds.length} memories found',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -492,11 +499,7 @@ class _RagAnswerCard extends StatelessWidget {
                   onTap: onClear,
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.close,
-                      size: 16,
-                      color: c.textMuted,
-                    ),
+                    child: Icon(Icons.close, size: 16, color: c.textMuted),
                   ),
                 ),
             ],
@@ -604,6 +607,33 @@ class _RagAnswerCard extends StatelessWidget {
   }
 }
 
+/// Two-column Keep-style masonry: cards alternate columns and size to their
+/// own content, so each column staggers naturally without a fixed aspect ratio.
+class _MasonryGrid extends StatelessWidget {
+  const _MasonryGrid({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final left = <Widget>[];
+    final right = <Widget>[];
+
+    for (var i = 0; i < children.length; i++) {
+      (i.isEven ? left : right).add(children[i]);
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: Column(children: left)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(children: right)),
+      ],
+    );
+  }
+}
+
 class _DayHeader extends StatelessWidget {
   const _DayHeader({required this.label});
 
@@ -624,21 +654,16 @@ class _DayHeader extends StatelessWidget {
             ),
             child: Text(
               label.toUpperCase(),
-              style: TextStyle(
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
-                color: c.textSecondary,
+                color: c.heading,
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: Divider(
-              color: c.border,
-              thickness: 1,
-            ),
-          ),
+          Expanded(child: Divider(color: c.border, thickness: 1)),
         ],
       ),
     );
@@ -690,7 +715,7 @@ class _EmptyConversations extends ConsumerWidget {
             Text(
               'A blank slate',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: c.heading,
@@ -700,11 +725,7 @@ class _EmptyConversations extends ConsumerWidget {
             Text(
               'Connect your pendant and let it listen to the world.\nYour memories will magically appear here.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: c.textMuted,
-                height: 1.5,
-                fontSize: 15,
-              ),
+              style: TextStyle(color: c.textMuted, height: 1.5, fontSize: 15),
             ),
             const SizedBox(height: 40),
             ElevatedButton(

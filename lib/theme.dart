@@ -15,32 +15,67 @@ class TanuTheme {
         : TanuColors.light;
 
     final textTheme = TextTheme(
-      displayLarge: GoogleFonts.dmSerifDisplay(
+      displayLarge: GoogleFonts.outfit(
         color: colors.heading,
         fontSize: 32,
-        height: 1.2,
+        fontWeight: FontWeight.w600,
+        height: 1.15,
+        letterSpacing: -0.6,
       ),
-      displayMedium: GoogleFonts.dmSerifDisplay(
+      displayMedium: GoogleFonts.outfit(
         color: colors.heading,
         fontSize: 28,
-        height: 1.2,
+        fontWeight: FontWeight.w600,
+        height: 1.15,
+        letterSpacing: -0.5,
       ),
-      titleLarge: GoogleFonts.inter(
+      displaySmall: GoogleFonts.outfit(
+        color: colors.heading,
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        letterSpacing: -0.4,
+      ),
+      headlineLarge: GoogleFonts.outfit(
+        color: colors.heading,
+        fontSize: 26,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        letterSpacing: -0.4,
+      ),
+      headlineMedium: GoogleFonts.outfit(
+        color: colors.heading,
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        letterSpacing: -0.3,
+      ),
+      headlineSmall: GoogleFonts.outfit(
         color: colors.heading,
         fontSize: 20,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.5,
+        height: 1.2,
+        letterSpacing: -0.2,
       ),
-      titleMedium: GoogleFonts.inter(
+      titleLarge: GoogleFonts.outfit(
+        color: colors.heading,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        height: 1.25,
+        letterSpacing: -0.3,
+      ),
+      titleMedium: GoogleFonts.outfit(
         color: colors.heading,
         fontSize: 16,
         fontWeight: FontWeight.w600,
+        height: 1.25,
         letterSpacing: -0.2,
       ),
-      titleSmall: GoogleFonts.inter(
+      titleSmall: GoogleFonts.outfit(
         color: colors.heading,
         fontSize: 14,
         fontWeight: FontWeight.w600,
+        height: 1.25,
         letterSpacing: -0.1,
       ),
       bodyLarge: GoogleFonts.inter(
@@ -55,10 +90,29 @@ class TanuTheme {
         letterSpacing: -0.2,
         height: 1.4,
       ),
+      bodySmall: GoogleFonts.inter(
+        color: colors.textMuted,
+        fontSize: 13,
+        letterSpacing: -0.1,
+        height: 1.35,
+      ),
       labelLarge: GoogleFonts.inter(
         color: colors.textMuted,
         fontSize: 13,
+        fontWeight: FontWeight.w600,
         letterSpacing: 0,
+      ),
+      labelMedium: GoogleFonts.inter(
+        color: colors.textMuted,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+      ),
+      labelSmall: GoogleFonts.inter(
+        color: colors.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
       ),
     );
 
