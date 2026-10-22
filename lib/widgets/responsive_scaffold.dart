@@ -1,6 +1,41 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tanu_colors.dart';
+import 'floating_navigation.dart';
+
+/// Page order supplied by the app shell:
+/// 0 = Home, 1 = Library, 2 = Settings, 3 = Recall.
+///
+/// The visual order below puts Recall before Library while keeping the
+/// existing page indices (and therefore the existing navigation state) stable.
+const List<FloatingNavItem> _navItems = [
+  FloatingNavItem(
+    label: 'Home',
+    icon: Icons.home_outlined,
+    activeIcon: Icons.home_rounded,
+    pageIndex: 0,
+    scrollsToTopOnRepeat: true,
+  ),
+  FloatingNavItem(
+    label: 'Recall',
+    icon: Icons.auto_awesome_outlined,
+    activeIcon: Icons.auto_awesome,
+    pageIndex: 3,
+  ),
+  FloatingNavItem(
+    label: 'Library',
+    icon: Icons.folder_outlined,
+    activeIcon: Icons.folder_rounded,
+    pageIndex: 1,
+    scrollsToTopOnRepeat: true,
+  ),
+  FloatingNavItem(
+    label: 'Settings',
+    icon: Icons.settings_outlined,
+    activeIcon: Icons.settings_rounded,
+    pageIndex: 2,
+  ),
+];
 
 class ResponsiveScaffold extends StatelessWidget {
   const ResponsiveScaffold({
@@ -8,13 +43,16 @@ class ResponsiveScaffold extends StatelessWidget {
     required this.currentIndex,
     required this.onTabTapped,
     required this.pages,
-    required this.items,
+    this.onAddTap,
   });
 
   final int currentIndex;
   final void Function(int) onTabTapped;
   final List<Widget> pages;
-  final List<BottomNavigationBarItem> items;
+
+  /// Optional action for the docked centre button. When omitted, the button
+  /// returns to Home, where a memory can be captured.
+  final VoidCallback? onAddTap;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +67,7 @@ class ResponsiveScaffold extends StatelessWidget {
                 _Sidebar(
                   currentIndex: currentIndex,
                   onTabTapped: onTabTapped,
-                  items: items,
+                  onAddTap: onAddTap,
                 ),
                 Container(
                   width: 1,
@@ -41,84 +79,28 @@ class ResponsiveScaffold extends StatelessWidget {
               ],
             ),
           );
-        } else {
-          // Mobile / Narrow Layout (Floating Pill Dock)
-          final c = context.tanuColors;
-          return Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            body: Stack(
-              children: [
-                IndexedStack(index: currentIndex, children: pages),
-                Positioned(
-                  bottom: MediaQuery.paddingOf(context).bottom + 16,
-                  left: 32,
-                  right: 32,
-                  child: Container(
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(32),
-                      border: Border.all(
-                        color: c.border,
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(items.length, (index) {
-                        final item = items[index];
-                        final isSelected = index == currentIndex;
-                        final activeIconData = (item.activeIcon as Icon?)?.icon;
-                        final iconData = (item.icon as Icon?)?.icon;
-
-                        return Tooltip(
-                          message: item.label ?? '',
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              onTap: () => onTabTapped(index),
-                              behavior: HitTestBehavior.opaque,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeOutCubic,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? c.surfaceMuted
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(
-                                  isSelected
-                                      ? (activeIconData ?? iconData)
-                                      : iconData,
-                                  color: isSelected
-                                      ? c.textPrimary
-                                      : c.textMuted,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
         }
+
+        // Mobile / Narrow Layout (Curved notched dock)
+        return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: Stack(
+            children: [
+              IndexedStack(index: currentIndex, children: pages),
+              Positioned(
+                bottom: MediaQuery.paddingOf(context).bottom + 12,
+                left: 16,
+                right: 16,
+                child: FloatingNavigationBar(
+                  items: _navItems,
+                  selectedIndex: currentIndex,
+                  onTabSelected: onTabTapped,
+                  onAddTap: onAddTap,
+                ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -128,12 +110,12 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.currentIndex,
     required this.onTabTapped,
-    required this.items,
+    required this.onAddTap,
   });
 
   final int currentIndex;
   final void Function(int) onTabTapped;
-  final List<BottomNavigationBarItem> items;
+  final VoidCallback? onAddTap;
 
   @override
   Widget build(BuildContext context) {
@@ -156,12 +138,10 @@ class _Sidebar extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: items.length,
+                itemCount: _navItems.length,
                 itemBuilder: (context, index) {
-                  final isSelected = index == currentIndex;
-                  final item = items[index];
-                  final activeIconData = (item.activeIcon as Icon?)?.icon;
-                  final iconData = (item.icon as Icon?)?.icon;
+                  final item = _navItems[index];
+                  final isSelected = item.pageIndex == currentIndex;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -178,7 +158,10 @@ class _Sidebar extends StatelessWidget {
                         ),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          onTap: () => onTabTapped(index),
+                          onTap: () {
+                            if (isSelected && !item.scrollsToTopOnRepeat) return;
+                            onTabTapped(item.pageIndex);
+                          },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -187,17 +170,15 @@ class _Sidebar extends StatelessWidget {
                             child: Row(
                               children: [
                                 Icon(
-                                  isSelected
-                                      ? (activeIconData ?? iconData)
-                                      : iconData,
+                                  isSelected ? item.activeIcon : item.icon,
                                   color: isSelected
-                                      ? c.textPrimary
+                                      ? const Color(0xFF8C6D58)
                                       : c.textMuted,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  item.label ?? '',
+                                  item.label,
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: isSelected
@@ -216,6 +197,29 @@ class _Sidebar extends StatelessWidget {
                     ),
                   );
                 },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onAddTap ?? () => onTabTapped(0),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Add'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF1F2937),
+                    foregroundColor: const Color(0xFFF5F1E9),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

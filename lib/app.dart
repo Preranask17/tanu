@@ -10,6 +10,7 @@ import 'providers/analytics_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/settings_provider.dart';
+import 'screens/ask_screen.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
@@ -31,9 +32,9 @@ class _TanuAppState extends ConsumerState<TanuApp> {
   final _homeKey = GlobalKey<HomeScreenState>();
   final _conversationsKey = GlobalKey<ConversationsScreenState>();
 
-  /// Tab index -> screen name. Indexed in step with the `BottomNavigationBarItem`
-  /// list in [build] and with the `items` passed to `ResponsiveScaffold`.
-  static const _tabScreens = ['capture', 'memories', 'settings'];
+  /// Tab index -> screen name. Indexed in step with the page list in [build]
+  /// and with the page indices in `ResponsiveScaffold`'s dock destinations.
+  static const _tabScreens = ['capture', 'memories', 'settings', 'recall'];
 
   @override
   void initState() {
@@ -194,29 +195,32 @@ class _TanuAppState extends ConsumerState<TanuApp> {
                   ref.read(navigationTabProvider.notifier).goTo(i);
                 }
               },
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.mic_none),
-                  activeIcon: Icon(Icons.mic),
-                  label: 'Capture',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  activeIcon: Icon(Icons.inventory_2),
-                  label: 'Memories',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.settings_outlined),
-                  activeIcon: Icon(Icons.settings),
-                  label: 'Settings',
-                ),
-              ],
               pages: [
                 HomeScreen(key: _homeKey),
                 ConversationsScreen(key: _conversationsKey),
                 const SettingsScreen(),
+                const _DockInset(child: AskScreen()),
               ],
             ),
+    );
+  }
+}
+
+/// Keeps the centred dock from covering pages that manage their own bottom
+/// inset. Home, Library, and Settings already reserve space; Ask does not.
+class _DockInset extends StatelessWidget {
+  const _DockInset({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 600) return child;
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 98,
+      ),
+      child: child,
     );
   }
 }
