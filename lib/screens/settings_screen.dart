@@ -18,23 +18,13 @@ import '../widgets/device_picker_sheet.dart';
 import '../widgets/page_layout.dart';
 import '../widgets/pinned_header.dart';
 
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _developerOpen = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final status =
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
-    final capture = ref.watch(devCaptureProvider);
-    final stats = ref.watch(pendantStatsProvider);
-    final c = context.tanuColors;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -61,35 +51,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                   _SettingsCard(
                     title: 'Speech Engine',
-                    subtitle: 'Offline AI model for transcription',
+                    subtitle: 'On-device transcription',
                     padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.fromLTRB(18, 16, 18, 18),
-                          child: _SttModelDashboard(),
-                        ),
-                        Divider(height: 1, color: c.borderSubtle),
-                        const _SttLanguagePicker(),
-                      ],
+                    child: _SettingsActionTile(
+                      icon: Icons.graphic_eq_rounded,
+                      title: 'Manage speech model',
+                      subtitle: 'Download or choose a language',
+                      onTap: () => _showSettingsSheet(
+                        context,
+                        title: 'Speech Engine',
+                        subtitle:
+                            'Offline AI model for transcription on this device',
+                        child: const _SpeechEngineControls(),
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  const _SettingsCard(
+                  _SettingsCard(
                     title: 'Memory',
                     subtitle: 'All your data stays on this device',
-                    child: _WipeMemoryButton(),
+                    padding: EdgeInsets.zero,
+                    child: _SettingsActionTile(
+                      icon: Icons.inventory_2_outlined,
+                      title: 'Manage local memory',
+                      subtitle: 'Review or permanently wipe local data',
+                      onTap: () => _showSettingsSheet(
+                        context,
+                        title: 'Memory',
+                        subtitle: 'Stored locally on this device',
+                        child: const _MemoryControls(),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  const _SettingsCard(
+                  _SettingsCard(
                     title: 'Gemini API Key',
-                    subtitle:
-                        'Used for memory processing, chat & RAG embeddings',
-                    child: _GeminiKeyField(),
+                    subtitle: 'AI processing & embeddings',
+                    padding: EdgeInsets.zero,
+                    child: _SettingsActionTile(
+                      icon: Icons.key_outlined,
+                      title: 'Configure API key',
+                      subtitle: 'For memory, chat & RAG embeddings',
+                      onTap: () => _showSettingsSheet(
+                        context,
+                        title: 'Gemini API Key',
+                        subtitle:
+                            'Used for memory processing, chat & RAG embeddings',
+                        child: const _GeminiKeyField(),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 16),
@@ -106,17 +120,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SettingsCard(
                     title: 'Under the Hood',
                     subtitle: 'Diagnostic tools',
-                    onHeaderTap: () =>
-                        setState(() => _developerOpen = !_developerOpen),
-                    trailing: Icon(
-                      _developerOpen
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      color: c.heading.withValues(alpha: 0.72),
+                    padding: EdgeInsets.zero,
+                    child: _SettingsActionTile(
+                      icon: Icons.terminal_rounded,
+                      title: 'Open console',
+                      subtitle: 'Telemetry, mic tests, and raw capture',
+                      onTap: () => _showSettingsSheet(
+                        context,
+                        title: 'Under the Hood',
+                        subtitle: 'Live pendant and capture diagnostics',
+                        child: const _UnderTheHoodControls(),
+                      ),
                     ),
-                    child: _developerOpen
-                        ? _DeveloperConsole(capture: capture, stats: stats)
-                        : null,
                   ),
                   // Clearance above the floating dock so the last section
                   // scrolls fully into view on every screen size.
@@ -131,45 +146,164 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
+/// Shared shell for the settings that need more room than the main page.
+Future<void> _showSettingsSheet(
+  BuildContext context, {
+  required String title,
+  String? subtitle,
+  required Widget child,
+}) async {
+  final c = context.tanuColors;
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: c.surface,
+    barrierColor: Colors.black.withValues(alpha: 0.35),
+    showDragHandle: true,
+    constraints: const BoxConstraints(maxWidth: 560),
+    clipBehavior: Clip.antiAlias,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) =>
+        _SettingsSheet(title: title, subtitle: subtitle, child: child),
+  );
+}
+
+class _SettingsSheet extends StatelessWidget {
+  const _SettingsSheet({
+    required this.title,
+    this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                style: textTheme.titleLarge?.copyWith(color: c.heading),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 5),
+                Text(
+                  subtitle!,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: c.heading.withValues(alpha: 0.72),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsActionTile extends StatelessWidget {
+  const _SettingsActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
+
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: c.primary.withValues(alpha: c.isDark ? 0.18 : 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 20, color: c.heading),
+      ),
+      title: Text(
+        title,
+        style: textTheme.bodyLarge?.copyWith(
+          color: c.heading,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          subtitle,
+          style: textTheme.bodySmall?.copyWith(
+            color: c.heading.withValues(alpha: 0.72),
+            fontSize: 13,
+            height: 1.35,
+          ),
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: c.heading.withValues(alpha: 0.72),
+      ),
+    );
+  }
+}
+
 // Components
 
-/// Grouped settings surface with an Outfit header and Inter tile text.
+/// Elevated grouped settings surface with an Outfit header and Inter tiles.
 class _SettingsCard extends StatelessWidget {
   const _SettingsCard({
     required this.title,
     this.subtitle,
     this.child,
     this.padding = const EdgeInsets.fromLTRB(18, 16, 18, 18),
-    this.trailing,
-    this.onHeaderTap,
   });
 
   final String title;
   final String? subtitle;
   final Widget? child;
   final EdgeInsetsGeometry padding;
-  final Widget? trailing;
-  final VoidCallback? onHeaderTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.tanuColors;
     final textTheme = Theme.of(context).textTheme;
-    final header = Padding(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: _SectionHeader(title: title, subtitle: subtitle),
-          ),
-          if (trailing != null) ...[const SizedBox(width: 12), trailing!],
-        ],
-      ),
-    );
 
     return Material(
       color: c.surface,
+      elevation: c.isDark ? 1 : 1.5,
+      shadowColor: Colors.black.withValues(alpha: c.isDark ? 0.45 : 0.08),
+      surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
@@ -178,10 +312,10 @@ class _SettingsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (onHeaderTap != null)
-            InkWell(onTap: onHeaderTap, child: header)
-          else
-            header,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+            child: _SectionHeader(title: title, subtitle: subtitle),
+          ),
           if (child != null) ...[
             Divider(height: 1, color: c.borderSubtle),
             ListTileTheme(
@@ -259,14 +393,24 @@ class _NotificationSettings extends ConsumerWidget {
           ),
         ),
         Divider(height: 1, color: c.borderSubtle),
-        const _BackgroundProtection(),
+        _SettingsActionTile(
+          icon: Icons.shield_outlined,
+          title: 'Background protection',
+          subtitle: 'Keep digest delivery on aggressive skins',
+          onTap: () => _showSettingsSheet(
+            context,
+            title: 'Background protection',
+            subtitle: 'Keep the morning digest alive after the app closes',
+            child: const _BackgroundProtection(),
+          ),
+        ),
       ],
     );
   }
 }
 
-/// Background protection: one-tap routes to the system screens that
-/// decide whether the digest worker survives app kill on aggressive OEM
+/// Background protection sheet content: one-tap routes to the system screens
+/// that decide whether the digest worker survives app kill on aggressive OEM
 /// skins (Oppo/Realme/Vivo/Xiaomi). Fired via plain Android intents — no
 /// native plugin, nothing to break the Gradle build. All launches guarded.
 class _BackgroundProtection extends StatelessWidget {
@@ -337,35 +481,37 @@ class _BackgroundProtection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ListTile(
-          leading: Icon(Icons.shield_outlined, color: c.heading),
-          title: const Text('Background protection'),
-          subtitle: Text(
-            'Aggressive skins kill background apps. Exempt Tanu so the '
-            'morning digest arrives with the app closed.',
+        Text(
+          'Aggressive skins kill background apps. Exempt Tanu so the '
+          'morning digest arrives with the app closed.',
+          style: textTheme.bodyMedium?.copyWith(
+            color: c.heading.withValues(alpha: 0.78),
+            height: 1.45,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 18, bottom: 12),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Wrap(
-              spacing: 4,
-              children: [
-                TextButton.icon(
-                  onPressed: _requestExemption,
-                  icon: const Icon(Icons.battery_saver_outlined, size: 16),
-                  label: const Text('Battery exemption'),
-                ),
-                TextButton.icon(
-                  onPressed: _openAutostart,
-                  icon: const Icon(Icons.play_circle_outline, size: 16),
-                  label: const Text('Autostart'),
-                ),
-              ],
-            ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: _requestExemption,
+                icon: const Icon(Icons.battery_saver_outlined, size: 16),
+                label: const Text('Battery exemption'),
+              ),
+              TextButton.icon(
+                onPressed: _openAutostart,
+                icon: const Icon(Icons.play_circle_outline, size: 16),
+                label: const Text('Autostart'),
+              ),
+            ],
           ),
         ),
       ],
@@ -426,9 +572,14 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
         const SizedBox(width: 8),
         FilledButton(
           onPressed: () {
+            final messenger = ScaffoldMessenger.of(context);
+            final navigator = Navigator.of(context);
             ref.read(settingsProvider.notifier).setGeminiApiKey(_ctrl.text);
             FocusScope.of(context).unfocus();
-            ScaffoldMessenger.of(context).showSnackBar(
+            if (navigator.canPop()) {
+              navigator.pop();
+            }
+            messenger.showSnackBar(
               const SnackBar(content: Text('Gemini API key saved')),
             );
           },
@@ -773,6 +924,23 @@ class _ThemePill extends StatelessWidget {
   }
 }
 
+class _SpeechEngineControls extends StatelessWidget {
+  const _SpeechEngineControls();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SttModelDashboard(),
+        Divider(height: 1, color: c.borderSubtle),
+        const _SttLanguagePicker(),
+      ],
+    );
+  }
+}
+
 /// Speech-language picker. Auto-detect (default Whisper engine) or one
 /// explicit Indic language (same on-device bundle driven through the Indic
 /// engine core with a fixed language hint). Pure selection UI: the engine
@@ -786,7 +954,7 @@ class _SttLanguagePicker extends ConsumerWidget {
     final c = context.tanuColors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
           Icon(Icons.translate_rounded, size: 20, color: c.heading),
@@ -1004,6 +1172,32 @@ class _SttModelDashboard extends ConsumerWidget {
   }
 }
 
+class _MemoryControls extends StatelessWidget {
+  const _MemoryControls();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Deleting local memory permanently removes your conversation '
+          'history and all commitments stored on this device. This cannot '
+          'be undone.',
+          style: textTheme.bodyMedium?.copyWith(
+            color: c.heading.withValues(alpha: 0.78),
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 18),
+        const _WipeMemoryButton(),
+      ],
+    );
+  }
+}
+
 class _WipeMemoryButton extends ConsumerWidget {
   const _WipeMemoryButton();
 
@@ -1055,6 +1249,18 @@ class _WipeMemoryButton extends ConsumerWidget {
           }
         },
       ),
+    );
+  }
+}
+
+class _UnderTheHoodControls extends ConsumerWidget {
+  const _UnderTheHoodControls();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _DeveloperConsole(
+      capture: ref.watch(devCaptureProvider),
+      stats: ref.watch(pendantStatsProvider),
     );
   }
 }

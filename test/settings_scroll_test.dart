@@ -7,10 +7,11 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:tanu_app/screens/settings_screen.dart';
 import 'package:tanu_app/services/storage_service.dart';
 
-/// Proves the Settings bottom cushion: scrolling to the very end leaves the
-/// "Under the Hood" section fully above any nav overlay, expandable and
-/// tappable. Filesystem work runs in runAsync (async dart:io stalls in this
-/// environment's FakeAsync test zone). No backend is exercised.
+/// Proves the Settings bottom cushion and the heavy sections' sub-views:
+/// scrolling to the very end leaves "Under the Hood" above any nav overlay,
+/// and its console opens in a sheet instead of expanding inline. Filesystem
+/// work runs in runAsync (async dart:io stalls in this environment's FakeAsync
+/// test zone). No backend is exercised.
 void main() {
   testWidgets('settings: bottom content clears the nav dock', (tester) async {
     await tester.runAsync(() async {
@@ -22,39 +23,37 @@ void main() {
     });
 
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(home: SettingsScreen()),
-      ),
+      const ProviderScope(child: MaterialApp(home: SettingsScreen())),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    // Scroll the last section fully into view.
+    // The complex controls are not dumped on the main settings page.
+    expect(find.textContaining('DEV CONSOLE'), findsNothing);
+    expect(find.text('Download Offline Model (~375MB)'), findsNothing);
+    expect(find.text("WIPE TANU'S MEMORY"), findsNothing);
+
+    // Scroll to the last action row and open its sub-view.
     await tester.scrollUntilVisible(
-      find.text('Under the Hood'),
+      find.text('Open console'),
       400,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pump();
     expect(find.text('Under the Hood'), findsOneWidget);
+    expect(find.text('Open console'), findsOneWidget);
 
-    // Expand it: console content appears and stays reachable/tappable.
-    await tester.tap(find.text('Under the Hood'));
+    await tester.tap(find.text('Open console'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.scrollUntilVisible(
-      find.textContaining('DEV CONSOLE'),
-      400,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.textContaining('DEV CONSOLE'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
-    // Drag to the absolute end: completes without layout exceptions and
-    // the diagnostics remain on screen (not clipped behind a dock).
+    // Drag the sheet to its end: completes without layout exceptions and
+    // the diagnostics remain reachable.
     await tester.fling(
-      find.byType(Scrollable).first,
-      const Offset(0, -600),
+      find.byType(Scrollable).last,
+      const Offset(0, -500),
       1000,
     );
     await tester.pump();
