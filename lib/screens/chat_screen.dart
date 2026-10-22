@@ -88,7 +88,7 @@ class _LiveHeader extends StatelessWidget {
             Text(
               'Tanu',
               style: TextStyle(
-                color: c.textPrimary,
+                color: c.heading,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),

@@ -42,8 +42,6 @@ class FloatingNavigationBar extends StatelessWidget {
   final ValueChanged<int> onTabSelected;
   final VoidCallback? onAddTap;
 
-  static const _terracotta = Color(0xFF8C6D58);
-  static const _slate = Color(0xFF1F2937);
   static const _barHeight = 62.0;
   static const _notchHalfWidth = 42.0;
   static const _fabSize = 52.0;
@@ -141,10 +139,8 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.tanuColors;
-    final iconColor = selected
-        ? FloatingNavigationBar._terracotta
-        : c.textMuted;
-    final labelColor = selected ? c.textPrimary : c.textMuted;
+    final iconColor = selected ? c.primary : c.textMuted;
+    final labelColor = selected ? c.primary : c.textMuted;
 
     return Semantics(
       button: true,
@@ -198,7 +194,7 @@ class _AddButton extends StatelessWidget {
       button: true,
       label: 'Add',
       child: Material(
-        color: FloatingNavigationBar._slate,
+        color: c.primary,
         elevation: 8,
         shadowColor: Colors.black.withValues(alpha: c.isDark ? 0.55 : 0.3),
         shape: CircleBorder(
@@ -212,11 +208,7 @@ class _AddButton extends StatelessWidget {
           child: SizedBox(
             width: size,
             height: size,
-            child: const Icon(
-              Icons.add_rounded,
-              size: 28,
-              color: Color(0xFFF5F1E9),
-            ),
+            child: Icon(Icons.add_rounded, size: 28, color: c.onPrimary),
           ),
         ),
       ),

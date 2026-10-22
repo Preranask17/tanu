@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/audio_source.dart';
 import '../providers/ble_provider.dart';
+import '../theme/tanu_colors.dart';
 
 /// Compact strip showing pendant connection + battery across screens.
 class ConnectionStatusBar extends ConsumerWidget {
@@ -11,31 +12,23 @@ class ConnectionStatusBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(pendantStatusProvider).value ?? PendantStatus();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     final (color, icon, text) = switch (status.state) {
       PendantState.connected => (
-        Colors.green,
+        c.success,
         Icons.bluetooth_connected,
         status.deviceName ?? 'Connected',
       ),
-      PendantState.reconnecting => (
-        Colors.orange,
-        Icons.sync,
-        'Reconnecting...',
-      ),
+      PendantState.reconnecting => (c.primary, Icons.sync, 'Reconnecting...'),
       PendantState.scanning => (
-        Theme.of(context).primaryColor,
+        c.primary,
         Icons.settings_bluetooth,
         'Looking for pendant...',
       ),
-      PendantState.connecting => (
-        Theme.of(context).primaryColor,
-        Icons.sync,
-        'Connecting...',
-      ),
+      PendantState.connecting => (c.primary, Icons.sync, 'Connecting...'),
       PendantState.disconnected => (
-        const Color(0xFF888888),
+        c.textMuted,
         Icons.bluetooth_disabled,
         'Not connected',
       ),
@@ -58,18 +51,11 @@ class ConnectionStatusBar extends ConsumerWidget {
             ),
           ),
           if (status.batteryPercent != null) ...[
-            const Icon(
-              Icons.battery_full,
-              size: 15,
-              color: Color(0xFF888888),
-            ),
+            Icon(Icons.battery_full, size: 15, color: c.textMuted),
             const SizedBox(width: 4),
             Text(
               '${status.batteryPercent}%',
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(fontSize: 13, color: c.textPrimary),
             ),
           ],
         ],

@@ -677,7 +677,7 @@ class _ThemePill extends StatelessWidget {
               Icon(
                 icon,
                 size: 20,
-                color: isSelected ? c.textPrimary : c.textMuted,
+                color: isSelected ? c.primary : c.textMuted,
               ),
               const SizedBox(height: 4),
               Text(
@@ -685,7 +685,7 @@ class _ThemePill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? c.textPrimary : c.textMuted,
+                  color: isSelected ? c.primary : c.textMuted,
                 ),
               ),
             ],

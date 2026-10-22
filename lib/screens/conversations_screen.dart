@@ -693,7 +693,7 @@ class _EmptyConversations extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: c.textPrimary,
+                color: c.heading,
               ),
             ),
             const SizedBox(height: 12),

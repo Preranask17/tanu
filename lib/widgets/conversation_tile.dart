@@ -97,10 +97,10 @@ class _ConversationTileState extends State<ConversationTile> {
                   background: Container(
                     alignment: Alignment.centerLeft,
                     padding: const EdgeInsets.only(left: 20),
-                    color: c.warning,
+                    color: c.primary,
                     child: Icon(
                       session.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-                      color: c.isDark ? c.scaffold : Colors.white,
+                      color: c.onPrimary,
                     ),
                   ),
                   secondaryBackground: Container(
@@ -177,7 +177,7 @@ class _ConversationTileState extends State<ConversationTile> {
               child: Text(
                 title.isEmpty ? 'M' : title.characters.first.toUpperCase(),
                 style: TextStyle(
-                  color: c.textSecondary,
+                  color: c.primary,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),
@@ -200,7 +200,7 @@ class _ConversationTileState extends State<ConversationTile> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: c.textPrimary,
+                            color: c.heading,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),

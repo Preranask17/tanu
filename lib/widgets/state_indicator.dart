@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../abstractions/audio_source.dart';
+import '../theme/tanu_colors.dart';
 
 /// Mirrors the pendant state in the UI: idle / listening / thinking / error.
 class StateIndicator extends StatelessWidget {
@@ -19,16 +20,17 @@ class StateIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     if (error != null) {
       return _Pill(
-        color: Colors.redAccent,
+        color: c.danger,
         icon: Icons.warning_amber_rounded,
         label: error!,
       );
     }
     if (isThinking) {
       return _Pill(
-        color: Theme.of(context).primaryColor,
+        color: c.primary,
         icon: Icons.auto_awesome,
         label: 'Tanu is thinking...',
         progress: true,
@@ -36,7 +38,7 @@ class StateIndicator extends StatelessWidget {
     }
     if (isListening) {
       return _Pill(
-        color: Theme.of(context).primaryColor,
+        color: c.primary,
         icon: Icons.graphic_eq,
         label: 'Listening...',
         pulse: true,
@@ -44,35 +46,35 @@ class StateIndicator extends StatelessWidget {
     }
     switch (state) {
       case PendantState.connected:
-        return const _Pill(
-          color: Colors.green,
+        return _Pill(
+          color: c.success,
           icon: Icons.check_circle_outline,
           label: 'Ready',
         );
       case PendantState.scanning:
         return _Pill(
-          color: Theme.of(context).primaryColor,
+          color: c.primary,
           icon: Icons.settings_bluetooth,
           label: 'Scanning for your pendant...',
           progress: true,
         );
       case PendantState.connecting:
         return _Pill(
-          color: Theme.of(context).primaryColor,
+          color: c.primary,
           icon: Icons.sync,
           label: 'Connecting...',
           progress: true,
         );
       case PendantState.reconnecting:
-        return const _Pill(
-          color: Colors.orange,
+        return _Pill(
+          color: c.primary,
           icon: Icons.sync,
           label: 'Reconnecting...',
           progress: true,
         );
       case PendantState.disconnected:
-        return const _Pill(
-          color: Color(0xFF888888),
+        return _Pill(
+          color: c.textMuted,
           icon: Icons.bluetooth_disabled,
           label: 'Pendant not connected',
         );

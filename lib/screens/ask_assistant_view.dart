@@ -72,7 +72,7 @@ class _AskAssistantViewState extends State<AskAssistantView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = const Color(0xFFF5F1E9);
-    final textColor = const Color(0xFF4A453F);
+    final textColor = const Color(0xFF33302B);
     final accentColor = const Color(0xFF899386);
     final actionColor = const Color(0xFF6F819A);
     final userBg = bgColor;
@@ -114,7 +114,7 @@ class _AskAssistantViewState extends State<AskAssistantView> {
         style: GoogleFonts.lato(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: const Color(0xFF4A453F),
+          color: const Color(0xFF33302B),
         ),
       ),
     );
@@ -143,7 +143,7 @@ class _AskAssistantViewState extends State<AskAssistantView> {
             child: Icon(
               Icons.mic,
               size: 20,
-              color: isDark ? Colors.white : const Color(0xFF4A453F),
+              color: isDark ? Colors.white : const Color(0xFF33302B),
             ),
           ),
           const SizedBox(width: 12),

@@ -49,22 +49,24 @@ class PendantStatusBanner extends StatelessWidget {
               _StatusDot(isConnected: state == BannerState.listening),
               const SizedBox(width: 8),
               // Battery level
-              const Text(
+              Text(
                 '85%',
                 style: TextStyle(
                   fontFamily: 'Lato',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
+                  color: c.textPrimary,
                 ),
               ),
               const SizedBox(width: 16),
               // Audio state
               Text(
                 _getAudioText(state),
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Lato',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
+                  color: c.heading,
                 ),
               ),
             ],

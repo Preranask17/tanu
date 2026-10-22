@@ -16,20 +16,32 @@ class TanuTheme {
 
     final textTheme = TextTheme(
       displayLarge: GoogleFonts.dmSerifDisplay(
-        color: colors.textPrimary,
+        color: colors.heading,
         fontSize: 32,
         height: 1.2,
       ),
       displayMedium: GoogleFonts.dmSerifDisplay(
-        color: colors.textPrimary,
+        color: colors.heading,
         fontSize: 28,
         height: 1.2,
       ),
       titleLarge: GoogleFonts.inter(
-        color: colors.textPrimary,
+        color: colors.heading,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
+      ),
+      titleMedium: GoogleFonts.inter(
+        color: colors.heading,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
+      ),
+      titleSmall: GoogleFonts.inter(
+        color: colors.heading,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.1,
       ),
       bodyLarge: GoogleFonts.inter(
         color: colors.textPrimary,
@@ -278,7 +290,7 @@ class TanuTheme {
       ),
       listTileTheme: ListTileThemeData(
         iconColor: colors.textSecondary,
-        textColor: colors.textPrimary,
+        textColor: colors.heading,
         subtitleTextStyle: TextStyle(color: colors.textMuted),
         selectedTileColor: colors.primary.withValues(alpha: 0.10),
         selectedColor: colors.primary,

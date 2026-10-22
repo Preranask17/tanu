@@ -171,9 +171,7 @@ class _Sidebar extends StatelessWidget {
                               children: [
                                 Icon(
                                   isSelected ? item.activeIcon : item.icon,
-                                  color: isSelected
-                                      ? const Color(0xFF8C6D58)
-                                      : c.textMuted,
+                                  color: isSelected ? c.primary : c.textMuted,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
@@ -184,9 +182,7 @@ class _Sidebar extends StatelessWidget {
                                     fontWeight: isSelected
                                         ? FontWeight.w600
                                         : FontWeight.w500,
-                                    color: isSelected
-                                        ? c.textPrimary
-                                        : c.textMuted,
+                                    color: isSelected ? c.primary : c.textMuted,
                                   ),
                                 ),
                               ],
@@ -208,8 +204,8 @@ class _Sidebar extends StatelessWidget {
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1F2937),
-                    foregroundColor: const Color(0xFFF5F1E9),
+                    backgroundColor: c.primary,
+                    foregroundColor: c.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),

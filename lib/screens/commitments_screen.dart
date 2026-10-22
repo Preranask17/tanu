@@ -348,7 +348,7 @@ class _CommitmentTile extends ConsumerWidget {
                   Text(
                     commitment.action,
                     style: TextStyle(
-                      color: isDone ? c.textMuted : c.textPrimary,
+                      color: isDone ? c.textMuted : c.heading,
                       decoration: isDone ? TextDecoration.lineThrough : null,
                       fontSize: 16,
                       fontWeight: isDone ? FontWeight.w500 : FontWeight.w600,
@@ -424,7 +424,7 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: c.textPrimary,
+              color: c.heading,
             ),
           ),
           const SizedBox(height: 12),

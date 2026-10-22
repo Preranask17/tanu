@@ -16,7 +16,7 @@ class EntryDetailModal extends StatelessWidget {
     final c = context.tanuColors;
     final bgColor = c.scaffold;
     final borderColor = c.border;
-    final textColor = c.textPrimary;
+    final textColor = c.heading;
     final accentColor = c.primary;
 
     final durationText = _formatDuration(entry.dateTime);
@@ -95,7 +95,7 @@ class EntryDetailModal extends StatelessWidget {
               entry.transcript,
               style: GoogleFonts.lora(
                 fontSize: 14,
-                color: c.textSecondary,
+                color: c.textMuted,
                 height: 1.4,
               ),
             ),
@@ -214,7 +214,7 @@ class _ActionRow extends StatelessWidget {
               style: GoogleFonts.lato(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: c.textPrimary,
+                color: c.heading,
                 height: 1.3,
               ),
             ),

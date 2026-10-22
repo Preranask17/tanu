@@ -306,7 +306,7 @@ class _PendantPill extends StatelessWidget {
     final dotColor = connected
         ? c.success
         : reconnecting
-        ? c.warning
+        ? c.primary
         : c.danger;
     final label = connected
         ? 'Pendant'
@@ -360,19 +360,23 @@ class _PendantPill extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: c.textSecondary,
+                    color: c.textMuted,
                   ),
                 ),
               ],
               const SizedBox(width: 8),
-              Icon(Icons.bluetooth_rounded, size: 14, color: c.textMuted),
+              Icon(
+                Icons.bluetooth_rounded,
+                size: 14,
+                color: connected ? c.primary : c.textMuted,
+              ),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: c.textPrimary,
+                  color: connected ? c.primary : c.textMuted,
                 ),
               ),
             ],
@@ -390,8 +394,6 @@ class _LiveConversationBanner extends StatelessWidget {
 
   final bool listening;
   final VoidCallback onTap;
-
-  static const _terracotta = Color(0xFF8C6D58);
 
   @override
   Widget build(BuildContext context) {
@@ -412,10 +414,10 @@ class _LiveConversationBanner extends StatelessWidget {
           decoration: BoxDecoration(
             color: c.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _terracotta.withValues(alpha: 0.35)),
+            border: Border.all(color: c.primary.withValues(alpha: 0.35)),
             boxShadow: [
               BoxShadow(
-                color: _terracotta.withValues(alpha: c.isDark ? 0.10 : 0.07),
+                color: c.primary.withValues(alpha: c.isDark ? 0.16 : 0.09),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -428,11 +430,11 @@ class _LiveConversationBanner extends StatelessWidget {
                 height: 10,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: listening ? _terracotta : c.textMuted,
+                  color: listening ? c.primary : c.textMuted,
                   boxShadow: listening
                       ? [
                           BoxShadow(
-                            color: _terracotta.withValues(alpha: 0.45),
+                            color: c.primary.withValues(alpha: 0.45),
                             blurRadius: 8,
                           ),
                         ]
@@ -450,7 +452,7 @@ class _LiveConversationBanner extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
-                        color: c.textPrimary,
+                        color: c.heading,
                       ),
                     ),
                     const SizedBox(height: 1),
@@ -577,7 +579,7 @@ class _TodayCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: c.textSecondary,
+                    color: c.textMuted,
                   ),
                 ),
               ),
@@ -595,7 +597,7 @@ class _TodayCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: c.textPrimary,
+                        color: c.heading,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -644,13 +646,9 @@ class _EmptyToday extends StatelessWidget {
             height: 38,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF8C6D58).withValues(alpha: 0.12),
+              color: c.primary.withValues(alpha: 0.12),
             ),
-            child: const Icon(
-              Icons.graphic_eq_rounded,
-              size: 19,
-              color: Color(0xFF8C6D58),
-            ),
+            child: Icon(Icons.graphic_eq_rounded, size: 19, color: c.primary),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -663,7 +661,7 @@ class _EmptyToday extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: c.textPrimary,
+                    color: c.heading,
                   ),
                 ),
                 const SizedBox(height: 2),

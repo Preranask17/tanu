@@ -21,7 +21,7 @@ class SettingsCard extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: c.textPrimary,
+              color: c.heading,
             ),
           ),
         ),

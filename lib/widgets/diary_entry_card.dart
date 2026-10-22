@@ -41,7 +41,7 @@ class DiaryEntryCard extends StatelessWidget {
                 style: GoogleFonts.ebGaramond(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: c.textPrimary,
+                  color: c.heading,
                 ),
               ),
               const SizedBox(height: 8),
@@ -49,7 +49,7 @@ class DiaryEntryCard extends StatelessWidget {
                 entry.transcript,
                 style: GoogleFonts.ebGaramond(
                   fontSize: 14,
-                  color: c.textSecondary,
+                  color: c.textMuted,
                 ),
               ),
               const SizedBox(height: 8),
@@ -60,7 +60,7 @@ class DiaryEntryCard extends StatelessWidget {
                     tag,
                     style: GoogleFonts.lato(
                       fontSize: 11,
-                      color: c.onSecondary,
+                      color: c.primary,
                     ),
                   ),
                   backgroundColor: c.secondary,

@@ -24,11 +24,9 @@ abstract final class TanuPalette {
   static const Color beige300 = Color(0xFFE3DCCB);
   static const Color beige400 = Color(0xFFD8CBB4);
 
-  // ---- Warm ink neutrals --------------------------------------------------
+  // ---- Slate / charcoal neutrals -----------------------------------------
   static const Color ink900 = Color(0xFF33302B);
-  static const Color ink700 = Color(0xFF4A453F);
   static const Color ink500 = Color(0xFF736B60);
-  static const Color ink300 = Color(0xFF857E71);
 
   // ---- Deep navy (dark-mode surfaces) ------------------------------------
   static const Color navy950 = Color(0xFF0E1A24);
@@ -42,7 +40,7 @@ abstract final class TanuPalette {
   static const Color sand300 = Color(0xFFC9C2B6);
   static const Color sand400 = Color(0xFFA6A095);
 
-  // ---- Semantic -----------------------------------------------------------
+  // ---- Semantic state only (never brand accents) --------------------------
   static const Color green700 = Color(0xFF2E7D32);
   static const Color green300 = Color(0xFF66BB6A);
   static const Color amber700 = Color(0xFFB26A00);
@@ -81,6 +79,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
     required this.textPrimary,
     required this.textSecondary,
     required this.textMuted,
+    required this.heading,
     required this.success,
     required this.warning,
     required this.danger,
@@ -97,7 +96,8 @@ class TanuColors extends ThemeExtension<TanuColors> {
   final Color primaryContainer;
   final Color onPrimaryContainer;
 
-  /// Warm sand accent used for selection and brand warmth.
+  /// Warm sand surface accent for tags and quiet emphasis. Primary selection
+  /// and action states use [primary] instead.
   final Color secondary;
   final Color onSecondary;
   final Color secondaryContainer;
@@ -124,6 +124,10 @@ class TanuColors extends ThemeExtension<TanuColors> {
   final Color textPrimary;
   final Color textSecondary;
   final Color textMuted;
+
+  /// Headlines, page titles and card titles. This is the midnight-blue accent
+  /// used for primary typography, separate from body copy.
+  final Color heading;
 
   final Color success;
   final Color warning;
@@ -152,8 +156,9 @@ class TanuColors extends ThemeExtension<TanuColors> {
     border: TanuPalette.beige300,
     borderSubtle: TanuPalette.beige200,
     textPrimary: TanuPalette.ink900,
-    textSecondary: TanuPalette.ink700,
+    textSecondary: TanuPalette.ink900,
     textMuted: TanuPalette.ink500,
+    heading: TanuPalette.blue700,
     success: TanuPalette.green700,
     warning: TanuPalette.amber700,
     danger: TanuPalette.red700,
@@ -182,6 +187,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
     textPrimary: TanuPalette.sand100,
     textSecondary: TanuPalette.sand300,
     textMuted: TanuPalette.sand400,
+    heading: TanuPalette.blue300,
     success: TanuPalette.green300,
     warning: TanuPalette.amber300,
     danger: TanuPalette.red300,
@@ -215,6 +221,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
     Color? textPrimary,
     Color? textSecondary,
     Color? textMuted,
+    Color? heading,
     Color? success,
     Color? warning,
     Color? danger,
@@ -241,6 +248,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       textMuted: textMuted ?? this.textMuted,
+      heading: heading ?? this.heading,
       success: success ?? this.success,
       warning: warning ?? this.warning,
       danger: danger ?? this.danger,
@@ -288,6 +296,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      heading: Color.lerp(heading, other.heading, t)!,
       success: Color.lerp(success, other.success, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
       danger: Color.lerp(danger, other.danger, t)!,

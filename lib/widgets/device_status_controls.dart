@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../abstractions/audio_source.dart';
+import '../theme/tanu_colors.dart';
 
 /// Shared pendant status controls for the Capture, Memories and Settings
 /// headers: [BatteryPill] + [PendantStatusButton], same look everywhere.
@@ -40,7 +41,8 @@ class DeviceStatusActions extends StatelessWidget {
 /// Bluetooth status button with a UNIFORM container in every state: same
 /// 44x44 dark circular surface, same subtle neutral border, same height and
 /// alignment as the battery pill beside it. Only the status accents change —
-/// icon + a soft red glow when disconnected, green connected icon otherwise.
+/// icon + a soft red glow when disconnected, blue while reconnecting, green
+/// connected icon otherwise.
 class PendantStatusButton extends StatelessWidget {
   const PendantStatusButton({
     super.key,
@@ -53,7 +55,7 @@ class PendantStatusButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     final connected = status.isConnected;
     final reconnecting = status.state == PendantState.reconnecting;
 
@@ -61,14 +63,18 @@ class PendantStatusButton extends StatelessWidget {
     final Color iconColor;
     if (connected) {
       icon = Icons.bluetooth_connected;
-      iconColor = const Color(0xFF4CAF50);
+      iconColor = c.success;
     } else if (reconnecting) {
       icon = Icons.sync;
-      iconColor = Colors.orange;
+      iconColor = c.primary;
     } else {
       icon = Icons.bluetooth;
-      iconColor = const Color(0xFF888888);
+      iconColor = c.textMuted;
     }
+
+    final glowColor = reconnecting
+        ? c.primary
+        : (connected ? Colors.black : c.danger);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -81,24 +87,19 @@ class PendantStatusButton extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-          border: Border.all(
-            color: isDark
-                ? const Color(0xFF2A2A2A)
-                : const Color(0xFFE5E5E5),
-            width: 1,
-          ),
+          color: c.surface,
+          border: Border.all(color: c.border, width: 1),
           boxShadow: [
             // Soft status glow; the container itself never changes.
             if (!connected)
               BoxShadow(
-                color: Colors.red.withValues(alpha: 0.30),
+                color: glowColor.withValues(alpha: 0.30),
                 blurRadius: 14,
                 spreadRadius: 1,
               )
             else
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
+                color: Colors.black.withValues(alpha: 0.18),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -119,29 +120,26 @@ class BatteryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        color: c.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-          width: 1,
-        ),
+        border: Border.all(color: c.border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.battery_std, size: 18, color: Color(0xFF888888)),
+          Icon(Icons.battery_std, size: 18, color: c.textMuted),
           const SizedBox(width: 6),
           Text(
             '$percent%',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF888888),
+              color: c.textMuted,
             ),
           ),
         ],

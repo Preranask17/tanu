@@ -49,7 +49,7 @@ class MemoryCard extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: c.textPrimary,
+              color: c.heading,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -59,7 +59,7 @@ class MemoryCard extends StatelessWidget {
             child: Text(
               summary.isNotEmpty ? summary : 'No transcript recorded.',
               style: TextStyle(
-                color: c.textSecondary,
+                color: c.textMuted,
                 fontSize: 13,
                 height: 1.3,
               ),
