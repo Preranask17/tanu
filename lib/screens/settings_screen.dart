@@ -13,6 +13,7 @@ import '../config/stt_config.dart';
 import '../constants.dart';
 import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
+import '../theme/tanu_colors.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/page_layout.dart';
 import '../widgets/pinned_header.dart';
@@ -117,7 +118,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _developerOpen
                               ? Icons.keyboard_arrow_up
                               : Icons.keyboard_arrow_down,
-                          color: const Color(0xFF888888),
+                          color: context.tanuColors.textMuted,
                         ),
                       ],
                     ),
@@ -263,11 +264,12 @@ class _BackgroundProtection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     return Column(
       children: [
-        const ListTile(
-          leading: Icon(Icons.shield_outlined, color: Color(0xFF888888)),
-          title: Text('Background protection'),
+        ListTile(
+          leading: Icon(Icons.shield_outlined, color: c.textMuted),
+          title: const Text('Background protection'),
           subtitle: Text(
             'Aggressive skins kill background apps. Exempt Tanu so the '
             'morning digest arrives with the app closed.',
@@ -321,7 +323,7 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Row(
       children: [
         Expanded(
@@ -331,9 +333,7 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
             decoration: InputDecoration(
               hintText: 'AIza...',
               filled: true,
-              fillColor: isDark
-                  ? const Color(0xFF1C1C1E)
-                  : const Color(0xFFF2F2F7),
+              fillColor: c.surfaceMuted,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
@@ -395,25 +395,25 @@ class _PendantDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     final isConnected = status.isConnected;
-    final accent = isConnected ? Colors.green : Theme.of(context).primaryColor;
+    final accent = isConnected ? c.success : c.primary;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        color: c.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isConnected
               ? accent.withValues(alpha: 0.35)
-              : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5)),
+              : c.border,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.05),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -512,13 +512,11 @@ class _PendantDashboard extends StatelessWidget {
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: isConnected
-                    ? (isDark
-                          ? const Color(0xFF2A2A2A)
-                          : const Color(0xFFE5E5E5))
-                    : Theme.of(context).primaryColor,
+                    ? c.surfaceMuted
+                    : c.primary,
                 foregroundColor: isConnected
-                    ? (isDark ? Colors.white : Colors.black)
-                    : Colors.white,
+                    ? c.textPrimary
+                    : c.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -560,25 +558,26 @@ class _BatteryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.1),
+        color: c.success.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.battery_charging_full,
-            color: Colors.green,
+            color: c.success,
             size: 16,
           ),
           const SizedBox(width: 4),
           Text(
             '$percent%',
-            style: const TextStyle(
-              color: Colors.green,
+            style: TextStyle(
+              color: c.success,
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
@@ -595,16 +594,14 @@ class _AppearanceSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentMode = ref.watch(settingsProvider).themeMode;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : const Color(0xFFF2F2F7),
+        color: c.surfaceMuted,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-        ),
+        border: Border.all(color: c.border),
       ),
       child: Row(
         children: [
@@ -653,7 +650,7 @@ class _ThemePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     return Expanded(
       child: GestureDetector(
@@ -663,11 +660,9 @@ class _ThemePill extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark ? const Color(0xFF2A2A2A) : Colors.white)
-                : Colors.transparent,
+            color: isSelected ? c.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected && !isDark
+            boxShadow: isSelected && !c.isDark
                 ? [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.05),
@@ -682,9 +677,7 @@ class _ThemePill extends StatelessWidget {
               Icon(
                 icon,
                 size: 20,
-                color: isSelected
-                    ? (isDark ? Colors.white : Colors.black)
-                    : const Color(0xFF888888),
+                color: isSelected ? c.textPrimary : c.textMuted,
               ),
               const SizedBox(height: 4),
               Text(
@@ -692,9 +685,7 @@ class _ThemePill extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected
-                      ? (isDark ? Colors.white : Colors.black)
-                      : const Color(0xFF888888),
+                  color: isSelected ? c.textPrimary : c.textMuted,
                 ),
               ),
             ],
@@ -717,39 +708,37 @@ class _SttLanguagePicker extends ConsumerWidget {
     final code = ref.watch(
       settingsProvider.select((s) => s.sttLanguageCode),
     );
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-        ),
+        border: Border.all(color: c.border),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.translate_rounded,
             size: 20,
-            color: Color(0xFF888888),
+            color: c.textMuted,
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                const Text(
                   'Speech language',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   'Same offline model, fixed hint',
                   style: TextStyle(
-                    color: Color(0xFF888888),
+                    color: c.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -811,7 +800,7 @@ class _SttModelDashboard extends ConsumerWidget {
       statusText = 'Not Installed';
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     // Active recognizer core: identical to the bundle title by default,
     // "Whisper Small · Hindi"-style only when an Indic language is fixed.
     final engineLabel = ref.watch(sttEngineProvider).modelLabel;
@@ -821,11 +810,9 @@ class _SttModelDashboard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-        ),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -845,16 +832,16 @@ class _SttModelDashboard extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       statusText,
-                      style: const TextStyle(
-                        color: Color(0xFF888888),
+                      style: TextStyle(
+                        color: c.textMuted,
                         fontSize: 12,
                       ),
                     ),
                     if (showEngineLabel)
                       Text(
                         engineLabel,
-                        style: const TextStyle(
-                          color: Color(0xFF888888),
+                        style: TextStyle(
+                          color: c.textMuted,
                           fontSize: 12,
                         ),
                       ),
@@ -862,7 +849,7 @@ class _SttModelDashboard extends ConsumerWidget {
                 ),
               ),
               if (state.phase == SttModelPhase.ready)
-                const Icon(Icons.check_circle, color: Colors.green)
+                Icon(Icons.check_circle, color: c.success)
               else if (state.busy)
                 const SizedBox(
                   width: 20,
@@ -879,8 +866,8 @@ class _SttModelDashboard extends ConsumerWidget {
                 icon: const Icon(Icons.download),
                 label: const Text('Download Offline Model (~375MB)'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: c.primary,
+                  foregroundColor: c.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -899,8 +886,8 @@ class _SttModelDashboard extends ConsumerWidget {
                 icon: const Icon(Icons.delete),
                 label: const Text('Delete Model'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.redAccent,
-                  side: const BorderSide(color: Colors.redAccent),
+                  foregroundColor: c.danger,
+                  side: BorderSide(color: c.danger),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -922,7 +909,7 @@ class _SttModelDashboard extends ConsumerWidget {
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.redAccent,
+                            foregroundColor: c.danger,
                           ),
                           child: const Text('Delete'),
                         ),
@@ -947,14 +934,15 @@ class _WipeMemoryButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.tanuColors;
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         icon: const Icon(Icons.delete_forever),
         label: const Text('WIPE TANU\'S MEMORY'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.redAccent,
-          side: const BorderSide(color: Colors.redAccent, width: 2),
+          foregroundColor: c.danger,
+          side: BorderSide(color: c.danger, width: 2),
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -976,8 +964,8 @@ class _WipeMemoryButton extends ConsumerWidget {
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.redAccent,
+                    foregroundColor: c.onDanger,
+                    backgroundColor: c.danger,
                   ),
                   child: const Text('Destroy'),
                 ),

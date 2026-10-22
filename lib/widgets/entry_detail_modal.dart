@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/diary_entry.dart';
+import '../theme/tanu_colors.dart';
 
 class EntryDetailModal extends StatelessWidget {
   const EntryDetailModal({
@@ -12,11 +13,11 @@ class EntryDetailModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = const Color(0xFFF5F1E9);
-    final borderColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5);
-    final textColor = isDark ? Colors.white : const Color(0xFF4A453F);
-    final accentColor = const Color(0xFF899386);
+    final c = context.tanuColors;
+    final bgColor = c.scaffold;
+    final borderColor = c.border;
+    final textColor = c.textPrimary;
+    final accentColor = c.primary;
 
     final durationText = _formatDuration(entry.dateTime);
 
@@ -40,7 +41,7 @@ class EntryDetailModal extends StatelessWidget {
                   entry.formattedDate,
                   style: GoogleFonts.lato(
                     fontSize: 14,
-                    color: const Color(0xFF888888),
+                    color: c.textMuted,
                     height: 1.2,
                   ),
                 ),
@@ -49,7 +50,7 @@ class EntryDetailModal extends StatelessWidget {
                   durationText,
                   style: GoogleFonts.lato(
                     fontSize: 14,
-                    color: const Color(0xFF888888),
+                    color: c.textMuted,
                     height: 1.2,
                   ),
                 ),
@@ -94,7 +95,7 @@ class EntryDetailModal extends StatelessWidget {
               entry.transcript,
               style: GoogleFonts.lora(
                 fontSize: 14,
-                color: textColor.withValues(alpha: 0.8),
+                color: c.textSecondary,
                 height: 1.4,
               ),
             ),
@@ -128,7 +129,7 @@ class EntryDetailModal extends StatelessWidget {
                   icon: Icons.delete,
                   label: 'Delete',
                   onTap: () => _onAction(context, 'delete'),
-                  color: const Color(0xFFE74C3C),
+                  color: c.danger,
                 ),
               ],
             ),
@@ -156,6 +157,7 @@ class EntryDetailModal extends StatelessWidget {
   }
 
   void _onAction(BuildContext context, String action) {
+    final c = context.tanuColors;
     // Close the modal first
     Navigator.of(context).maybePop();
 
@@ -165,13 +167,11 @@ class EntryDetailModal extends StatelessWidget {
         content: Text(
           'Entry $action',
           style: GoogleFonts.lato(
-            color: const Color(0xFFF5F1E9),
+            color: action == 'delete' ? c.onDanger : c.onPrimary,
             fontSize: 14,
           ),
         ),
-        backgroundColor: action == 'delete'
-            ? const Color(0xFFE74C3C)
-            : const Color(0xFF899386),
+        backgroundColor: action == 'delete' ? c.danger : c.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -198,8 +198,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : const Color(0xFF4A453F);
+    final c = context.tanuColors;
 
     return InkWell(
       onTap: onTap,
@@ -215,7 +214,7 @@ class _ActionRow extends StatelessWidget {
               style: GoogleFonts.lato(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: textColor,
+                color: c.textPrimary,
                 height: 1.3,
               ),
             ),
@@ -223,7 +222,7 @@ class _ActionRow extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios,
               size: 12,
-              color: textColor.withValues(alpha: 0.5),
+              color: c.textMuted,
             ),
           ],
         ),

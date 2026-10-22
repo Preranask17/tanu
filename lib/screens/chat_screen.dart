@@ -9,6 +9,7 @@ import '../providers/agent_provider.dart';
 import '../providers/rag_provider.dart';
 import '../abstractions/agent_engine.dart';
 import '../abstractions/audio_source.dart';
+import '../theme/tanu_colors.dart';
 import '../widgets/audio_waveform.dart';
 
 /// Live memory page: the in-progress session's timestamped transcript streams
@@ -24,7 +25,7 @@ class ChatPage extends ConsumerWidget {
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: context.tanuColors.scaffold,
       body: SafeArea(
         child: Column(
           children: [
@@ -61,9 +62,10 @@ class _LiveHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     final statusColor = status.isConnected
-        ? Colors.greenAccent
-        : Colors.white54;
+        ? c.success
+        : c.textMuted;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
       child: SizedBox(
@@ -76,17 +78,17 @@ class _LiveHeader extends StatelessWidget {
               child: IconButton(
                 tooltip: 'Close',
                 onPressed: onClose,
-                icon: const Icon(
+                icon: Icon(
                   Icons.close_rounded,
-                  color: Colors.white,
+                  color: c.textPrimary,
                   size: 25,
                 ),
               ),
             ),
-            const Text(
+            Text(
               'Tanu',
               style: TextStyle(
-                color: Colors.white,
+                color: c.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
@@ -105,16 +107,16 @@ class _LiveHeader extends StatelessWidget {
                   ),
                   if (status.batteryPercent != null) ...[
                     const SizedBox(width: 8),
-                    const Icon(
+                    Icon(
                       Icons.battery_full_rounded,
-                      color: Colors.white60,
+                      color: c.textMuted,
                       size: 16,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${status.batteryPercent}%',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: c.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -252,7 +254,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -277,16 +279,9 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF111111)
-                            : const Color(0xFFFFFFFF),
+                        color: c.surface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isDark
-                              ? const Color(0xFF2A2A2A)
-                              : const Color(0xFFE5E5E5),
-                          width: 1,
-                        ),
+                        border: Border.all(color: c.border, width: 1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,7 +291,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                               Icon(
                                 Icons.auto_awesome,
                                 size: 16,
-                                color: Theme.of(context).primaryColor,
+                                color: c.primary,
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -304,7 +299,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
-                                  color: Theme.of(context).primaryColor,
+                                  color: c.primary,
                                 ),
                               ),
                             ],
@@ -343,12 +338,12 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                       style: const TextStyle(height: 1.6, fontSize: 15),
                     )
                   else if (session.segments.isEmpty)
-                    const Center(
+                    Center(
                       child: Padding(
-                        padding: EdgeInsets.all(32.0),
+                        padding: const EdgeInsets.all(32.0),
                         child: Text(
                           'Nothing was captured in this session.',
-                          style: TextStyle(color: Color(0xFF888888)),
+                          style: TextStyle(color: c.textMuted),
                         ),
                       ),
                     )
@@ -383,12 +378,12 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                       color: Theme.of(context).dividerTheme.color,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Memory Chat',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
-                        color: Color(0xFF888888),
+                        color: c.textMuted,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -411,15 +406,11 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
               ),
               padding: const EdgeInsets.only(left: 20, right: 6, top: 6, bottom: 6),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1C1C1E)
-                    : const Color(0xFFF2F2F7),
+                color: c.surfaceMuted,
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context)
-                        .primaryColor
-                        .withValues(alpha: 0.35),
+                    color: c.primary.withValues(alpha: 0.25),
                     blurRadius: 24,
                     spreadRadius: 1,
                   ),
@@ -435,17 +426,19 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                   Expanded(
                     child: TextField(
                       controller: _chatCtrl,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Ask about this memory...',
                         hintStyle: TextStyle(
-                          color: Color(0xFF888888),
+                          color: c.textMuted,
                           fontSize: 15,
                         ),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                        ),
                       ),
                       style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black,
+                        color: c.textPrimary,
                         fontSize: 15,
                       ),
                       onSubmitted: (_) => _send(),
@@ -460,22 +453,20 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
                       height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: _isGenerating
-                            ? const Color(0xFF888888)
-                            : Theme.of(context).primaryColor,
+                        color: _isGenerating ? c.textMuted : c.primary,
                       ),
                       child: _isGenerating
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
+                          ? Padding(
+                              padding: const EdgeInsets.all(12),
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: c.onPrimary,
                               ),
                             )
-                          : const Icon(
+                          : Icon(
                               Icons.arrow_upward,
                               size: 20,
-                              color: Colors.white,
+                              color: c.onPrimary,
                             ),
                     ),
                   ),
@@ -509,6 +500,7 @@ class _SummaryBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     final points = splitSummaryPoints(text);
     if (points.length < 2) {
       return Text(
@@ -531,7 +523,7 @@ class _SummaryBody extends StatelessWidget {
                   height: 5,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Theme.of(context).primaryColor,
+                    color: c.primary,
                   ),
                 ),
               ),
@@ -563,15 +555,13 @@ class _TranscriptToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).primaryColor
-              : (isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7)),
+          color: selected ? c.primary : c.surfaceMuted,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
@@ -579,7 +569,7 @@ class _TranscriptToggle extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : const Color(0xFF888888),
+            color: selected ? c.onPrimary : c.textMuted,
           ),
         ),
       ),
@@ -594,32 +584,23 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isUser
-              ? (isDark ? const Color(0xFF333333) : const Color(0xFFE5E5E5))
-              : (isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF)),
+          color: isUser ? c.surfaceMuted : c.surface,
           borderRadius: BorderRadius.circular(12),
           border: isUser
               ? null
-              : Border.all(
-                  color: isDark
-                      ? const Color(0xFF2A2A2A)
-                      : const Color(0xFFE5E5E5),
-                  width: 1,
-                ),
+              : Border.all(color: c.border, width: 1),
         ),
         child: Text(
           message.content,
           style: TextStyle(
-            color: isUser
-                ? (isDark ? Colors.white : Colors.black)
-                : (isDark ? Colors.white : Colors.black),
+            color: c.textPrimary,
             fontSize: 15,
             height: 1.4,
           ),
@@ -645,13 +626,17 @@ class _ChatWelcome extends StatelessWidget {
             Icon(
               status.isConnected ? Icons.mic : Icons.mic_none,
               size: 48,
-              color: Theme.of(context).primaryColor,
+              color: context.tanuColors.primary,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Connect your pendant over Bluetooth and just talk.\nTanu transcribes into a memory, right here.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, height: 1.5),
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.5,
+                color: context.tanuColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -721,6 +706,7 @@ class _LivePartialRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -731,9 +717,9 @@ class _LivePartialRow extends StatelessWidget {
               children: [
                 Text(
                   _offsetLabel(ms),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF888888),
+                    color: c.textMuted,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -745,8 +731,8 @@ class _LivePartialRow extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Theme.of(context).primaryColor.withValues(alpha: 0.5),
-                          Theme.of(context).primaryColor.withValues(alpha: 0.0),
+                          c.primary.withValues(alpha: 0.5),
+                          c.primary.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -807,7 +793,7 @@ class _SegmentGroupRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     final combinedText = segments.map((s) => s.text.trim()).join(' ');
     final startMs = segments.first.startMs;
 
@@ -822,9 +808,9 @@ class _SegmentGroupRow extends StatelessWidget {
               children: [
                 Text(
                   _offsetLabel(startMs),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF888888),
+                    color: c.textMuted,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -837,8 +823,8 @@ class _SegmentGroupRow extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Theme.of(context).primaryColor.withValues(alpha: 0.5),
-                            Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                            c.primary.withValues(alpha: 0.5),
+                            c.primary.withValues(alpha: 0.1),
                           ],
                         ),
                       ),
@@ -858,19 +844,12 @@ class _SegmentGroupRow extends StatelessWidget {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF161618)
-                      : const Color(0xFFF8F9FA),
+                  color: c.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF2A2A2C)
-                        : const Color(0xFFE9ECEF),
-                    width: 1,
-                  ),
+                  border: Border.all(color: c.border, width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
+                      color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

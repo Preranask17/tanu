@@ -8,6 +8,7 @@ import '../models/transcript.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/rag_provider.dart';
+import '../theme/tanu_colors.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/pinned_header.dart';
 import 'chat_screen.dart';
@@ -169,7 +170,7 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
       groups[label]!.add(session);
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -213,14 +214,12 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                       bottom: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF161618)
-                          : const Color(0xFFFFFFFF),
+                      color: c.surface,
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(
-                            alpha: isDark ? 0.35 : 0.06,
+                            alpha: c.isDark ? 0.35 : 0.06,
                           ),
                           blurRadius: 16,
                           offset: const Offset(0, 4),
@@ -234,14 +233,12 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                           height: 40,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Theme.of(context)
-                                .primaryColor
-                                .withValues(alpha: 0.12),
+                            color: c.primary.withValues(alpha: 0.12),
                           ),
                           child: Icon(
                             Icons.search_rounded,
                             size: 20,
-                            color: Theme.of(context).primaryColor,
+                            color: c.primary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -250,19 +247,19 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                             controller: _query,
                             textInputAction: TextInputAction.search,
                             onSubmitted: (_) => _askRag(),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'Ask anything about your day…',
                               hintStyle: TextStyle(
-                                color: Color(0xFF888888),
+                                color: c.textMuted,
                                 fontSize: 16,
                               ),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
+                              contentPadding: const EdgeInsets.symmetric(
                                 vertical: 10,
                               ),
                             ),
                             style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black,
+                              color: c.textPrimary,
                               fontSize: 16,
                             ),
                             onChanged: (_) => setState(() {}),
@@ -277,14 +274,12 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                               height: 32,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.08)
-                                    : const Color(0xFFF2F2F7),
+                                color: c.surfaceMuted,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.clear_rounded,
                                 size: 16,
-                                color: Color(0xFF888888),
+                                color: c.textMuted,
                               ),
                             ),
                           ),
@@ -386,7 +381,7 @@ class _HeaderCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     final button = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -395,13 +390,10 @@ class _HeaderCircleButton extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
-          border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-            width: 1,
-          ),
+          color: c.surface,
+          border: Border.all(color: c.border, width: 1),
         ),
-        child: Icon(icon, size: 20, color: const Color(0xFF888888)),
+        child: Icon(icon, size: 20, color: c.textMuted),
       ),
     );
     if (tooltip == null) return button;
@@ -451,22 +443,15 @@ class _RagAnswerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Container(
       margin: const EdgeInsets.only(top: 12, bottom: 4, left: 20, right: 20),
       padding: const EdgeInsets.all(18),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.08)
-            : const Color(0xFFFFFFFF),
+        color: c.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : const Color(0xFFE5E5E5),
-          width: 1.0,
-        ),
+        border: Border.all(color: c.border, width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,7 +461,7 @@ class _RagAnswerCard extends StatelessWidget {
               Icon(
                 Icons.auto_awesome,
                 size: 14,
-                color: Theme.of(context).primaryColor,
+                color: c.primary,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -488,10 +473,10 @@ class _RagAnswerCard extends StatelessWidget {
                           : sourceIds.length == 1
                               ? '1 memory found'
                               : '${sourceIds.length} memories found',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF888888),
+                    color: c.textMuted,
                   ),
                 ),
               ),
@@ -505,12 +490,12 @@ class _RagAnswerCard extends StatelessWidget {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: onClear,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
                     child: Icon(
                       Icons.close,
                       size: 16,
-                      color: Color(0xFF888888),
+                      color: c.textMuted,
                     ),
                   ),
                 ),
@@ -522,7 +507,6 @@ class _RagAnswerCard extends StatelessWidget {
               'Searching your saved memories for relevant moments…',
               style: TextStyle(
                 fontStyle: FontStyle.italic,
-                color: Color(0xFF888888),
                 fontSize: 14,
                 height: 1.4,
               ),
@@ -554,7 +538,7 @@ class _RagAnswerCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.45,
-                color: isDark ? Colors.white : Colors.black,
+                color: c.textPrimary,
               ),
             ),
           if (!busy && error == null && sourceIds.isNotEmpty) ...[
@@ -583,9 +567,7 @@ class _RagAnswerCard extends StatelessWidget {
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .primaryColor
-                            .withValues(alpha: 0.10),
+                        color: c.primaryContainer,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -594,7 +576,7 @@ class _RagAnswerCard extends StatelessWidget {
                           Icon(
                             Icons.inventory_2_outlined,
                             size: 13,
-                            color: Theme.of(context).primaryColor,
+                            color: c.onPrimaryContainer,
                           ),
                           const SizedBox(width: 5),
                           Flexible(
@@ -605,7 +587,7 @@ class _RagAnswerCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).primaryColor,
+                                color: c.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -629,7 +611,7 @@ class _DayHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Padding(
       padding: const EdgeInsets.only(top: 24, bottom: 12, left: 8),
       child: Row(
@@ -637,7 +619,7 @@ class _DayHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF222222) : const Color(0xFFE5E5E5),
+              color: c.surfaceMuted,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -646,16 +628,14 @@ class _DayHeader extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: isDark
-                    ? const Color(0xFFCCCCCC)
-                    : const Color(0xFF666666),
+                color: c.textSecondary,
               ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Divider(
-              color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+              color: c.border,
               thickness: 1,
             ),
           ),
@@ -670,12 +650,12 @@ class _NoMatches extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 80),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 80),
       child: Center(
         child: Text(
           'No matches for that search.',
-          style: TextStyle(color: Color(0xFF888888)),
+          style: TextStyle(color: context.tanuColors.textMuted),
         ),
       ),
     );
@@ -687,6 +667,7 @@ class _EmptyConversations extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.tanuColors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -696,27 +677,31 @@ class _EmptyConversations extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
+                color: c.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.memory_rounded,
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                color: c.primary.withValues(alpha: 0.8),
                 size: 64,
               ),
             ),
             const SizedBox(height: 32),
-            const Text(
+            Text(
               'A blank slate',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: c.textPrimary,
+              ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Connect your pendant and let it listen to the world.\nYour memories will magically appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF888888),
+                color: c.textMuted,
                 height: 1.5,
                 fontSize: 15,
               ),
@@ -726,8 +711,8 @@ class _EmptyConversations extends ConsumerWidget {
               onPressed: () =>
                   ref.read(navigationTabProvider.notifier).goToHome(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
+                backgroundColor: c.primary,
+                foregroundColor: c.onPrimary,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(100),

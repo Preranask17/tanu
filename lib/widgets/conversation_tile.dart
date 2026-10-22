@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../models/transcript.dart';
 import '../screens/chat_screen.dart';
+import '../theme/tanu_colors.dart';
 
 /// One completed memory card: a warm-beige initial tile, the session title,
 /// the tail of its transcript and the close time. Swipe-to-delete when
@@ -67,7 +68,7 @@ class _ConversationTileState extends State<ConversationTile> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -75,15 +76,12 @@ class _ConversationTileState extends State<ConversationTile> {
         duration: const Duration(milliseconds: 200),
         width: double.maxFinite,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+          color: c.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isDark ? const Color(0xFF2A2A2C).withOpacity(0.5) : const Color(0xFFE9ECEF).withOpacity(0.8),
-            width: 1,
-          ),
+          border: Border.all(color: c.border, width: 1),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.03),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -99,19 +97,19 @@ class _ConversationTileState extends State<ConversationTile> {
                   background: Container(
                     alignment: Alignment.centerLeft,
                     padding: const EdgeInsets.only(left: 20),
-                    color: Colors.orange,
+                    color: c.warning,
                     child: Icon(
                       session.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-                      color: Colors.white,
+                      color: c.isDark ? c.scaffold : Colors.white,
                     ),
                   ),
                   secondaryBackground: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
-                    color: Colors.redAccent,
-                    child: const Icon(
+                    color: c.danger,
+                    child: Icon(
                       Icons.delete,
-                      color: Colors.white,
+                      color: c.onDanger,
                     ),
                   ),
                   confirmDismiss: (direction) async {
@@ -137,7 +135,7 @@ class _ConversationTileState extends State<ConversationTile> {
 
   Widget _body(BuildContext context) {
     final session = widget.session;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     final title = session.title.trim();
     final revealedAt = session.finishedAt ?? session.startedAt;
     final time =
@@ -173,15 +171,13 @@ class _ConversationTileState extends State<ConversationTile> {
               height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF2A2A2A)
-                    : const Color(0xFFE5E5E5),
+                color: c.surfaceMuted,
                 shape: BoxShape.circle,
               ),
               child: Text(
                 title.isEmpty ? 'M' : title.characters.first.toUpperCase(),
                 style: TextStyle(
-                  color: isDark ? Colors.white : const Color(0xFF666666),
+                  color: c.textSecondary,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                 ),
@@ -204,7 +200,7 @@ class _ConversationTileState extends State<ConversationTile> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black,
+                            color: c.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -217,8 +213,8 @@ class _ConversationTileState extends State<ConversationTile> {
                     tail,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF888888),
+                    style: TextStyle(
+                      color: c.textMuted,
                       fontSize: 13,
                     ),
                   ),
@@ -238,8 +234,8 @@ class _ConversationTileState extends State<ConversationTile> {
                             'Writing summary…',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF888888),
+                            style: TextStyle(
+                              color: c.textMuted,
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
                             ),
@@ -260,7 +256,6 @@ class _ConversationTileState extends State<ConversationTile> {
                           const Icon(
                             Icons.refresh_rounded,
                             size: 14,
-                            color: Color(0xFF888888),
                           ),
                           const SizedBox(width: 6),
                           Flexible(
@@ -268,8 +263,8 @@ class _ConversationTileState extends State<ConversationTile> {
                               'AI paused — tap to retry',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF888888),
+                              style: TextStyle(
+                                color: c.textMuted,
                                 fontSize: 12,
                               ),
                             ),
@@ -284,8 +279,8 @@ class _ConversationTileState extends State<ConversationTile> {
                     children: [
                       Text(
                         time,
-                        style: const TextStyle(
-                          color: Color(0xFF888888),
+                        style: TextStyle(
+                          color: c.textMuted,
                           fontSize: 14,
                         ),
                       ),
@@ -296,8 +291,8 @@ class _ConversationTileState extends State<ConversationTile> {
                             '· ${session.segmentCount} segment${session.segmentCount == 1 ? '' : 's'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF888888),
+                            style: TextStyle(
+                              color: c.textMuted,
                               fontSize: 14,
                             ),
                           ),
@@ -311,15 +306,13 @@ class _ConversationTileState extends State<ConversationTile> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withValues(
-                              alpha: 0.14,
-                            ),
+                            color: c.primaryContainer,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             'New',
                             style: TextStyle(
-                              color: Theme.of(context).primaryColor,
+                              color: c.onPrimaryContainer,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -333,29 +326,39 @@ class _ConversationTileState extends State<ConversationTile> {
             if (widget.isTrash) ...[
               IconButton(
                 onPressed: widget.onRestore,
-                style: IconButton.styleFrom(backgroundColor: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF)),
-                icon: Icon(Icons.restore, size: 20, color: Theme.of(context).primaryColor),
+                style: IconButton.styleFrom(backgroundColor: c.surfaceMuted),
+                icon: Icon(Icons.restore, size: 20, color: c.primary),
               ),
               const SizedBox(width: 4),
               IconButton(
                 onPressed: widget.onDeletePermanently,
-                style: IconButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.1)),
-                icon: const Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                style: IconButton.styleFrom(
+                  backgroundColor: c.dangerContainer,
+                ),
+                icon: Icon(
+                  Icons.delete_forever,
+                  size: 20,
+                  color: c.danger,
+                ),
               ),
             ] else ...[
               if (widget.onDelete != null)
                 IconButton(
                   onPressed: widget.onDelete,
-                  icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFF888888)),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 20,
+                    color: c.textMuted,
+                  ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   splashRadius: 20,
                 ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
                 size: 20,
-                color: Color(0xFF888888),
+                color: c.textMuted,
               ),
             ],
           ],

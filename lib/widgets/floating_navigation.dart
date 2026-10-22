@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tanu_colors.dart';
+
 class FloatingNavigationBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onTabSelected;
@@ -12,16 +14,13 @@ class FloatingNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1a1a1a) : Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(
-          color: isDark ? const Color(0xFF333333) : const Color(0xFFE5E5E5),
-          width: 1,
-        ),
+        border: Border.all(color: c.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
@@ -57,7 +56,7 @@ class FloatingNavigationBar extends StatelessWidget {
     required int index,
     required bool isSelected,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return GestureDetector(
       onTap: () => onTabSelected(index),
       child: Container(
@@ -65,15 +64,11 @@ class FloatingNavigationBar extends StatelessWidget {
         height: 48,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isSelected
-              ? (isDark ? Colors.white : Colors.black)
-              : Colors.transparent,
+          color: isSelected ? c.primary : Colors.transparent,
         ),
         child: Icon(
           icon,
-          color: isSelected
-              ? (isDark ? Colors.black : Colors.white)
-              : (isDark ? Colors.grey[400] : const Color(0xFF888888)),
+          color: isSelected ? c.onPrimary : c.textMuted,
           size: 22,
         ),
       ),

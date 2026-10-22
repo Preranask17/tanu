@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tanu_colors.dart';
+
 class ResponsiveScaffold extends StatelessWidget {
   const ResponsiveScaffold({
     super.key,
@@ -41,7 +43,7 @@ class ResponsiveScaffold extends StatelessWidget {
           );
         } else {
           // Mobile / Narrow Layout (Floating Pill Dock)
-          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final c = context.tanuColors;
           return Scaffold(
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             body: Stack(
@@ -54,14 +56,10 @@ class ResponsiveScaffold extends StatelessWidget {
                   child: Container(
                     height: 64,
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF111111)
-                          : const Color(0xFFFFFFFF),
+                      color: c.surface,
                       borderRadius: BorderRadius.circular(32),
                       border: Border.all(
-                        color: isDark
-                            ? const Color(0xFF2A2A2A)
-                            : const Color(0xFFE5E5E5),
+                        color: c.border,
                         width: 1,
                       ),
                       boxShadow: [
@@ -96,9 +94,7 @@ class ResponsiveScaffold extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? (isDark
-                                            ? const Color(0xFF222222)
-                                            : const Color(0xFFF0F0F0))
+                                      ? c.surfaceMuted
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
@@ -107,8 +103,8 @@ class ResponsiveScaffold extends StatelessWidget {
                                       ? (activeIconData ?? iconData)
                                       : iconData,
                                   color: isSelected
-                                      ? (isDark ? Colors.white : Colors.black)
-                                      : const Color(0xFF888888),
+                                      ? c.textPrimary
+                                      : c.textMuted,
                                   size: 24,
                                 ),
                               ),
@@ -141,7 +137,7 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Container(
       width: 250,
       color: Theme.of(context).scaffoldBackgroundColor,
@@ -176,9 +172,7 @@ class _Sidebar extends StatelessWidget {
                         curve: Curves.easeOutCubic,
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? (isDark
-                                    ? const Color(0xFF222222)
-                                    : const Color(0xFFF0F0F0))
+                              ? c.surfaceMuted
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -197,8 +191,8 @@ class _Sidebar extends StatelessWidget {
                                       ? (activeIconData ?? iconData)
                                       : iconData,
                                   color: isSelected
-                                      ? (isDark ? Colors.white : Colors.black)
-                                      : const Color(0xFF888888),
+                                      ? c.textPrimary
+                                      : c.textMuted,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
@@ -210,8 +204,8 @@ class _Sidebar extends StatelessWidget {
                                         ? FontWeight.w600
                                         : FontWeight.w500,
                                     color: isSelected
-                                        ? (isDark ? Colors.white : Colors.black)
-                                        : const Color(0xFF888888),
+                                        ? c.textPrimary
+                                        : c.textMuted,
                                   ),
                                 ),
                               ],

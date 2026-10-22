@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tanu_colors.dart';
+
 class TopStatusRow extends StatelessWidget {
   final bool isConnected;
   final VoidCallback onBluetoothTap;
@@ -16,7 +18,7 @@ class TopStatusRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     final hasLive = liveTranscript != null && liveTranscript!.trim().isNotEmpty;
     final displayText = hasLive 
         ? "● LIVE: $liveTranscript" 
@@ -32,12 +34,12 @@ class TopStatusRow extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isDark ? const Color(0xFF1a1a1a) : Colors.white,
+              color: c.surface,
               boxShadow: [
                 BoxShadow(
-                  color: isConnected
-                      ? Colors.green.withValues(alpha: 0.35)
-                      : Colors.red.withValues(alpha: 0.35),
+                  color: (isConnected ? c.success : c.danger).withValues(
+                    alpha: 0.35,
+                  ),
                   blurRadius: 12,
                   spreadRadius: 2,
                   offset: const Offset(0, 0),
@@ -49,15 +51,15 @@ class TopStatusRow extends StatelessWidget {
                 ),
               ],
               border: Border.all(
-                color: isConnected
-                    ? Colors.green.withValues(alpha: 0.5)
-                    : Colors.red.withValues(alpha: 0.5),
+                color: (isConnected ? c.success : c.danger).withValues(
+                  alpha: 0.5,
+                ),
                 width: 1.5,
               ),
             ),
             child: Icon(
               isConnected ? Icons.bluetooth_connected : Icons.bluetooth,
-              color: isConnected ? Colors.green[400] : Colors.red[400],
+              color: isConnected ? c.success : c.danger,
               size: 20,
             ),
           ),
@@ -72,7 +74,7 @@ class TopStatusRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.centerLeft,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF111111) : Colors.white,
+                color: c.surface,
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
@@ -81,19 +83,14 @@ class TopStatusRow extends StatelessWidget {
                     offset: const Offset(0, 3),
                   ),
                 ],
-                border: Border.all(
-                  color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-                  width: 1,
-                ),
+                border: Border.all(color: c.border, width: 1),
               ),
               child: Text(
                 displayText,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: hasLive
-                      ? Colors.red[400]
-                      : (isDark ? Colors.grey[300] : const Color(0xFF4A453F)),
+                  color: hasLive ? c.danger : c.textSecondary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/commitment.dart';
 import '../providers/commitment_provider.dart';
+import '../theme/tanu_colors.dart';
 import '../widgets/connection_status_bar.dart';
 
 class CommitmentsScreen extends ConsumerStatefulWidget {
@@ -60,7 +61,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
 
   // ── Section Card style ────────────────────────────────────────────────────
   Widget _sectionCard({required String header, required List<Widget> children}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,22 +73,19 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
               fontSize: 12,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.2,
-              color: isDark ? const Color(0xFFCCCCCC) : const Color(0xFF666666),
+              color: c.textMuted,
             ),
           ),
         ),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+            color: c.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isDark ? const Color(0xFF2A2A2C).withValues(alpha: 0.5) : const Color(0xFFE9ECEF).withValues(alpha: 0.8),
-              width: 1,
-            ),
+            border: Border.all(color: c.border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
@@ -106,6 +104,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     final commitments = ref.watch(commitmentsProvider);
 
     final overdue = commitments
@@ -151,7 +150,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                           height: 200,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                            color: c.primary.withValues(alpha: 0.15),
                           ),
                         ),
                       ),
@@ -163,7 +162,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                           height: 250,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.redAccent.withValues(alpha: 0.08),
+                            color: c.danger.withValues(alpha: 0.08),
                           ),
                         ),
                       ),
@@ -229,7 +228,7 @@ class _CommitmentsScreenState extends ConsumerState<CommitmentsScreen> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13,
-                              color: const Color(0xFF888888),
+                              color: c.textMuted,
                               height: 1.4,
                             ),
                           ),
@@ -309,8 +308,8 @@ class _CommitmentTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(commitmentsProvider.notifier);
     final isDone = done || commitment.done;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final c = context.tanuColors;
+
     return InkWell(
       onTap: () => notifier.toggleDone(commitment.id),
       child: Padding(
@@ -326,18 +325,18 @@ class _CommitmentTile extends ConsumerWidget {
                 height: 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDone 
-                      ? Theme.of(context).primaryColor 
-                      : (highlight ? Colors.red.withValues(alpha: 0.1) : Colors.transparent),
+                  color: isDone
+                      ? c.primary
+                      : (highlight ? c.dangerContainer : Colors.transparent),
                   border: Border.all(
-                    color: isDone 
-                        ? Theme.of(context).primaryColor 
-                        : (highlight ? Colors.red : const Color(0xFF888888)),
+                    color: isDone
+                        ? c.primary
+                        : (highlight ? c.danger : c.border),
                     width: 2,
                   ),
                 ),
                 child: isDone
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    ? Icon(Icons.check, size: 16, color: c.onPrimary)
                     : null,
               ),
             ),
@@ -349,9 +348,7 @@ class _CommitmentTile extends ConsumerWidget {
                   Text(
                     commitment.action,
                     style: TextStyle(
-                      color: isDone
-                          ? const Color(0xFF888888)
-                          : (isDark ? Colors.white : Colors.black),
+                      color: isDone ? c.textMuted : c.textPrimary,
                       decoration: isDone ? TextDecoration.lineThrough : null,
                       fontSize: 16,
                       fontWeight: isDone ? FontWeight.w500 : FontWeight.w600,
@@ -362,15 +359,15 @@ class _CommitmentTile extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: highlight 
-                            ? Colors.red.withValues(alpha: 0.1) 
-                            : (isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF)),
+                        color: highlight
+                            ? c.dangerContainer
+                            : c.surfaceMuted,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         dueText,
                         style: TextStyle(
-                          color: highlight ? Colors.red : (isDark ? const Color(0xFFCCCCCC) : const Color(0xFF666666)),
+                          color: highlight ? c.danger : c.textSecondary,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -383,13 +380,13 @@ class _CommitmentTile extends ConsumerWidget {
             IconButton(
               onPressed: () => notifier.remove(commitment.id),
               style: IconButton.styleFrom(
-                backgroundColor: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
+                backgroundColor: c.surfaceMuted,
                 shape: const CircleBorder(),
               ),
-              icon: const Icon(
+              icon: Icon(
                 Icons.close,
                 size: 16,
-                color: Color(0xFF888888),
+                color: c.textMuted,
               ),
             ),
           ],
@@ -404,6 +401,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
       child: Column(
@@ -411,31 +409,32 @@ class _EmptyState extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
+              color: c.primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.task_alt_rounded,
               size: 64,
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+              color: c.primary.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(height: 32),
-          const Text(
+          Text(
             'All caught up!',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
+              color: c.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Say "Remind me to..." during your day and Tanu will automatically add it here.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
               height: 1.5,
-              color: Color(0xFF888888),
+              color: c.textMuted,
             ),
           ),
         ],
@@ -463,20 +462,18 @@ class _ManualAddBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final c = context.tanuColors;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161618) : const Color(0xFFF8F9FA),
+        color: c.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFE9ECEF),
-        ),
+        border: Border.all(color: c.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.05),
+            color: Colors.black.withValues(alpha: c.isDark ? 0.4 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -501,7 +498,7 @@ class _ManualAddBar extends StatelessWidget {
                       vertical: 14,
                     ),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF222222) : Colors.white,
+                    fillColor: c.surfaceElevated,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
@@ -513,10 +510,8 @@ class _ManualAddBar extends StatelessWidget {
               IconButton(
                 onPressed: submitting ? null : onSubmit,
                 style: IconButton.styleFrom(
-                  backgroundColor: submitting
-                      ? const Color(0xFF888888)
-                      : Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: submitting ? c.textMuted : c.primary,
+                  foregroundColor: c.onPrimary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -537,7 +532,7 @@ class _ManualAddBar extends StatelessWidget {
                     prefixIcon: const Icon(Icons.person_outline, size: 20),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF222222) : Colors.white,
+                    fillColor: c.surfaceElevated,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -548,12 +543,10 @@ class _ManualAddBar extends StatelessWidget {
               const SizedBox(width: 8),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: due != null 
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
-                      : (isDark ? const Color(0xFF222222) : Colors.white),
-                  foregroundColor: due != null 
-                      ? Theme.of(context).primaryColor
-                      : (isDark ? Colors.white : Colors.black),
+                  backgroundColor: due != null
+                      ? c.primaryContainer
+                      : c.surfaceElevated,
+                  foregroundColor: due != null ? c.primary : c.textPrimary,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

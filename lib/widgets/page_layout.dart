@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tanu_colors.dart';
+
 const double kPageMaxWidth = 970;
 const double kPageGutter = 24;
 
@@ -57,17 +59,17 @@ class TanuPageIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
+    final c = context.tanuColors;
     final button = IconButton(
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
         backgroundColor: selected
             ? theme.colorScheme.primary.withValues(alpha: 0.12)
-            : (dark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7)),
+            : c.surfaceMuted,
         foregroundColor: selected
             ? theme.colorScheme.primary
-            : (dark ? Colors.white : Colors.black),
+            : c.textPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       icon: Icon(icon),

@@ -12,6 +12,7 @@ import '../widgets/ai_presence_orb.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
 import '../widgets/pinned_header.dart';
+import '../theme/tanu_colors.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -228,8 +229,8 @@ class _PendantButtonState extends State<_PendantButton>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     final status = widget.status;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final connected = status.isConnected;
     final reconnecting = status.state == PendantState.reconnecting ||
         status.state == PendantState.scanning ||
@@ -240,17 +241,17 @@ class _PendantButtonState extends State<_PendantButton>
     final Color iconColor;
     if (connected) {
       icon = Icons.bluetooth_connected;
-      body = const Color(0xFF2E7D32);
-      iconColor = Colors.white;
+      body = c.success;
+      iconColor = c.isDark ? c.scaffold : Colors.white;
     } else if (reconnecting) {
       icon = Icons.sync;
-      body = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE2E2E2);
-      iconColor = Colors.orange;
+      body = c.surfaceMuted;
+      iconColor = c.warning;
     } else {
       // Same solid treatment as the connected state, in red.
       icon = Icons.bluetooth_disabled;
-      body = const Color(0xFFC62828);
-      iconColor = Colors.white;
+      body = c.danger;
+      iconColor = c.onDanger;
     }
 
     return GestureDetector(
@@ -276,7 +277,7 @@ class _PendantButtonState extends State<_PendantButton>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.red.withValues(alpha: 0.5 * (1 - t)),
+                        color: c.danger.withValues(alpha: 0.5 * (1 - t)),
                         width: 2,
                       ),
                     ),
@@ -292,13 +293,13 @@ class _PendantButtonState extends State<_PendantButton>
                 boxShadow: [
                   if (!connected)
                     BoxShadow(
-                      color: Colors.red.withValues(alpha: 0.35),
+                      color: c.danger.withValues(alpha: 0.35),
                       blurRadius: 14,
                       spreadRadius: 1,
                     )
                   else
                     BoxShadow(
-                      color: const Color(0xFF2E7D32).withValues(alpha: 0.45),
+                      color: c.success.withValues(alpha: 0.45),
                       blurRadius: 12,
                       spreadRadius: 1,
                     ),
@@ -359,7 +360,7 @@ class _LiveCaptureStrip extends StatelessWidget {
                 fontSize: 15,
                 height: 1.45,
                 color: idle
-                    ? const Color(0xFF888888)
+                    ? context.tanuColors.textMuted
                     : Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
@@ -378,29 +379,26 @@ class _BatteryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.tanuColors;
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF),
+        color: c.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E5E5),
-          width: 1,
-        ),
+        border: Border.all(color: c.border, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.battery_std, size: 18, color: Color(0xFF888888)),
+          Icon(Icons.battery_std, size: 18, color: c.textMuted),
           const SizedBox(width: 6),
           Text(
             '$percent%',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF888888),
+              color: c.textMuted,
             ),
           ),
         ],
@@ -448,7 +446,7 @@ class _CaptureHero extends StatelessWidget {
             deviceName!,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: const Color(0xFF888888),
+              color: context.tanuColors.textMuted,
             ),
           ),
         ],

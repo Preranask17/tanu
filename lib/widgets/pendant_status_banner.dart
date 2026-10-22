@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/tanu_colors.dart';
+
 /// Flat symmetrical banner positioned below the AppBar showing pendant status.
 /// Uses ValueNotifier for isolated micro-rebuilds without re-rendering parent widgets.
 ///
@@ -12,6 +14,7 @@ class PendantStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.tanuColors;
     // Use ValueNotifier for lightweight state management - only this widget
     // rebuilds when state changes, not parent widgets
     final _statusNotifier = ValueNotifier<BannerState>(BannerState.listening);
@@ -32,10 +35,10 @@ class PendantStatusBanner extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F1E9),
+            color: c.scaffold,
             border: Border(
               bottom: BorderSide(
-                color: const Color(0xFF899386),
+                color: c.border,
                 width: 0.5,
               ),
             ),
@@ -52,7 +55,6 @@ class PendantStatusBanner extends StatelessWidget {
                   fontFamily: 'Lato',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A453F),
                 ),
               ),
               const SizedBox(width: 16),
@@ -63,7 +65,6 @@ class PendantStatusBanner extends StatelessWidget {
                   fontFamily: 'Lato',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A453F),
                 ),
               ),
             ],
@@ -99,7 +100,8 @@ class _StatusDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isConnected ? Colors.green : const Color(0xFF888888);
+    final c = context.tanuColors;
+    final color = isConnected ? c.success : c.textMuted;
 
     return Container(
       width: 8,
