@@ -19,20 +19,20 @@ const List<FloatingNavItem> _navItems = [
   FloatingNavItem(
     label: 'Recall',
     icon: Icons.auto_awesome_outlined,
-    activeIcon: Icons.auto_awesome,
+    activeIcon: Icons.auto_awesome_rounded,
     pageIndex: 3,
   ),
   FloatingNavItem(
     label: 'Library',
-    icon: Icons.folder_outlined,
-    activeIcon: Icons.folder_rounded,
+    icon: Icons.grid_view_outlined,
+    activeIcon: Icons.grid_view_rounded,
     pageIndex: 1,
     scrollsToTopOnRepeat: true,
   ),
   FloatingNavItem(
     label: 'Settings',
-    icon: Icons.settings_outlined,
-    activeIcon: Icons.settings_rounded,
+    icon: Icons.tune_outlined,
+    activeIcon: Icons.tune_rounded,
     pageIndex: 2,
   ),
 ];
@@ -159,7 +159,9 @@ class _Sidebar extends StatelessWidget {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
                           onTap: () {
-                            if (isSelected && !item.scrollsToTopOnRepeat) return;
+                            if (isSelected && !item.scrollsToTopOnRepeat) {
+                              return;
+                            }
                             onTabTapped(item.pageIndex);
                           },
                           child: Padding(

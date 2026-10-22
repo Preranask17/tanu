@@ -139,41 +139,57 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.tanuColors;
-    final iconColor = selected ? c.primary : c.textMuted;
-    final labelColor = selected ? c.primary : c.textMuted;
+    final activeColor = c.isDark ? c.primary : c.heading;
+    final iconColor = selected ? activeColor : c.textMuted;
 
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          if (selected && !item.scrollsToTopOnRepeat) return;
-          onTap();
-        },
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected ? item.activeIcon : item.icon,
-                size: 21,
-                color: iconColor,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                item.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  letterSpacing: 0.1,
-                  color: labelColor,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (selected && !item.scrollsToTopOnRepeat) return;
+            onTap();
+          },
+          child: Center(
+            child: AnimatedScale(
+              scale: selected ? 1.06 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              child: AnimatedContainer(
+                width: 42,
+                height: 42,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? activeColor.withValues(alpha: c.isDark ? 0.16 : 0.09)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: activeColor.withValues(
+                              alpha: c.isDark ? 0.22 : 0.12,
+                            ),
+                            blurRadius: 14,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : const [],
+                ),
+                child: Center(
+                  child: Icon(
+                    selected ? item.activeIcon : item.icon,
+                    size: 26,
+                    color: iconColor,
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -194,21 +210,24 @@ class _AddButton extends StatelessWidget {
       button: true,
       label: 'Add',
       child: Material(
-        color: c.primary,
+        color: TanuPalette.midnightBlue,
         elevation: 8,
-        shadowColor: Colors.black.withValues(alpha: c.isDark ? 0.55 : 0.3),
+        shadowColor: Colors.black.withValues(alpha: c.isDark ? 0.5 : 0.22),
         shape: CircleBorder(
           side: BorderSide(
-            color: c.border.withValues(alpha: c.isDark ? 0.8 : 0.5),
+            color: c.primary.withValues(alpha: c.isDark ? 0.55 : 0.28),
+            width: 1.5,
           ),
         ),
         child: InkWell(
           customBorder: const CircleBorder(),
+          splashColor: Colors.white.withValues(alpha: 0.16),
+          highlightColor: Colors.white.withValues(alpha: 0.08),
           onTap: onTap,
           child: SizedBox(
             width: size,
             height: size,
-            child: Icon(Icons.add_rounded, size: 28, color: c.onPrimary),
+            child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
           ),
         ),
       ),
@@ -230,7 +249,7 @@ class _DockPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final path = _dockPath(size);
-    canvas.drawShadow(path, shadowColor, 12, false);
+    canvas.drawShadow(path, shadowColor, 16, false);
     canvas.drawPath(
       path,
       Paint()
@@ -251,17 +270,19 @@ class _DockPainter extends CustomPainter {
     final width = size.width;
     final height = size.height;
     final centre = width / 2;
-    const radius = 28.0;
-    const notchDepth = 38.0;
+    const radius = 30.0;
+    const notchDepth = 40.0;
 
+    // The notch is tuned to the 52px FAB with a few pixels of breathing room
+    // around its lower edge while keeping horizontal tangents at both ends.
     return Path()
       ..moveTo(radius, 0)
       ..lineTo(centre - FloatingNavigationBar._notchHalfWidth, 0)
-      ..cubicTo(centre - 24, 0, centre - 30, notchDepth, centre, notchDepth)
+      ..cubicTo(centre - 26, 0, centre - 28, notchDepth, centre, notchDepth)
       ..cubicTo(
-        centre + 30,
+        centre + 28,
         notchDepth,
-        centre + 24,
+        centre + 26,
         0,
         centre + FloatingNavigationBar._notchHalfWidth,
         0,
