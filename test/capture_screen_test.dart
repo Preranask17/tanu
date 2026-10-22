@@ -5,18 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:tanu_app/screens/home_screen.dart';
-import 'package:tanu_app/screens/welcome/tanu_wordmark.dart';
 import 'package:tanu_app/services/storage_service.dart';
+import 'package:tanu_app/widgets/waveform_visualizer.dart';
 
-/// Proves the Capture sequence renders with the real widgets, disconnected
-/// and empty: [wordmark + greeting header] -> [pendant status strip] ->
-/// [waveform] -> [live transcription box] -> [connect-pendant hero].
+/// Proves the Home wireframe renders with the real widgets, disconnected:
+/// [greeting + date | pendant pill] -> [waveform] -> [Today timeline].
 /// Filesystem work runs in runAsync (async dart:io stalls in this
 /// environment's FakeAsync test zone). No backend is exercised.
 void main() {
-  testWidgets('capture: greeting, status, waveform, transcription', (
-    tester,
-  ) async {
+  testWidgets('home: header, waveform, today feed', (tester) async {
     await tester.runAsync(() async {
       final scratch = await Directory.systemTemp.createTemp('tanu_capture');
       Hive.init(scratch.path);
@@ -33,28 +30,23 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    // 1. Top header: wordmark left, disconnected BT control right.
-    expect(find.byType(TanuWordmark), findsOneWidget);
-    expect(find.byIcon(Icons.bluetooth_disabled), findsOneWidget);
-    // No battery pill while disconnected with no known value.
+    // 1. Header row: greeting/date on the left, compact pendant pill right.
+    expect(find.textContaining('Good '), findsOneWidget);
+    expect(find.byIcon(Icons.bluetooth_rounded), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
+    // No battery percentage while disconnected.
     expect(find.textContaining('%'), findsNothing);
-    // Section headline below the header is now the time-based greeting, and
-    // the pendant status lives in a strip directly above the waveform.
-    expect(find.text('Connect Pendant'), findsOneWidget);
 
-    // 2 + 3. Hero orb and persistent transcription box with idle placeholder.
-    expect(find.text('Transcription will appear here…'), findsOneWidget);
-    // Capture carries zero search bars.
+    // 2. Waveform directly follows the header stack; no live banner when idle.
+    expect(find.byType(WaveformVisualizer), findsOneWidget);
+    expect(find.text('Live Conversation'), findsNothing);
+
+    // 3. Today timeline section is always present.
+    expect(find.text('Today'), findsOneWidget);
+
+    // Home carries zero search bars and no legacy wordmark header.
     expect(find.byType(TextField), findsNothing);
-    // Idle capture: hero invites pendant connect, never a live state.
-    expect(find.text('Connect your pendant to begin'), findsOneWidget);
-    expect(find.text('Capturing...'), findsNothing);
-
-    // 4. Memories section is gone: no empty-state text, no cards.
-    expect(
-      find.text('No memories recorded yet. TANU is listening...'),
-      findsNothing,
-    );
+    expect(find.text('Capture'), findsNothing);
     expect(find.text('Scan'), findsNothing);
     expect(find.text('No pendant yet'), findsNothing);
   }, timeout: const Timeout(Duration(minutes: 5)));

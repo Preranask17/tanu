@@ -3,15 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/audio_source.dart';
-import '../models/conversation.dart';
+import '../models/transcript.dart';
 import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
-import 'chat_screen.dart';
-import '../widgets/device_picker_sheet.dart';
-import '../widgets/pinned_header.dart';
-import '../widgets/waveform_visualizer.dart';
 import '../theme/tanu_colors.dart';
+import '../widgets/device_picker_sheet.dart';
+import '../widgets/waveform_visualizer.dart';
+import 'chat_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -108,11 +107,45 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
+  String _greeting(DateTime now) {
+    if (now.hour < 12) return 'Good morning';
+    if (now.hour < 17) return 'Good afternoon';
     return 'Good evening';
+  }
+
+  String _dateLabel(DateTime now) {
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${weekdays[now.weekday - 1]}, '
+        '${months[now.month - 1]} ${now.day}';
+  }
+
+  bool _isToday(DateTime time, DateTime now) {
+    final local = time.toLocal();
+    return local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
   }
 
   @override
@@ -121,107 +154,142 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final conversation = ref.watch(conversationProvider);
 
+    final now = DateTime.now();
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
     final live = conversation.isListening || conversation.active != null;
-    // Keep the scrollable content clear of the floating dock on mobile.
     final bottomInset =
         MediaQuery.paddingOf(context).bottom + (isDesktop ? 24 : 108);
 
+    final todaySessions =
+        conversation.conversations
+            .where(
+              (session) =>
+                  !session.isDeleted &&
+                  session.status == ConversationStatus.completed &&
+                  _isToday(session.finishedAt ?? session.startedAt, now),
+            )
+            .toList()
+          ..sort((a, b) => a.startedAt.compareTo(b.startedAt));
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: RefreshIndicator(
-        onRefresh: () async =>
-            ref.read(conversationProvider.notifier).reloadFromStorage(),
-        child: CustomScrollView(
-          controller: _scroll,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          slivers: [
-            PinnedHeader(
-              title: '${_greeting()},',
-              subtitle: 'Let’s capture something worth remembering.',
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () async =>
+              ref.read(conversationProvider.notifier).reloadFromStorage(),
+          child: CustomScrollView(
+            controller: _scroll,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(top: 8, bottom: bottomInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _HomeStatusStrip(
-                      status: status,
-                      conversation: conversation,
-                      onConnect: _openDevicePicker,
-                      onOpenTranscript: _openTranscript,
-                    ),
-                    WaveformVisualizer(
-                      level: conversation.micLevel,
-                      listening: conversation.isListening,
-                      transcribing: conversation.liveTranscript
-                          .trim()
-                          .isNotEmpty,
-                    ),
-                    _LiveCaptureStrip(
-                      conversation: conversation,
-                      onOpenTranscript: _openTranscript,
-                    ),
-                    const SizedBox(height: 12),
-                    if (!live)
-                      _CaptureHero(
-                        isConnected: status.isConnected,
-                        deviceName: status.deviceName,
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _HomeHeader(
+                        greeting: _greeting(now),
+                        dateLabel: _dateLabel(now),
+                        status: status,
+                        onPendantTap: _openDevicePicker,
                       ),
-                  ],
+                      const SizedBox(height: 16),
+                      if (live) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _LiveConversationBanner(
+                            listening: conversation.isListening,
+                            onTap: _openTranscript,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                      WaveformVisualizer(
+                        level: conversation.micLevel,
+                        listening: conversation.isListening,
+                        transcribing: conversation.liveTranscript
+                            .trim()
+                            .isNotEmpty,
+                      ),
+                      const SizedBox(height: 8),
+                      _TodayFeed(
+                        sessions: todaySessions,
+                        processingIds: conversation.processingIds,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Connection + live-session status, placed directly above the waveform.
-/// Presentation only: reads the already-watched status/conversation values and
-/// forwards taps to the existing device picker / live transcript route.
-class _HomeStatusStrip extends StatelessWidget {
-  const _HomeStatusStrip({
+/// Header row: time-based salutation and date on the left, compact pendant
+/// connection/battery pill on the right.
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
+    required this.greeting,
+    required this.dateLabel,
     required this.status,
-    required this.conversation,
-    required this.onConnect,
-    required this.onOpenTranscript,
+    required this.onPendantTap,
   });
 
+  final String greeting;
+  final String dateLabel;
   final PendantStatus status;
-  final ConversationState conversation;
-  final VoidCallback onConnect;
-  final VoidCallback onOpenTranscript;
+  final VoidCallback onPendantTap;
 
   @override
   Widget build(BuildContext context) {
-    final live = conversation.isListening || conversation.active != null;
+    final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _ConnectionStrip(status: status, onTap: onConnect),
-          if (live) ...[
-            const SizedBox(height: 8),
-            _LiveConversationBanner(
-              listening: conversation.isListening,
-              onTap: onOpenTranscript,
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(greeting, style: textTheme.displayMedium),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  dateLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: c.textMuted,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+          const SizedBox(width: 12),
+          _PendantPill(status: status, onTap: onPendantTap),
         ],
       ),
     );
   }
 }
 
-class _ConnectionStrip extends StatelessWidget {
-  const _ConnectionStrip({required this.status, required this.onTap});
+class _PendantPill extends StatelessWidget {
+  const _PendantPill({required this.status, required this.onTap});
 
   final PendantStatus status;
   final VoidCallback onTap;
@@ -235,33 +303,23 @@ class _ConnectionStrip extends StatelessWidget {
         status.state == PendantState.scanning ||
         status.state == PendantState.connecting;
 
-    final IconData icon;
-    final Color accent;
-    final String label;
-    if (connected) {
-      icon = Icons.bluetooth_connected;
-      accent = c.success;
-      label = status.deviceName?.trim().isNotEmpty == true
-          ? status.deviceName!.trim()
-          : 'Pendant connected';
-    } else if (reconnecting) {
-      icon = Icons.sync;
-      accent = c.warning;
-      label = status.state == PendantState.scanning
-          ? 'Looking for pendant…'
-          : 'Reconnecting…';
-    } else {
-      icon = Icons.bluetooth_disabled;
-      accent = c.danger;
-      label = 'Connect Pendant';
-    }
-
-    final battery = status.batteryPercent;
-    final showBattery = connected && battery != null;
+    final dotColor = connected
+        ? c.success
+        : reconnecting
+        ? c.warning
+        : c.danger;
+    final label = connected
+        ? 'Pendant'
+        : reconnecting
+        ? 'Syncing'
+        : 'Connect';
+    final battery = connected ? status.batteryPercent : null;
 
     return Semantics(
       button: true,
-      label: '$label. Tap to manage your pendant.',
+      label: connected
+          ? 'Pendant connected${battery == null ? '' : ', $battery percent battery'}. Tap to manage.'
+          : 'Connect pendant. Tap to manage.',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -269,45 +327,54 @@ class _ConnectionStrip extends StatelessWidget {
           onTap();
         },
         child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: c.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: connected ? c.success.withValues(alpha: 0.28) : c.border,
-            ),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: c.border),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: c.textPrimary,
-                  ),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dotColor,
+                  boxShadow: connected
+                      ? [
+                          BoxShadow(
+                            color: dotColor.withValues(alpha: 0.35),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
                 ),
               ),
-              if (showBattery) ...[
-                Icon(Icons.battery_std, size: 16, color: c.textMuted),
-                const SizedBox(width: 4),
+              if (battery != null) ...[
+                const SizedBox(width: 6),
                 Text(
                   '$battery%',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: c.textMuted,
+                    color: c.textSecondary,
                   ),
                 ),
-                const SizedBox(width: 8),
               ],
-              Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+              const SizedBox(width: 8),
+              Icon(Icons.bluetooth_rounded, size: 14, color: c.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: c.textPrimary,
+                ),
+              ),
             ],
           ),
         ),
@@ -316,6 +383,8 @@ class _ConnectionStrip extends StatelessWidget {
   }
 }
 
+/// Active-session banner directly below the header. Tapping it opens the live
+/// transcript while a capture session is running.
 class _LiveConversationBanner extends StatelessWidget {
   const _LiveConversationBanner({required this.listening, required this.onTap});
 
@@ -412,54 +481,142 @@ class _LiveConversationBanner extends StatelessWidget {
   }
 }
 
-/// Live transcription strip under the waveform: the in-progress words stream
-/// here while capturing, the last captured line stays visible when idle.
-/// Tapping opens the live transcript only while a session is active.
-class _LiveCaptureStrip extends StatelessWidget {
-  const _LiveCaptureStrip({
-    required this.conversation,
-    required this.onOpenTranscript,
-  });
+/// "Today" timeline: completed memories captured since midnight, ordered from
+/// morning to evening. Reads already-loaded sessions only.
+class _TodayFeed extends StatelessWidget {
+  const _TodayFeed({required this.sessions, required this.processingIds});
 
-  final ConversationState conversation;
-  final VoidCallback onOpenTranscript;
+  final List<ConversationSession> sessions;
+  final Set<String> processingIds;
 
   @override
   Widget build(BuildContext context) {
-    final words = conversation.liveTranscript.trim();
-    final active = conversation.active;
-    final preview = words.isNotEmpty
-        ? words
-        : (active != null && active.segments.isNotEmpty
-              ? active.segments.last.text.trim()
-              : '');
-    final idle = preview.isEmpty;
-    final live = conversation.isListening || active != null;
     return Padding(
-      padding: const EdgeInsets.only(top: 2, left: 32, right: 32),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: live
-            ? () {
-                HapticFeedback.selectionClick();
-                onOpenTranscript();
-              }
-            : null,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 110),
-          child: SingleChildScrollView(
-            child: Text(
-              idle ? 'Transcription will appear here…' : preview,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                fontSize: 15,
-                height: 1.45,
-                color: idle
-                    ? context.tanuColors.textMuted
-                    : Theme.of(context).textTheme.bodyLarge?.color,
-              ),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Today',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+          const SizedBox(height: 10),
+          if (sessions.isEmpty)
+            const _EmptyToday()
+          else
+            for (final session in sessions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _TodayCard(
+                  session: session,
+                  processing: processingIds.contains(session.id),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TodayCard extends StatelessWidget {
+  const _TodayCard({required this.session, required this.processing});
+
+  final ConversationSession session;
+  final bool processing;
+
+  String get _title {
+    final title = session.title.trim();
+    return title.isEmpty ? 'Untitled memory' : title;
+  }
+
+  String get _summary {
+    if (processing) return 'Writing summary…';
+    final summary = session.summary?.trim();
+    if (summary != null && summary.isNotEmpty) return summary;
+    if (session.segments.isNotEmpty) {
+      final tail = session.segments.last.text.trim();
+      if (tail.isNotEmpty) return tail;
+    }
+    return 'No transcript yet';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final time = _formatClock(session.startedAt.toLocal());
+
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: c.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (_) => SessionDetailPage(session: session),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 50,
+                child: Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 34, color: c.borderSubtle),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: c.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontStyle: processing
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                        color: c.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, size: 20, color: c.textMuted),
+            ],
           ),
         ),
       ),
@@ -467,43 +624,63 @@ class _LiveCaptureStrip extends StatelessWidget {
   }
 }
 
-class _CaptureHero extends StatelessWidget {
-  const _CaptureHero({required this.isConnected, required this.deviceName});
-
-  final bool isConnected;
-  final String? deviceName;
+class _EmptyToday extends StatelessWidget {
+  const _EmptyToday();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          isConnected ? 'Ready when you are' : 'Connect your pendant to begin',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+    final c = context.tanuColors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF8C6D58).withValues(alpha: 0.12),
+            ),
+            child: const Icon(
+              Icons.graphic_eq_rounded,
+              size: 19,
+              color: Color(0xFF8C6D58),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isConnected
-              ? 'Your pendant captures automatically as you speak.'
-              : 'Your conversations stay on this device',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
-        ),
-        if (isConnected && deviceName != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            deviceName!,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: context.tanuColors.textMuted,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'No conversations yet today',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: c.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Your pendant will capture them automatically.',
+                  style: TextStyle(fontSize: 12.5, color: c.textMuted),
+                ),
+              ],
             ),
           ),
         ],
-      ],
+      ),
     );
   }
+}
+
+String _formatClock(DateTime time) {
+  final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+  return '$hour:${time.minute.toString().padLeft(2, '0')}';
 }
