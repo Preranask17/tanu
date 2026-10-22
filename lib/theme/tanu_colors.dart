@@ -12,6 +12,7 @@ abstract final class TanuPalette {
   static const Color blue800 = Color(0xFF1A4263);
   static const Color blue700 = Color(0xFF1F4E79);
   static const Color blue500 = Color(0xFF2F6690);
+  static const Color midnightBlue = Color(0xFF1E3A5F);
   static const Color blue300 = Color(0xFF6FA8C9);
   static const Color blue100 = Color(0xFFD7E6F0);
   static const Color blue050 = Color(0xFFEDF4F8);
@@ -158,7 +159,7 @@ class TanuColors extends ThemeExtension<TanuColors> {
     textPrimary: TanuPalette.ink900,
     textSecondary: TanuPalette.ink900,
     textMuted: TanuPalette.ink500,
-    heading: TanuPalette.blue700,
+    heading: TanuPalette.midnightBlue,
     success: TanuPalette.green700,
     warning: TanuPalette.amber700,
     danger: TanuPalette.red700,

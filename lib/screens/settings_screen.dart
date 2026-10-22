@@ -34,104 +34,93 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     final capture = ref.watch(devCaptureProvider);
     final stats = ref.watch(pendantStatsProvider);
+    final c = context.tanuColors;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          const PinnedHeader(
-            title: 'Settings',
-          ),
+          const PinnedHeader(title: 'Settings'),
           SliverToBoxAdapter(
             child: TanuPageRail(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Ã¢â€â‚¬Ã¢â€â‚¬ Hero: Pendant Status Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+                  // Pendant status
                   _PendantDashboard(status: status),
 
-                  const SizedBox(height: 36),
-                  // Ã¢â€â‚¬Ã¢â€â‚¬ Appearance Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-                  const _SectionHeader(
+                  const SizedBox(height: 20),
+
+                  const _SettingsCard(
                     title: 'Appearance',
                     subtitle: 'How Tanu looks',
+                    child: _AppearanceSelector(),
                   ),
+
                   const SizedBox(height: 16),
-                  const _AppearanceSelector(),
 
-                  const SizedBox(height: 36),
-
-                  // Ã¢â€â‚¬Ã¢â€â‚¬ Speech Engine Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-                  const _SectionHeader(
+                  _SettingsCard(
                     title: 'Speech Engine',
-                    subtitle: 'Offline AI Model for Transcription',
-                  ),
-                  const SizedBox(height: 16),
-                  const _SttModelDashboard(),
-                  const SizedBox(height: 16),
-                  const _SttLanguagePicker(),
-
-                  const SizedBox(height: 36),
-
-                  // Ã¢â€â‚¬Ã¢â€â‚¬ Memory & Privacy Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-                  const _SectionHeader(
-                    title: 'Memory',
-                    subtitle: 'All your data stays on this device',
-                  ),
-                  const SizedBox(height: 16),
-                  const _WipeMemoryButton(),
-
-                  const SizedBox(height: 36),
-
-                  // ── Gemini API key ──
-                  const _SectionHeader(
-                    title: 'Gemini API Key',
-                    subtitle: 'Used for memory processing, chat & RAG embeddings',
-                  ),
-                  const SizedBox(height: 16),
-                  const _GeminiKeyField(),
-
-                  const SizedBox(height: 36),
-
-                  const _SectionHeader(
-                    title: 'Notifications',
-                    subtitle: 'Important moments, not noise',
-                  ),
-                  const SizedBox(height: 16),
-                  const _NotificationSettings(),
-
-                  const SizedBox(height: 36),
-
-                  // Ã¢â€â‚¬Ã¢â€â‚¬ Developer / Under the Hood Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-                  GestureDetector(
-                    onTap: () =>
-                        setState(() => _developerOpen = !_developerOpen),
-                    behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    subtitle: 'Offline AI model for transcription',
+                    padding: EdgeInsets.zero,
+                    child: Column(
                       children: [
-                        const _SectionHeader(
-                          title: 'Under the Hood',
-                          subtitle: 'Diagnostic tools',
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(18, 16, 18, 18),
+                          child: _SttModelDashboard(),
                         ),
-                        Icon(
-                          _developerOpen
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: context.tanuColors.textMuted,
-                        ),
+                        Divider(height: 1, color: c.borderSubtle),
+                        const _SttLanguagePicker(),
                       ],
                     ),
                   ),
-                  if (_developerOpen) ...[
-                    const SizedBox(height: 16),
-                    _DeveloperConsole(capture: capture, stats: stats),
-                  ],
+
+                  const SizedBox(height: 16),
+
+                  const _SettingsCard(
+                    title: 'Memory',
+                    subtitle: 'All your data stays on this device',
+                    child: _WipeMemoryButton(),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const _SettingsCard(
+                    title: 'Gemini API Key',
+                    subtitle:
+                        'Used for memory processing, chat & RAG embeddings',
+                    child: _GeminiKeyField(),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const _SettingsCard(
+                    title: 'Notifications',
+                    subtitle: 'Important moments, not noise',
+                    padding: EdgeInsets.zero,
+                    child: _NotificationSettings(),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _SettingsCard(
+                    title: 'Under the Hood',
+                    subtitle: 'Diagnostic tools',
+                    onHeaderTap: () =>
+                        setState(() => _developerOpen = !_developerOpen),
+                    trailing: Icon(
+                      _developerOpen
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: c.heading.withValues(alpha: 0.72),
+                    ),
+                    child: _developerOpen
+                        ? _DeveloperConsole(capture: capture, stats: stats)
+                        : null,
+                  ),
                   // Clearance above the floating dock so the last section
                   // scrolls fully into view on every screen size.
-                  SizedBox(
-                    height: MediaQuery.paddingOf(context).bottom + 112,
-                  ),
+                  SizedBox(height: MediaQuery.paddingOf(context).bottom + 112),
                 ],
               ),
             ),
@@ -142,9 +131,83 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // Components
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+/// Grouped settings surface with an Outfit header and Inter tile text.
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.title,
+    this.subtitle,
+    this.child,
+    this.padding = const EdgeInsets.fromLTRB(18, 16, 18, 18),
+    this.trailing,
+    this.onHeaderTap,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? child;
+  final EdgeInsetsGeometry padding;
+  final Widget? trailing;
+  final VoidCallback? onHeaderTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _SectionHeader(title: title, subtitle: subtitle),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+        ],
+      ),
+    );
+
+    return Material(
+      color: c.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: c.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (onHeaderTap != null)
+            InkWell(onTap: onHeaderTap, child: header)
+          else
+            header,
+          if (child != null) ...[
+            Divider(height: 1, color: c.borderSubtle),
+            ListTileTheme(
+              data: ListTileThemeData(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+                iconColor: c.heading,
+                textColor: c.heading,
+                titleTextStyle: textTheme.bodyLarge?.copyWith(
+                  color: c.heading,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                subtitleTextStyle: textTheme.bodySmall?.copyWith(
+                  color: c.heading.withValues(alpha: 0.72),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+              child: Padding(padding: padding, child: child!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 /// Notification preferences: master switch, morning digest + hour.
 /// Display only — the proactive service reads the persisted values.
@@ -154,6 +217,7 @@ class _NotificationSettings extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final c = context.tanuColors;
     return Column(
       children: [
         SwitchListTile(
@@ -168,16 +232,18 @@ class _NotificationSettings extends ConsumerWidget {
           subtitle: const Text('Top stashed memories, once daily'),
           value: settings.digestEnabled,
           onChanged: settings.notifyEnabled
-              ? (v) =>
-                  ref.read(settingsProvider.notifier).setDigestEnabled(v)
+              ? (v) => ref.read(settingsProvider.notifier).setDigestEnabled(v)
               : null,
         ),
-        const Divider(height: 24),
-        const _BackgroundProtection(),
         ListTile(
           title: const Text('Digest hour'),
           trailing: DropdownButton<int>(
             value: settings.digestHour,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: c.heading,
+              fontWeight: FontWeight.w600,
+            ),
+            dropdownColor: c.surfaceElevated,
             underline: const SizedBox.shrink(),
             onChanged: settings.notifyEnabled && settings.digestEnabled
                 ? (v) {
@@ -188,13 +254,12 @@ class _NotificationSettings extends ConsumerWidget {
                 : null,
             items: [
               for (var h = 6; h <= 10; h++)
-                DropdownMenuItem(
-                  value: h,
-                  child: Text('$h am'),
-                ),
+                DropdownMenuItem(value: h, child: Text('$h am')),
             ],
           ),
         ),
+        Divider(height: 1, color: c.borderSubtle),
+        const _BackgroundProtection(),
       ],
     );
   }
@@ -238,11 +303,18 @@ class _BackgroundProtection extends StatelessWidget {
   /// entries, then the app-details page as a guaranteed fallback.
   Future<void> _openAutostart() async {
     const candidates = [
-      ('com.coloros.safecenter',
-          'com.coloros.safecenter.startupapp.StartupAppListActivity'),
-      ('com.oppo.safe', 'com.oppo.safe.permission.startup.StartupAppListActivity'),
-      ('com.coloros.safecenter',
-          'com.coloros.safecenter.permission.startup.StartupAppListActivity'),
+      (
+        'com.coloros.safecenter',
+        'com.coloros.safecenter.startupapp.StartupAppListActivity',
+      ),
+      (
+        'com.oppo.safe',
+        'com.oppo.safe.permission.startup.StartupAppListActivity',
+      ),
+      (
+        'com.coloros.safecenter',
+        'com.coloros.safecenter.permission.startup.StartupAppListActivity',
+      ),
     ];
     for (final c in candidates) {
       try {
@@ -268,29 +340,32 @@ class _BackgroundProtection extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          leading: Icon(Icons.shield_outlined, color: c.textMuted),
+          leading: Icon(Icons.shield_outlined, color: c.heading),
           title: const Text('Background protection'),
           subtitle: Text(
             'Aggressive skins kill background apps. Exempt Tanu so the '
             'morning digest arrives with the app closed.',
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Wrap(
-            spacing: 4,
-            children: [
-              TextButton.icon(
-                onPressed: _requestExemption,
-                icon: const Icon(Icons.battery_saver_outlined, size: 16),
-                label: const Text('Battery exemption'),
-              ),
-              TextButton.icon(
-                onPressed: _openAutostart,
-                icon: const Icon(Icons.play_circle_outline, size: 16),
-                label: const Text('Autostart'),
-              ),
-            ],
+        Padding(
+          padding: const EdgeInsets.only(right: 18, bottom: 12),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: _requestExemption,
+                  icon: const Icon(Icons.battery_saver_outlined, size: 16),
+                  label: const Text('Battery exemption'),
+                ),
+                TextButton.icon(
+                  onPressed: _openAutostart,
+                  icon: const Icon(Icons.play_circle_outline, size: 16),
+                  label: const Text('Autostart'),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -330,12 +405,15 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
           child: TextField(
             controller: _ctrl,
             obscureText: _obscure,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: c.heading),
             decoration: InputDecoration(
               hintText: 'AIza...',
               filled: true,
               fillColor: c.surfaceMuted,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
               suffixIcon: IconButton(
@@ -369,19 +447,28 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final c = context.tanuColors;
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          style: textTheme.titleLarge?.copyWith(
+            color: c.heading,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
-          Text(subtitle!, style: TextStyle(color: muted, fontSize: 14)),
+          Text(
+            subtitle!,
+            style: textTheme.bodyMedium?.copyWith(
+              color: c.heading.withValues(alpha: 0.72),
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
         ],
       ],
     );
@@ -404,11 +491,9 @@ class _PendantDashboard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: c.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isConnected
-              ? accent.withValues(alpha: 0.35)
-              : c.border,
+          color: isConnected ? accent.withValues(alpha: 0.35) : c.border,
           width: 1,
         ),
         boxShadow: [
@@ -451,7 +536,9 @@ class _PendantDashboard extends StatelessWidget {
                             isConnected
                                 ? 'Pendant connected'
                                 : 'Pendant offline',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleLarge?.copyWith(color: c.heading),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -461,9 +548,7 @@ class _PendantDashboard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: c.heading.withValues(alpha: 0.72),
                               fontSize: 13,
                             ),
                           ),
@@ -495,12 +580,16 @@ class _PendantDashboard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  isConnected ? 'Ready to capture' : 'No pendant connected',
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                Expanded(
+                  child: Text(
+                    isConnected ? 'Ready to capture' : 'No pendant connected',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -511,15 +600,11 @@ class _PendantDashboard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: isConnected
-                    ? c.surfaceMuted
-                    : c.primary,
-                foregroundColor: isConnected
-                    ? c.textPrimary
-                    : c.onPrimary,
+                backgroundColor: isConnected ? c.surfaceMuted : c.primary,
+                foregroundColor: isConnected ? c.heading : c.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 elevation: 0,
               ),
@@ -568,11 +653,7 @@ class _BatteryBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.battery_charging_full,
-            color: c.success,
-            size: 16,
-          ),
+          Icon(Icons.battery_charging_full, color: c.success, size: 16),
           const SizedBox(width: 4),
           Text(
             '$percent%',
@@ -600,7 +681,7 @@ class _AppearanceSelector extends ConsumerWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: c.surfaceMuted,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: c.border),
       ),
       child: Row(
@@ -661,7 +742,7 @@ class _ThemePill extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? c.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             boxShadow: isSelected && !c.isDark
                 ? [
                     BoxShadow(
@@ -674,18 +755,14 @@ class _ThemePill extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isSelected ? c.primary : c.textMuted,
-              ),
+              Icon(icon, size: 20, color: isSelected ? c.primary : c.textMuted),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? c.primary : c.textMuted,
+                  color: c.heading.withValues(alpha: isSelected ? 1 : 0.65),
                 ),
               ),
             ],
@@ -705,40 +782,32 @@ class _SttLanguagePicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final code = ref.watch(
-      settingsProvider.select((s) => s.sttLanguageCode),
-    );
+    final code = ref.watch(settingsProvider.select((s) => s.sttLanguageCode));
     final c = context.tanuColors;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: c.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
       child: Row(
         children: [
-          Icon(
-            Icons.translate_rounded,
-            size: 20,
-            color: c.textMuted,
-          ),
+          Icon(Icons.translate_rounded, size: 20, color: c.heading),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Speech language',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: c.heading,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
                 ),
                 Text(
                   'Same offline model, fixed hint',
-                  style: TextStyle(
-                    color: c.textMuted,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: c.heading.withValues(alpha: 0.72),
                     fontSize: 12,
                   ),
                 ),
@@ -747,6 +816,10 @@ class _SttLanguagePicker extends ConsumerWidget {
           ),
           DropdownButton<String>(
             value: code.isEmpty ? '' : code,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: c.heading),
+            dropdownColor: c.surfaceElevated,
             underline: const SizedBox.shrink(),
             onChanged: (next) {
               if (next != null) {
@@ -754,15 +827,9 @@ class _SttLanguagePicker extends ConsumerWidget {
               }
             },
             items: [
-              const DropdownMenuItem(
-                value: '',
-                child: Text('Auto-detect'),
-              ),
+              const DropdownMenuItem(value: '', child: Text('Auto-detect')),
               for (final lang in SttConfig.indicLanguages)
-                DropdownMenuItem(
-                  value: lang.code,
-                  child: Text(lang.label),
-                ),
+                DropdownMenuItem(value: lang.code, child: Text(lang.label)),
             ],
           ),
         ],
@@ -806,125 +873,133 @@ class _SttModelDashboard extends ConsumerWidget {
     final engineLabel = ref.watch(sttEngineProvider).modelLabel;
     final showEngineLabel = engineLabel != kOfflineModelLabel;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: c.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      kOfflineModelLabel,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    kOfflineModelLabel,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: c.heading,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
+                  ),
 
-                    const SizedBox(height: 4),
+                  const SizedBox(height: 4),
+                  Text(
+                    statusText,
+                    style: TextStyle(
+                      color: c.heading.withValues(alpha: 0.72),
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (showEngineLabel)
                     Text(
-                      statusText,
+                      engineLabel,
                       style: TextStyle(
-                        color: c.textMuted,
+                        color: c.heading.withValues(alpha: 0.72),
                         fontSize: 12,
                       ),
                     ),
-                    if (showEngineLabel)
-                      Text(
-                        engineLabel,
-                        style: TextStyle(
-                          color: c.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (state.phase == SttModelPhase.ready)
-                Icon(Icons.check_circle, color: c.success)
-              else if (state.busy)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          if (state.phase != SttModelPhase.ready && !state.busy) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text('Download Offline Model (~375MB)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: c.primary,
-                  foregroundColor: c.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                onPressed: () => notifier.download(),
+                ],
               ),
             ),
+            if (state.phase == SttModelPhase.ready)
+              Icon(Icons.check_circle, color: c.success)
+            else if (state.busy)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
           ],
-          if (state.phase == SttModelPhase.ready && !state.busy) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.delete),
-                label: const Text('Delete Model'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: c.danger,
-                  side: BorderSide(color: c.danger),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+        ),
+        if (state.phase != SttModelPhase.ready && !state.busy) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: c.primary,
+                foregroundColor: c.onPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Model?'),
-                      content: const Text(
-                        'This will delete the downloaded speech model. You will need to download it again to use offline transcription.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: TextButton.styleFrom(
-                            foregroundColor: c.danger,
-                          ),
-                          child: const Text('Delete'),
-                        ),
-                      ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => notifier.download(),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.download),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Download Offline Model (~375MB)',
+                      textAlign: TextAlign.center,
                     ),
-                  );
-                  if (confirmed == true) {
-                    notifier.deleteModel();
-                  }
-                },
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ],
-      ),
+        if (state.phase == SttModelPhase.ready && !state.busy) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.delete),
+              label: const Text('Delete Model'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: c.danger,
+                side: BorderSide(color: c.danger),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Model?'),
+                    content: const Text(
+                      'This will delete the downloaded speech model. You will need to download it again to use offline transcription.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: TextButton.styleFrom(foregroundColor: c.danger),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  notifier.deleteModel();
+                }
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -945,7 +1020,7 @@ class _WipeMemoryButton extends ConsumerWidget {
           side: BorderSide(color: c.danger, width: 2),
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
         onPressed: () async {
@@ -1006,7 +1081,7 @@ class _DeveloperConsole extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: consoleBorder),
       ),
       child: Column(
@@ -1015,13 +1090,15 @@ class _DeveloperConsole extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '>  DEV CONSOLE',
-                style: TextStyle(
-                  color: consoleGreen,
-                  fontFamily: 'Courier',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
+              const Expanded(
+                child: Text(
+                  '>  DEV CONSOLE',
+                  style: TextStyle(
+                    color: consoleGreen,
+                    fontFamily: 'Courier',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
               ),
               IconButton(
@@ -1058,18 +1135,7 @@ class _DeveloperConsole extends ConsumerWidget {
 
           const Divider(color: consoleBorder, height: 16),
 
-          ElevatedButton.icon(
-            icon: Icon(
-              capture.recording
-                  ? Icons.stop_rounded
-                  : Icons.fiber_manual_record,
-              size: 16,
-            ),
-            label: Text(
-              capture.recording
-                  ? 'STOP WAV CAPTURE [${_fmtSize(capture.bytes)}]'
-                  : 'START RAW AUDIO DUMP',
-            ),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: capture.recording
                   ? Colors.red.shade700
@@ -1082,6 +1148,27 @@ class _DeveloperConsole extends ConsumerWidget {
               textStyle: const TextStyle(fontSize: 12),
             ),
             onPressed: () => ref.read(devCaptureProvider.notifier).toggle(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  capture.recording
+                      ? Icons.stop_rounded
+                      : Icons.fiber_manual_record,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    capture.recording
+                        ? 'STOP WAV CAPTURE [${_fmtSize(capture.bytes)}]'
+                        : 'START RAW AUDIO DUMP',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
           ),
           if (capture.path != null && !capture.recording)
             Padding(
@@ -1096,9 +1183,7 @@ class _DeveloperConsole extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.notifications_outlined, size: 16),
-            label: const Text('SEND TEST NOTIFICATION'),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF353535),
               foregroundColor: Colors.white,
@@ -1125,6 +1210,20 @@ class _DeveloperConsole extends ConsumerWidget {
                 );
               }
             },
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.notifications_outlined, size: 16),
+                SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'SEND TEST NOTIFICATION',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
