@@ -2,11 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Calm audio waveform for the Capture screen.
+/// Calm audio waveform for the Home screen.
 ///
 /// A horizontal row of rounded vertical bars, mirrored around a soft centre
 /// line. The bars breathe gently while idle and swell with [level] once a
-/// session is [listening] or [transcribing].
+/// session is [listening] or [transcribing]. Active bars use a metallic
+/// midnight-blue gradient with a soft specular sheen.
 ///
 /// Pure presentation: plain values in, no providers or audio services.
 class WaveformVisualizer extends StatefulWidget {
@@ -57,7 +58,12 @@ class _WaveformVisualizerState extends State<WaveformVisualizer>
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final active = _WaveformColors.terracotta;
+    final activeStart = dark
+        ? _WaveformColors.midnightBlue
+        : _WaveformColors.midnightDeep;
+    final activeEnd = dark
+        ? _WaveformColors.midnightSky
+        : _WaveformColors.midnightSlate;
     final inactive = dark
         ? _WaveformColors.mutedNeutral
         : _WaveformColors.softBeigeBorder;
@@ -76,8 +82,13 @@ class _WaveformVisualizerState extends State<WaveformVisualizer>
                 level: widget.level.clamp(0.0, 1.0).toDouble(),
                 listening: widget.listening,
                 transcribing: widget.transcribing,
-                activeColor: active,
+                activeStartColor: activeStart,
+                activeEndColor: activeEnd,
                 inactiveColor: inactive,
+                sheenHighlight: Colors.white.withValues(
+                  alpha: dark ? 0.16 : 0.22,
+                ),
+                sheenShadow: Colors.black.withValues(alpha: dark ? 0.14 : 0.10),
               ),
             ),
           ),
@@ -88,8 +99,17 @@ class _WaveformVisualizerState extends State<WaveformVisualizer>
 }
 
 abstract final class _WaveformColors {
-  /// Muted terracotta beige used for active bars.
-  static const Color terracotta = Color(0xFF8C6D58);
+  /// Deep metallic midnight used for active bars in light mode.
+  static const Color midnightDeep = Color(0xFF1E3A5F);
+
+  /// Slate midnight highlight used across the light-mode waveform.
+  static const Color midnightSlate = Color(0xFF2F527B);
+
+  /// Brighter midnight blue used for active bars in dark mode.
+  static const Color midnightBlue = Color(0xFF4A7BB0);
+
+  /// Ice-blue highlight used across the dark-mode waveform.
+  static const Color midnightSky = Color(0xFF6FA8C9);
 
   /// Soft beige border used for resting bars in light mode.
   static const Color softBeigeBorder = Color(0xFFE3DCCB);
@@ -104,16 +124,22 @@ class _WaveformPainter extends CustomPainter {
     required this.level,
     required this.listening,
     required this.transcribing,
-    required this.activeColor,
+    required this.activeStartColor,
+    required this.activeEndColor,
     required this.inactiveColor,
+    required this.sheenHighlight,
+    required this.sheenShadow,
   });
 
   final double phase;
   final double level;
   final bool listening;
   final bool transcribing;
-  final Color activeColor;
+  final Color activeStartColor;
+  final Color activeEndColor;
   final Color inactiveColor;
+  final Color sheenHighlight;
+  final Color sheenShadow;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -135,34 +161,52 @@ class _WaveformPainter extends CustomPainter {
     final minHeight = barWidth + 2;
     final maxHeight = size.height * 0.56;
     final energyGate = listening || transcribing;
-    final dynamicEnergy =
-        0.28 + level * 0.62 + (transcribing ? 0.08 : 0.0);
+    final dynamicEnergy = 0.28 + level * 0.62 + (transcribing ? 0.08 : 0.0);
 
     final paint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.fill;
 
+    // One vertical sheen for the whole row: tall active bars catch the
+    // highlight at the top while their lower half picks up a soft shadow.
+    final sheenPaint = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          sheenHighlight,
+          sheenHighlight.withValues(alpha: 0),
+          sheenShadow,
+        ],
+        stops: const [0.0, 0.48, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
     for (var i = 0; i < count; i++) {
       final position = count == 1 ? 0.5 : i / (count - 1);
       // Taper the ends so the row reads as a single waveform, not a block.
-      final envelope = math
-          .pow(math.sin(math.pi * position), 0.7)
-          .toDouble();
+      final envelope = math.pow(math.sin(math.pi * position), 0.7).toDouble();
 
       final breath = 0.5 + 0.5 * math.sin(phase * 0.9 + i * 0.35);
-      final ripple =
-          0.5 + 0.5 * math.sin(phase * 1.7 - i * 0.52 + 1.2);
+      final ripple = 0.5 + 0.5 * math.sin(phase * 1.7 - i * 0.52 + 1.2);
 
-      final energy = (envelope *
-              (0.12 +
-                  0.08 * breath +
-                  (energyGate ? dynamicEnergy : 0.10) *
-                      (0.55 * breath + 0.45 * ripple)))
-          .clamp(0.0, 1.0)
-          .toDouble();
+      final energy =
+          (envelope *
+                  (0.12 +
+                      0.08 * breath +
+                      (energyGate ? dynamicEnergy : 0.10) *
+                          (0.55 * breath + 0.45 * ripple)))
+              .clamp(0.0, 1.0)
+              .toDouble();
 
       final barHeight = minHeight + (maxHeight - minHeight) * energy;
       final tint = ((energy - 0.12) / 0.55).clamp(0.0, 1.0).toDouble();
+      final activeColor = Color.lerp(
+        activeStartColor,
+        activeEndColor,
+        position,
+      )!;
       paint.color = Color.lerp(inactiveColor, activeColor, tint)!;
 
       final x = startX + i * (barWidth + gap);
@@ -171,10 +215,14 @@ class _WaveformPainter extends CustomPainter {
         width: barWidth,
         height: barHeight,
       );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(barWidth / 2)),
-        paint,
+      final bar = RRect.fromRectAndRadius(
+        rect,
+        const Radius.circular(barWidth / 2),
       );
+      canvas.drawRRect(bar, paint);
+      if (tint > 0.04) {
+        canvas.drawRRect(bar, sheenPaint);
+      }
     }
   }
 
@@ -184,6 +232,9 @@ class _WaveformPainter extends CustomPainter {
       old.level != level ||
       old.listening != listening ||
       old.transcribing != transcribing ||
-      old.activeColor != activeColor ||
-      old.inactiveColor != inactiveColor;
+      old.activeStartColor != activeStartColor ||
+      old.activeEndColor != activeEndColor ||
+      old.inactiveColor != inactiveColor ||
+      old.sheenHighlight != sheenHighlight ||
+      old.sheenShadow != sheenShadow;
 }
