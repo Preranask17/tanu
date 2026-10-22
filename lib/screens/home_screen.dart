@@ -8,10 +8,10 @@ import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
 import 'chat_screen.dart';
-import '../widgets/ai_presence_orb.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/home_chat_bar.dart';
 import '../widgets/pinned_header.dart';
+import '../widgets/waveform_visualizer.dart';
 import '../theme/tanu_colors.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -107,7 +107,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
 
     final isDesktop = MediaQuery.sizeOf(context).width >= 600;
     // While a conversation is happening the bottom bar and hero copy get
-    // out of the way: orb + live transcription only. The bar returns the
+    // out of the way: waveform + live transcription only. The bar returns the
     // moment capture is idle so a new session can always start.
     final capturing = status.isConnected &&
         (conversation.isListening || conversation.active != null);
@@ -148,7 +148,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        AiPresenceOrb(
+                        WaveformVisualizer(
                           level: conversation.micLevel,
                           listening: conversation.isListening,
                           transcribing: conversation.liveTranscript
@@ -319,7 +319,7 @@ class _PendantButtonState extends State<_PendantButton>
   }
 }
 
-/// Live transcription strip under the orb: the in-progress words stream
+/// Live transcription strip under the waveform: the in-progress words stream
 /// here while capturing, the last captured line stays visible when idle.
 /// Display only — capture controls live in the chat bar as before.
 class _LiveCaptureStrip extends StatelessWidget {
