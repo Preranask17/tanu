@@ -44,16 +44,15 @@ class ResponsiveScaffold extends StatelessWidget {
     required this.currentIndex,
     required this.onTabTapped,
     required this.pages,
-    this.onAddTap,
+    required this.onAskTap,
   });
 
   final int currentIndex;
   final void Function(int) onTabTapped;
   final List<Widget> pages;
 
-  /// Optional action for the docked centre button. When omitted, the button
-  /// returns to Home, where a memory can be captured.
-  final VoidCallback? onAddTap;
+  /// Direct Ask TANU action shared by the dock and the wide-layout sidebar.
+  final VoidCallback onAskTap;
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +67,7 @@ class ResponsiveScaffold extends StatelessWidget {
                 _Sidebar(
                   currentIndex: currentIndex,
                   onTabTapped: onTabTapped,
-                  onAddTap: onAddTap,
+                  onAskTap: onAskTap,
                 ),
                 Container(
                   width: 1,
@@ -96,7 +95,7 @@ class ResponsiveScaffold extends StatelessWidget {
                   items: _navItems,
                   selectedIndex: currentIndex,
                   onTabSelected: onTabTapped,
-                  onAddTap: onAddTap,
+                  onAskTap: onAskTap,
                 ),
               ),
             ],
@@ -111,12 +110,12 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.currentIndex,
     required this.onTabTapped,
-    required this.onAddTap,
+    required this.onAskTap,
   });
 
   final int currentIndex;
   final void Function(int) onTabTapped;
-  final VoidCallback? onAddTap;
+  final VoidCallback onAskTap;
 
   @override
   Widget build(BuildContext context) {
@@ -205,11 +204,11 @@ class _Sidebar extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () {
-                    HapticFeedback.lightImpact();
-                    (onAddTap ?? () => onTabTapped(0))();
+                    HapticFeedback.selectionClick();
+                    onAskTap();
                   },
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Add'),
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                  label: const Text('Ask TANU'),
                   style: FilledButton.styleFrom(
                     backgroundColor: c.primary,
                     foregroundColor: c.onPrimary,

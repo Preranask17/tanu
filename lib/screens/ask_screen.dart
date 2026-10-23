@@ -11,6 +11,7 @@ import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/rag_provider.dart';
 import '../services/rag/vector_store.dart';
+import '../theme/tanu_colors.dart';
 import '../widgets/device_picker_sheet.dart';
 import '../widgets/device_status_controls.dart';
 import '../widgets/pinned_header.dart';
@@ -22,11 +23,12 @@ class AskScreen extends ConsumerStatefulWidget {
   const AskScreen({super.key});
 
   @override
-  ConsumerState<AskScreen> createState() => _AskScreenState();
+  ConsumerState<AskScreen> createState() => AskScreenState();
 }
 
-class _AskScreenState extends ConsumerState<AskScreen> {
+class AskScreenState extends ConsumerState<AskScreen> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   final _scrollCtrl = ScrollController();
   final List<ChatMessage> _messages = [];
 
@@ -35,9 +37,24 @@ class _AskScreenState extends ConsumerState<AskScreen> {
   bool _busy = false;
   bool _backfilled = false;
 
+  /// Focuses the query field when the shell's Ask TANU action is tapped.
+  void focusInput() {
+    _focusNode.requestFocus();
+  }
+
+  void _useProbingQuestion(String question) {
+    HapticFeedback.lightImpact();
+    _controller.value = TextEditingValue(
+      text: question,
+      selection: TextSelection.collapsed(offset: question.length),
+    );
+    _focusNode.requestFocus();
+  }
+
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -182,6 +199,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
               ],
             ),
           ),
+          _RecallProbingChips(onSelected: _useProbingQuestion),
           if (_busy)
             const Padding(
               padding: EdgeInsets.all(8),
@@ -194,6 +212,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    focusNode: _focusNode,
                     decoration: InputDecoration(
                       hintText: 'Ask about your memories...',
                       filled: true,
@@ -216,6 +235,71 @@ class _AskScreenState extends ConsumerState<AskScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Static prompts that put a useful question straight into the query field.
+class _RecallProbingChips extends StatelessWidget {
+  const _RecallProbingChips({required this.onSelected});
+
+  final ValueChanged<String> onSelected;
+
+  static const _questions = [
+    'What were my main takeaways today?',
+    'Did anyone mention a deadline?',
+    'Summarize my last conversation',
+    'What tasks or action items were discussed?',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.tanuColors;
+    final labelStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+      color: c.textPrimary,
+      fontSize: 12.5,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0,
+    );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        children: [
+          for (var i = 0; i < _questions.length; i++) ...[
+            Material(
+              color: c.surface,
+              shape: StadiumBorder(side: BorderSide(color: c.border)),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () => onSelected(_questions[i]),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 13,
+                        color: c.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(_questions[i], maxLines: 1, style: labelStyle),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (i != _questions.length - 1) const SizedBox(width: 8),
+          ],
         ],
       ),
     );

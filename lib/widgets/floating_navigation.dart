@@ -26,7 +26,7 @@ class FloatingNavItem {
   final bool scrollsToTopOnRepeat;
 }
 
-/// Grounded, edge-to-edge bottom navigation bar with a raised centre action.
+/// Grounded, edge-to-edge bottom navigation bar with a raised Ask TANU action.
 ///
 /// Pure presentation: destinations and callbacks come from the scaffold.
 class FloatingNavigationBar extends StatelessWidget {
@@ -35,13 +35,13 @@ class FloatingNavigationBar extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onTabSelected,
-    this.onAddTap,
+    required this.onAskTap,
   });
 
   final List<FloatingNavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onTabSelected;
-  final VoidCallback? onAddTap;
+  final VoidCallback onAskTap;
 
   static const _barHeight = 62.0;
   static const _fabClearance = 84.0;
@@ -112,10 +112,7 @@ class FloatingNavigationBar extends StatelessWidget {
             left: 0,
             right: 0,
             child: Center(
-              child: _AddButton(
-                size: _fabSize,
-                onTap: onAddTap ?? () => onTabSelected(0),
-              ),
+              child: _AskButton(size: _fabSize, onTap: onAskTap),
             ),
           ),
         ],
@@ -197,8 +194,8 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.size, required this.onTap});
+class _AskButton extends StatelessWidget {
+  const _AskButton({required this.size, required this.onTap});
 
   final double size;
   final VoidCallback onTap;
@@ -208,7 +205,7 @@ class _AddButton extends StatelessWidget {
     final c = context.tanuColors;
     return Semantics(
       button: true,
-      label: 'Add',
+      label: 'Ask TANU',
       child: Material(
         color: TanuPalette.midnightBlue,
         elevation: 8,
@@ -230,7 +227,11 @@ class _AddButton extends StatelessWidget {
           child: SizedBox(
             width: size,
             height: size,
-            child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              size: 28,
+              color: Colors.white,
+            ),
           ),
         ),
       ),

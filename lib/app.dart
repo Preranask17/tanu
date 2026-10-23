@@ -31,6 +31,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
   String _fgNotice = '';
   final _homeKey = GlobalKey<HomeScreenState>();
   final _conversationsKey = GlobalKey<ConversationsScreenState>();
+  final _recallKey = GlobalKey<AskScreenState>();
 
   /// Tab index -> screen name. Indexed in step with the page list in [build]
   /// and with the page indices in `ResponsiveScaffold`'s dock destinations.
@@ -160,6 +161,14 @@ class _TanuAppState extends ConsumerState<TanuApp> {
     }
   }
 
+  /// The centre dock action goes straight to the Recall query field.
+  void _openAskTanu() {
+    ref.read(navigationTabProvider.notifier).goTo(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recallKey.currentState?.focusInput();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Keep the foreground service running while an active session lives in
@@ -188,6 +197,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
           ? const WelcomeFlow()
           : ResponsiveScaffold(
               currentIndex: index,
+              onAskTap: _openAskTanu,
               onTabTapped: (i) {
                 if (i == index) {
                   _onTabTap(i, true);
@@ -199,7 +209,7 @@ class _TanuAppState extends ConsumerState<TanuApp> {
                 HomeScreen(key: _homeKey),
                 ConversationsScreen(key: _conversationsKey),
                 const SettingsScreen(),
-                const _DockInset(child: AskScreen()),
+                _DockInset(child: AskScreen(key: _recallKey)),
               ],
             ),
     );

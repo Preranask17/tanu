@@ -36,6 +36,7 @@ const _items = [
 Widget _app({
   required Brightness brightness,
   required ValueChanged<int> onTabSelected,
+  VoidCallback? onAskTap,
 }) {
   final colors = brightness == Brightness.dark
       ? TanuColors.dark
@@ -59,6 +60,7 @@ Widget _app({
           items: _items,
           selectedIndex: 0,
           onTabSelected: onTabSelected,
+          onAskTap: onAskTap ?? () {},
         ),
       ),
     ),
@@ -78,9 +80,14 @@ void main() {
   ) async {
     _usePhoneSurface(tester);
     var tapped = -1;
+    var askTapped = 0;
 
     await tester.pumpWidget(
-      _app(brightness: Brightness.light, onTabSelected: (i) => tapped = i),
+      _app(
+        brightness: Brightness.light,
+        onTabSelected: (i) => tapped = i,
+        onAskTap: () => askTapped++,
+      ),
     );
     await tester.pump();
 
@@ -101,16 +108,19 @@ void main() {
         matching: find.byIcon(Icons.auto_awesome_outlined),
       ),
     );
-    final add = tester.widget<Icon>(
-      find.descendant(of: bar, matching: find.byIcon(Icons.add_rounded)),
+    final ask = tester.widget<Icon>(
+      find.descendant(
+        of: bar,
+        matching: find.byIcon(Icons.auto_awesome_rounded),
+      ),
     );
 
     expect(home.size, 26);
     expect(home.color, TanuColors.light.heading);
     expect(recall.size, 26);
     expect(recall.color, TanuColors.light.textMuted);
-    expect(add.size, 28);
-    expect(add.color, Colors.white);
+    expect(ask.size, 28);
+    expect(ask.color, Colors.white);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -128,6 +138,11 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.auto_awesome_outlined));
     await tester.pump();
+    expect(tapped, 3);
+
+    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
+    await tester.pump();
+    expect(askTapped, 1);
     expect(tapped, 3);
     expect(tester.takeException(), isNull);
   });
@@ -166,7 +181,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('bar tabs and add button emit selection haptics', (tester) async {
+  testWidgets('bar tabs and Ask TANU button emit selection haptics', (
+    tester,
+  ) async {
     _usePhoneSurface(tester);
     final haptics = <String>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -194,7 +211,7 @@ void main() {
     await tester.pump();
     expect(haptics, ['HapticFeedbackType.selectionClick']);
 
-    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
     await tester.pump();
     expect(haptics, [
       'HapticFeedbackType.selectionClick',
