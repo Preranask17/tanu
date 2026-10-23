@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/tanu_colors.dart';
 
@@ -151,6 +152,7 @@ class _NavItem extends StatelessWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
+            HapticFeedback.selectionClick();
             if (selected && !item.scrollsToTopOnRepeat) return;
             onTap();
           },
@@ -223,7 +225,10 @@ class _AddButton extends StatelessWidget {
           customBorder: const CircleBorder(),
           splashColor: Colors.white.withValues(alpha: 0.16),
           highlightColor: Colors.white.withValues(alpha: 0.08),
-          onTap: onTap,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
           child: SizedBox(
             width: size,
             height: size,

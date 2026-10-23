@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ble_device.dart';
@@ -261,7 +262,10 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                             child: TextButton(
                               onPressed: _connectingId != null
                                   ? null
-                                  : () => Navigator.pop(context),
+                                  : () {
+                                      HapticFeedback.lightImpact();
+                                      Navigator.pop(context);
+                                    },
                               style: TextButton.styleFrom(
                                 foregroundColor: isDark ? Colors.white : Colors.black,
                                 backgroundColor: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
@@ -278,7 +282,10 @@ class _DevicePickerSheetState extends ConsumerState<DevicePickerSheet> {
                             child: ElevatedButton(
                               onPressed: _connectingId != null
                                   ? null
-                                  : _restartScan,
+                                  : () {
+                                      HapticFeedback.lightImpact();
+                                      _restartScan();
+                                    },
                               style: ElevatedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -325,7 +332,12 @@ class _DeviceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
-      onTap: enabled ? onTap : null,
+      onTap: enabled
+          ? () {
+              HapticFeedback.lightImpact();
+              onTap();
+            }
+          : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         child: Row(

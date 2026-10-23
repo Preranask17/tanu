@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/commitment.dart';
@@ -311,14 +312,20 @@ class _CommitmentTile extends ConsumerWidget {
     final c = context.tanuColors;
 
     return InkWell(
-      onTap: () => notifier.toggleDone(commitment.id),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        notifier.toggleDone(commitment.id);
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             GestureDetector(
-              onTap: () => notifier.toggleDone(commitment.id),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                notifier.toggleDone(commitment.id);
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: 28,
@@ -378,7 +385,10 @@ class _CommitmentTile extends ConsumerWidget {
               ),
             ),
             IconButton(
-              onPressed: () => notifier.remove(commitment.id),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                notifier.remove(commitment.id);
+              },
               style: IconButton.styleFrom(
                 backgroundColor: c.surfaceMuted,
                 shape: const CircleBorder(),
@@ -508,7 +518,12 @@ class _ManualAddBar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               IconButton(
-                onPressed: submitting ? null : onSubmit,
+                onPressed: submitting
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        onSubmit();
+                      },
                 style: IconButton.styleFrom(
                   backgroundColor: submitting ? c.textMuted : c.primary,
                   foregroundColor: c.onPrimary,
@@ -553,7 +568,10 @@ class _ManualAddBar extends StatelessWidget {
                   ),
                   elevation: 0,
                 ),
-                onPressed: onPickDue,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onPickDue();
+                },
                 icon: const Icon(Icons.calendar_today, size: 16),
                 label: Text(
                   due == null ? 'Date' : _shortDate(due!),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/conversation_provider.dart';
@@ -23,6 +24,7 @@ class TrashScreen extends ConsumerWidget {
           if (deletedSessions.isNotEmpty)
             TextButton(
               onPressed: () {
+                HapticFeedback.lightImpact();
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -30,11 +32,15 @@ class TrashScreen extends ConsumerWidget {
                     content: const Text('This will permanently delete all memories in the trash. This cannot be undone.'),
                     actions: [
                       TextButton(
-                        onPressed: () => Navigator.pop(ctx),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(ctx);
+                        },
                         child: const Text('Cancel'),
                       ),
                       TextButton(
                         onPressed: () {
+                          HapticFeedback.lightImpact();
                           ref.read(conversationProvider.notifier).emptyTrash();
                           Navigator.pop(ctx);
                         },
@@ -91,11 +97,15 @@ class TrashScreen extends ConsumerWidget {
                           content: const Text('This memory will be lost forever. This cannot be undone.'),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.pop(ctx),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.pop(ctx);
+                              },
                               child: const Text('Cancel'),
                             ),
                             TextButton(
                               onPressed: () {
+                                HapticFeedback.lightImpact();
                                 ref.read(conversationProvider.notifier).deleteSessionPermanently(session.id);
                                 Navigator.pop(ctx);
                               },

@@ -296,7 +296,10 @@ class _ActiveControl extends StatelessWidget {
         ),
         IconButton(
           tooltip: 'Open chat',
-          onPressed: onOpenChat,
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            onOpenChat();
+          },
           icon: Icon(Icons.chevron_right_rounded, color: primary),
         ),
         const SizedBox(width: 4),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/agent_engine.dart';
@@ -39,6 +40,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _busy) return;
+    HapticFeedback.lightImpact();
     _controller.clear();
     setState(() {
       _messages.add(ChatMessage(role: 'user', content: text));
@@ -214,6 +216,7 @@ class _SourceChips extends ConsumerWidget {
               ),
               avatar: const Icon(Icons.history, size: 14),
               onPressed: () {
+                HapticFeedback.lightImpact();
                 ConversationSession? session;
                 try {
                   session = conversations.firstWhere(

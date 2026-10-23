@@ -189,7 +189,7 @@ class _ConversationTileState extends State<ConversationTile> {
       onTap: widget.isTrash
           ? null
           : () {
-              HapticFeedback.selectionClick();
+              HapticFeedback.lightImpact();
               Navigator.of(context).push(
                 MaterialPageRoute(
                   fullscreenDialog: true,
@@ -382,7 +382,7 @@ class _ConversationTileState extends State<ConversationTile> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        HapticFeedback.selectionClick();
+        HapticFeedback.lightImpact();
         widget.onRetry!();
       },
       child: pill,
@@ -411,7 +411,7 @@ class _ConversationTileState extends State<ConversationTile> {
       onTap: widget.isTrash
           ? null
           : () {
-              HapticFeedback.selectionClick();
+              HapticFeedback.lightImpact();
               Navigator.of(context).push(
                 MaterialPageRoute(
                   fullscreenDialog: true,
@@ -507,7 +507,7 @@ class _ConversationTileState extends State<ConversationTile> {
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
-                        HapticFeedback.selectionClick();
+                        HapticFeedback.lightImpact();
                         widget.onRetry!();
                       },
                       child: Row(
@@ -576,20 +576,33 @@ class _ConversationTileState extends State<ConversationTile> {
             ),
             if (widget.isTrash) ...[
               IconButton(
-                onPressed: widget.onRestore,
+                onPressed: widget.onRestore == null
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        widget.onRestore!();
+                      },
                 style: IconButton.styleFrom(backgroundColor: c.surfaceMuted),
                 icon: Icon(Icons.restore, size: 20, color: c.primary),
               ),
               const SizedBox(width: 4),
               IconButton(
-                onPressed: widget.onDeletePermanently,
+                onPressed: widget.onDeletePermanently == null
+                    ? null
+                    : () {
+                        HapticFeedback.lightImpact();
+                        widget.onDeletePermanently!();
+                      },
                 style: IconButton.styleFrom(backgroundColor: c.dangerContainer),
                 icon: Icon(Icons.delete_forever, size: 20, color: c.danger),
               ),
             ] else ...[
               if (widget.onDelete != null)
                 IconButton(
-                  onPressed: widget.onDelete,
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    widget.onDelete!();
+                  },
                   icon: Icon(
                     Icons.delete_outline,
                     size: 20,

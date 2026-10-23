@@ -52,6 +52,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () {
+                HapticFeedback.lightImpact();
                 Navigator.of(context).pop();
                 notifier.deleteModel().then((_) => notifier.download());
               },
@@ -98,7 +99,6 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _openTranscript() {
-    HapticFeedback.selectionClick();
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -323,7 +323,7 @@ class _PendantPill extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          HapticFeedback.selectionClick();
+          HapticFeedback.lightImpact();
           onTap();
         },
         child: Container(
@@ -406,7 +406,7 @@ class _LiveConversationBanner extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          HapticFeedback.selectionClick();
+          HapticFeedback.lightImpact();
           onTap();
         },
         child: Container(
@@ -559,7 +559,7 @@ class _TodayCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          HapticFeedback.lightImpact();
           Navigator.of(context).push(
             MaterialPageRoute(
               fullscreenDialog: true,

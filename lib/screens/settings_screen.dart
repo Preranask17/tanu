@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:android_intent_plus/android_intent.dart';
 
@@ -199,7 +200,10 @@ class _SettingsSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(context).pop();
+                    },
                     icon: const Icon(Icons.close_rounded, size: 18),
                     tooltip: 'Close',
                     padding: EdgeInsets.zero,
@@ -269,7 +273,10 @@ class _SettingsActionTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return ListTile(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       dense: true,
       visualDensity: VisualDensity.compact,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -413,8 +420,10 @@ class _NotificationSettings extends ConsumerWidget {
           title: const Text('Important notifications'),
           subtitle: const Text('Commitments & highlights'),
           value: settings.notifyEnabled,
-          onChanged: (v) =>
-              ref.read(settingsProvider.notifier).setNotificationsEnabled(v),
+          onChanged: (v) {
+            HapticFeedback.selectionClick();
+            ref.read(settingsProvider.notifier).setNotificationsEnabled(v);
+          },
         ),
         SwitchListTile(
           dense: true,
@@ -423,7 +432,10 @@ class _NotificationSettings extends ConsumerWidget {
           subtitle: const Text('Once-daily memory recap'),
           value: settings.digestEnabled,
           onChanged: settings.notifyEnabled
-              ? (v) => ref.read(settingsProvider.notifier).setDigestEnabled(v)
+              ? (v) {
+                  HapticFeedback.selectionClick();
+                  ref.read(settingsProvider.notifier).setDigestEnabled(v);
+                }
               : null,
         ),
         ListTile(
@@ -442,6 +454,7 @@ class _NotificationSettings extends ConsumerWidget {
             onChanged: settings.notifyEnabled && settings.digestEnabled
                 ? (v) {
                     if (v != null) {
+                      HapticFeedback.selectionClick();
                       ref.read(settingsProvider.notifier).setDigestHour(v);
                     }
                   }
@@ -563,7 +576,10 @@ class _BackgroundProtection extends StatelessWidget {
             runSpacing: 2,
             children: [
               TextButton.icon(
-                onPressed: _requestExemption,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _requestExemption();
+                },
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(
@@ -579,7 +595,10 @@ class _BackgroundProtection extends StatelessWidget {
                 label: const Text('Battery exemption'),
               ),
               TextButton.icon(
-                onPressed: _openAutostart,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _openAutostart();
+                },
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(
@@ -659,7 +678,10 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
                   _obscure ? Icons.visibility_off : Icons.visibility,
                   size: 18,
                 ),
-                onPressed: () => setState(() => _obscure = !_obscure),
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _obscure = !_obscure);
+                },
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
                   width: 32,
@@ -682,6 +704,7 @@ class _GeminiKeyFieldState extends ConsumerState<_GeminiKeyField> {
             ),
           ),
           onPressed: () {
+            HapticFeedback.lightImpact();
             final messenger = ScaffoldMessenger.of(context);
             final navigator = Navigator.of(context);
             ref.read(settingsProvider.notifier).setGeminiApiKey(_ctrl.text);
@@ -840,6 +863,7 @@ class _PendantDashboard extends StatelessWidget {
                 elevation: 0,
               ),
               onPressed: () {
+                HapticFeedback.lightImpact();
                 if (isConnected) {
                   ProviderScope.containerOf(
                     context,
@@ -970,7 +994,10 @@ class _ThemeButton extends StatelessWidget {
       child: Tooltip(
         message: tooltip,
         child: IconButton(
-          onPressed: onTap,
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
           icon: Icon(icon, size: 16),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 30, height: 30),
@@ -1060,6 +1087,7 @@ class _SttLanguagePicker extends ConsumerWidget {
             underline: const SizedBox.shrink(),
             onChanged: (next) {
               if (next != null) {
+                HapticFeedback.selectionClick();
                 ref.read(settingsProvider.notifier).setSttLanguageCode(next);
               }
             },
@@ -1176,7 +1204,10 @@ class _SttModelDashboard extends ConsumerWidget {
                 ),
                 elevation: 0,
               ),
-              onPressed: () => notifier.download(),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                notifier.download();
+              },
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1211,6 +1242,7 @@ class _SttModelDashboard extends ConsumerWidget {
                 ),
               ),
               onPressed: () async {
+                HapticFeedback.lightImpact();
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -1220,11 +1252,17 @@ class _SttModelDashboard extends ConsumerWidget {
                     ),
                     actions: [
                       TextButton(
-                        onPressed: () => Navigator.pop(context, false),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(context, false);
+                        },
                         child: const Text('Cancel'),
                       ),
                       TextButton(
-                        onPressed: () => Navigator.pop(context, true),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(context, true);
+                        },
                         style: TextButton.styleFrom(foregroundColor: c.danger),
                         child: const Text('Delete'),
                       ),
@@ -1293,6 +1331,7 @@ class _WipeMemoryButton extends ConsumerWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: () async {
+          HapticFeedback.lightImpact();
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
@@ -1302,11 +1341,17 @@ class _WipeMemoryButton extends ConsumerWidget {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context, false),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.pop(context, false);
+                  },
                   child: const Text('Cancel'),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.pop(context, true),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.pop(context, true);
+                  },
                   style: TextButton.styleFrom(
                     foregroundColor: c.onDanger,
                     backgroundColor: c.danger,
@@ -1391,8 +1436,10 @@ class _DeveloperConsole extends ConsumerWidget {
                 ),
                 iconSize: 18,
                 icon: const Icon(Icons.mic, color: consoleGreen),
-                onPressed: () =>
-                    ref.read(conversationProvider.notifier).microphoneTest(),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(conversationProvider.notifier).microphoneTest();
+                },
                 tooltip: 'Phone Mic Test',
               ),
             ],
@@ -1435,7 +1482,10 @@ class _DeveloperConsole extends ConsumerWidget {
               ),
               textStyle: const TextStyle(fontSize: 11.5),
             ),
-            onPressed: () => ref.read(devCaptureProvider.notifier).toggle(),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              ref.read(devCaptureProvider.notifier).toggle();
+            },
             child: Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1483,6 +1533,7 @@ class _DeveloperConsole extends ConsumerWidget {
               textStyle: const TextStyle(fontSize: 11.5),
             ),
             onPressed: () async {
+              HapticFeedback.lightImpact();
               final ok = await ref
                   .read(proactiveServiceProvider.future)
                   .then((svc) => svc.showTestNotification())

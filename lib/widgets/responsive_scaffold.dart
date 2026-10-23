@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/tanu_colors.dart';
 import 'floating_navigation.dart';
@@ -159,6 +160,7 @@ class _Sidebar extends StatelessWidget {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
                           onTap: () {
+                            HapticFeedback.selectionClick();
                             if (isSelected && !item.scrollsToTopOnRepeat) {
                               return;
                             }
@@ -202,7 +204,10 @@ class _Sidebar extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: onAddTap ?? () => onTabTapped(0),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    (onAddTap ?? () => onTabTapped(0))();
+                  },
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add'),
                   style: FilledButton.styleFrom(

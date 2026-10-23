@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -77,7 +78,10 @@ class _LiveHeader extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: IconButton(
                 tooltip: 'Close',
-                onPressed: onClose,
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onClose();
+                },
                 icon: Icon(
                   Icons.close_rounded,
                   color: c.textPrimary,
@@ -160,6 +164,7 @@ class _SessionDetailPageState extends ConsumerState<SessionDetailPage> {
     final text = _chatCtrl.text.trim();
     if (text.isEmpty || _isGenerating) return;
 
+    HapticFeedback.lightImpact();
     _chatCtrl.clear();
     setState(() {
       _messages.add(ChatMessage(role: 'user', content: text));
@@ -557,7 +562,10 @@ class _TranscriptToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.tanuColors;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(

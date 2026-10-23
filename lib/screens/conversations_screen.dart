@@ -264,7 +264,6 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                   icon: Icons.delete_outline,
                   tooltip: 'Trash',
                   onTap: () {
-                    HapticFeedback.selectionClick();
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const TrashScreen()),
                     );
@@ -368,7 +367,10 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                             if (query.isNotEmpty)
                               GestureDetector(
                                 behavior: HitTestBehavior.opaque,
-                                onTap: _clearSearch,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  _clearSearch();
+                                },
                                 child: Container(
                                   width: 28,
                                   height: 28,
@@ -518,7 +520,10 @@ class _HeaderCircleButton extends StatelessWidget {
     final c = context.tanuColors;
     final button = GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Container(
         width: 44,
         height: 44,
@@ -619,7 +624,10 @@ class _RagAnswerCard extends StatelessWidget {
               else
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: onClear,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onClear();
+                  },
                   child: Padding(
                     padding: const EdgeInsets.all(4),
                     child: Icon(Icons.close, size: 16, color: c.textMuted),
@@ -652,7 +660,10 @@ class _RagAnswerCard extends StatelessWidget {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  onPressed: onRetry,
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    onRetry();
+                  },
                   icon: const Icon(Icons.refresh_rounded, size: 16),
                   label: const Text('Try again'),
                 ),
@@ -679,7 +690,7 @@ class _RagAnswerCard extends StatelessWidget {
                     onTap: () {
                       final target = _sourceSession(id);
                       if (target == null) return;
-                      HapticFeedback.selectionClick();
+                      HapticFeedback.lightImpact();
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           fullscreenDialog: true,
@@ -854,8 +865,10 @@ class _EmptyConversations extends ConsumerWidget {
             ),
             const SizedBox(height: 40),
             ElevatedButton(
-              onPressed: () =>
-                  ref.read(navigationTabProvider.notifier).goToHome(),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(navigationTabProvider.notifier).goToHome();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: c.primary,
                 foregroundColor: c.onPrimary,

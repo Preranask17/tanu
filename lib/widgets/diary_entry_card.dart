@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/diary_entry.dart';
 import '../theme/tanu_colors.dart';
@@ -12,10 +13,13 @@ class DiaryEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.tanuColors;
     return GestureDetector(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        builder: (context) => EntryDetailModal(entry: entry),
-      ),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        showModalBottomSheet(
+          context: context,
+          builder: (context) => EntryDetailModal(entry: entry),
+        );
+      },
       child: Card(
         color: c.surface,
         elevation: 0,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../widgets/ai_presence_orb.dart';
 
@@ -51,7 +52,10 @@ class _OrbEnterTransitionState extends State<OrbEnterTransition>
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _finish,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        _finish();
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: AnimatedBuilder(
