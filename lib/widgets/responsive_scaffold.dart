@@ -51,7 +51,7 @@ class ResponsiveScaffold extends StatelessWidget {
   final void Function(int) onTabTapped;
   final List<Widget> pages;
 
-  /// Direct Ask TANU action shared by the dock and the wide-layout sidebar.
+  /// Direct Ask TANU action for the wide-layout sidebar.
   final VoidCallback onAskTap;
 
   @override
@@ -95,7 +95,6 @@ class ResponsiveScaffold extends StatelessWidget {
                   items: _navItems,
                   selectedIndex: currentIndex,
                   onTabSelected: onTabTapped,
-                  onAskTap: onAskTap,
                 ),
               ),
             ],

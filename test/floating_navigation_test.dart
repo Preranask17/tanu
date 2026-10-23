@@ -36,7 +36,6 @@ const _items = [
 Widget _app({
   required Brightness brightness,
   required ValueChanged<int> onTabSelected,
-  VoidCallback? onAskTap,
 }) {
   final colors = brightness == Brightness.dark
       ? TanuColors.dark
@@ -60,7 +59,6 @@ Widget _app({
           items: _items,
           selectedIndex: 0,
           onTabSelected: onTabSelected,
-          onAskTap: onAskTap ?? () {},
         ),
       ),
     ),
@@ -75,19 +73,14 @@ void _usePhoneSurface(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('light bar is icon-only with enlarged active icons', (
+  testWidgets('light bar is a flat four-tab layout with labels', (
     tester,
   ) async {
     _usePhoneSurface(tester);
     var tapped = -1;
-    var askTapped = 0;
 
     await tester.pumpWidget(
-      _app(
-        brightness: Brightness.light,
-        onTabSelected: (i) => tapped = i,
-        onAskTap: () => askTapped++,
-      ),
+      _app(brightness: Brightness.light, onTabSelected: (i) => tapped = i),
     );
     await tester.pump();
 
@@ -97,7 +90,15 @@ void main() {
     expect(barRect.right, 320);
     expect(barRect.bottom, 240);
     expect(barRect.height, 78);
-    expect(find.descendant(of: bar, matching: find.byType(Text)), findsNothing);
+
+    for (final label in const ['Home', 'Recall', 'Library', 'Settings']) {
+      expect(
+        find.descendant(of: bar, matching: find.text(label)),
+        findsOneWidget,
+      );
+    }
+    expect(find.byIcon(Icons.add_rounded), findsNothing);
+    expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);
 
     final home = tester.widget<Icon>(
       find.descendant(of: bar, matching: find.byIcon(Icons.home_rounded)),
@@ -108,46 +109,38 @@ void main() {
         matching: find.byIcon(Icons.auto_awesome_outlined),
       ),
     );
-    final ask = tester.widget<Icon>(
-      find.descendant(
-        of: bar,
-        matching: find.byIcon(Icons.auto_awesome_rounded),
-      ),
-    );
-
-    expect(home.size, 26);
+    expect(home.size, 24);
     expect(home.color, TanuColors.light.heading);
-    expect(recall.size, 26);
+    expect(recall.size, 24);
     expect(recall.color, TanuColors.light.textMuted);
-    expect(ask.size, 28);
-    expect(ask.color, Colors.white);
+
+    final homeLabel = tester.widget<Text>(
+      find.descendant(of: bar, matching: find.text('Home')),
+    );
+    final recallLabel = tester.widget<Text>(
+      find.descendant(of: bar, matching: find.text('Recall')),
+    );
+    expect(homeLabel.style?.color, TanuColors.light.heading);
+    expect(recallLabel.style?.color, TanuColors.light.textMuted);
     expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Material && widget.color == TanuPalette.midnightBlue,
-      ),
-      findsOneWidget,
+      tester.getCenter(find.text('Home')).dy,
+      greaterThan(tester.getCenter(find.byIcon(Icons.home_rounded)).dy),
     );
 
-    final scales = tester
-        .widgetList<AnimatedScale>(
-          find.descendant(of: bar, matching: find.byType(AnimatedScale)),
-        )
-        .toList();
-    expect(scales.where((scale) => scale.scale == 1.06), hasLength(1));
+    final container = tester.widget<Container>(
+      find.descendant(of: bar, matching: find.byType(Container)).first,
+    );
+    final decoration = container.decoration! as BoxDecoration;
+    expect(decoration.color, TanuColors.light.surface);
+    expect((decoration.border! as Border).top.color, TanuColors.light.border);
 
     await tester.tap(find.byIcon(Icons.auto_awesome_outlined));
     await tester.pump();
     expect(tapped, 3);
-
-    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
-    await tester.pump();
-    expect(askTapped, 1);
-    expect(tapped, 3);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dark bar uses the blue accent and keeps the midnight FAB', (
+  testWidgets('dark bar uses sand active and muted inactive states', (
     tester,
   ) async {
     _usePhoneSurface(tester);
@@ -167,23 +160,29 @@ void main() {
         matching: find.byIcon(Icons.auto_awesome_outlined),
       ),
     );
-
-    expect(find.descendant(of: bar, matching: find.byType(Text)), findsNothing);
-    expect(home.color, TanuColors.dark.primary);
-    expect(recall.color, TanuColors.dark.textMuted);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Material && widget.color == TanuPalette.midnightBlue,
-      ),
-      findsOneWidget,
+    final homeLabel = tester.widget<Text>(
+      find.descendant(of: bar, matching: find.text('Home')),
     );
+    final recallLabel = tester.widget<Text>(
+      find.descendant(of: bar, matching: find.text('Recall')),
+    );
+
+    expect(home.color, TanuColors.dark.heading);
+    expect(recall.color, TanuColors.dark.textMuted);
+    expect(homeLabel.style?.color, TanuColors.dark.heading);
+    expect(recallLabel.style?.color, TanuColors.dark.textMuted);
+    expect(find.byIcon(Icons.add_rounded), findsNothing);
+
+    final container = tester.widget<Container>(
+      find.descendant(of: bar, matching: find.byType(Container)).first,
+    );
+    final decoration = container.decoration! as BoxDecoration;
+    expect(decoration.color, TanuColors.dark.surface);
+    expect((decoration.border! as Border).top.color, TanuColors.dark.border);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('bar tabs and Ask TANU button emit selection haptics', (
-    tester,
-  ) async {
+  testWidgets('flat bar tabs emit selection haptics', (tester) async {
     _usePhoneSurface(tester);
     final haptics = <String>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -211,7 +210,7 @@ void main() {
     await tester.pump();
     expect(haptics, ['HapticFeedbackType.selectionClick']);
 
-    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
+    await tester.tap(find.byIcon(Icons.grid_view_outlined));
     await tester.pump();
     expect(haptics, [
       'HapticFeedbackType.selectionClick',
