@@ -82,16 +82,16 @@ class ResponsiveScaffold extends StatelessWidget {
           );
         }
 
-        // Mobile / Narrow Layout (Curved notched dock)
+        // Mobile / Narrow Layout (Grounded, edge-to-edge bottom bar)
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: Stack(
             children: [
               IndexedStack(index: currentIndex, children: pages),
               Positioned(
-                bottom: MediaQuery.paddingOf(context).bottom + 12,
-                left: 16,
-                right: 16,
+                bottom: 0,
+                left: 0,
+                right: 0,
                 child: FloatingNavigationBar(
                   items: _navItems,
                   selectedIndex: currentIndex,

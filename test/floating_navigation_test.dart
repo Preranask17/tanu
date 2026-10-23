@@ -55,13 +55,10 @@ Widget _app({
     home: Scaffold(
       body: Align(
         alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: FloatingNavigationBar(
-            items: _items,
-            selectedIndex: 0,
-            onTabSelected: onTabSelected,
-          ),
+        child: FloatingNavigationBar(
+          items: _items,
+          selectedIndex: 0,
+          onTabSelected: onTabSelected,
         ),
       ),
     ),
@@ -76,7 +73,7 @@ void _usePhoneSurface(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('light dock is icon-only with enlarged active icons', (
+  testWidgets('light bar is icon-only with enlarged active icons', (
     tester,
   ) async {
     _usePhoneSurface(tester);
@@ -87,23 +84,25 @@ void main() {
     );
     await tester.pump();
 
-    final dock = find.byType(FloatingNavigationBar);
-    expect(
-      find.descendant(of: dock, matching: find.byType(Text)),
-      findsNothing,
-    );
+    final bar = find.byType(FloatingNavigationBar);
+    final barRect = tester.getRect(bar);
+    expect(barRect.left, 0);
+    expect(barRect.right, 320);
+    expect(barRect.bottom, 240);
+    expect(barRect.height, 78);
+    expect(find.descendant(of: bar, matching: find.byType(Text)), findsNothing);
 
     final home = tester.widget<Icon>(
-      find.descendant(of: dock, matching: find.byIcon(Icons.home_rounded)),
+      find.descendant(of: bar, matching: find.byIcon(Icons.home_rounded)),
     );
     final recall = tester.widget<Icon>(
       find.descendant(
-        of: dock,
+        of: bar,
         matching: find.byIcon(Icons.auto_awesome_outlined),
       ),
     );
     final add = tester.widget<Icon>(
-      find.descendant(of: dock, matching: find.byIcon(Icons.add_rounded)),
+      find.descendant(of: bar, matching: find.byIcon(Icons.add_rounded)),
     );
 
     expect(home.size, 26);
@@ -122,7 +121,7 @@ void main() {
 
     final scales = tester
         .widgetList<AnimatedScale>(
-          find.descendant(of: dock, matching: find.byType(AnimatedScale)),
+          find.descendant(of: bar, matching: find.byType(AnimatedScale)),
         )
         .toList();
     expect(scales.where((scale) => scale.scale == 1.06), hasLength(1));
@@ -133,7 +132,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dark dock uses the blue accent and keeps the midnight FAB', (
+  testWidgets('dark bar uses the blue accent and keeps the midnight FAB', (
     tester,
   ) async {
     _usePhoneSurface(tester);
@@ -143,21 +142,18 @@ void main() {
     );
     await tester.pump();
 
-    final dock = find.byType(FloatingNavigationBar);
+    final bar = find.byType(FloatingNavigationBar);
     final home = tester.widget<Icon>(
-      find.descendant(of: dock, matching: find.byIcon(Icons.home_rounded)),
+      find.descendant(of: bar, matching: find.byIcon(Icons.home_rounded)),
     );
     final recall = tester.widget<Icon>(
       find.descendant(
-        of: dock,
+        of: bar,
         matching: find.byIcon(Icons.auto_awesome_outlined),
       ),
     );
 
-    expect(
-      find.descendant(of: dock, matching: find.byType(Text)),
-      findsNothing,
-    );
+    expect(find.descendant(of: bar, matching: find.byType(Text)), findsNothing);
     expect(home.color, TanuColors.dark.primary);
     expect(recall.color, TanuColors.dark.textMuted);
     expect(
@@ -170,9 +166,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('dock tabs and add button emit selection haptics', (
-    tester,
-  ) async {
+  testWidgets('bar tabs and add button emit selection haptics', (tester) async {
     _usePhoneSurface(tester);
     final haptics = <String>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(

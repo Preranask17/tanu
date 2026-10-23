@@ -26,7 +26,7 @@ class FloatingNavItem {
   final bool scrollsToTopOnRepeat;
 }
 
-/// Curved dock navigation bar with a notched centre action.
+/// Grounded, edge-to-edge bottom navigation bar with a notched centre action.
 ///
 /// Pure presentation: destinations and callbacks come from the scaffold.
 class FloatingNavigationBar extends StatelessWidget {
@@ -50,29 +50,27 @@ class FloatingNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    assert(items.length == 4, 'The dock expects four destinations.');
+    assert(items.length == 4, 'The bottom bar expects four destinations.');
     final c = context.tanuColors;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return SizedBox(
-      height: _totalHeight,
+      height: _totalHeight + bottomInset,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Positioned(
             left: 0,
             right: 0,
+            top: _totalHeight - _barHeight,
             bottom: 0,
-            height: _barHeight,
             child: CustomPaint(
-              painter: _DockPainter(
+              painter: _BottomBarPainter(
                 fillColor: c.surface,
                 borderColor: c.border,
-                shadowColor: Colors.black.withValues(
-                  alpha: c.isDark ? 0.45 : 0.16,
-                ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                padding: EdgeInsets.fromLTRB(4, 0, 4, bottomInset),
                 child: Row(
                   children: [
                     Expanded(
@@ -240,29 +238,22 @@ class _AddButton extends StatelessWidget {
   }
 }
 
-class _DockPainter extends CustomPainter {
-  const _DockPainter({
-    required this.fillColor,
-    required this.borderColor,
-    required this.shadowColor,
-  });
+class _BottomBarPainter extends CustomPainter {
+  const _BottomBarPainter({required this.fillColor, required this.borderColor});
 
   final Color fillColor;
   final Color borderColor;
-  final Color shadowColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = _dockPath(size);
-    canvas.drawShadow(path, shadowColor, 16, false);
     canvas.drawPath(
-      path,
+      _barPath(size),
       Paint()
         ..isAntiAlias = true
         ..color = fillColor,
     );
     canvas.drawPath(
-      path,
+      _topBorderPath(size),
       Paint()
         ..isAntiAlias = true
         ..style = PaintingStyle.stroke
@@ -271,17 +262,16 @@ class _DockPainter extends CustomPainter {
     );
   }
 
-  Path _dockPath(Size size) {
+  Path _barPath(Size size) {
     final width = size.width;
     final height = size.height;
     final centre = width / 2;
-    const radius = 30.0;
     const notchDepth = 40.0;
 
     // The notch is tuned to the 52px FAB with a few pixels of breathing room
     // around its lower edge while keeping horizontal tangents at both ends.
     return Path()
-      ..moveTo(radius, 0)
+      ..moveTo(0, 0)
       ..lineTo(centre - FloatingNavigationBar._notchHalfWidth, 0)
       ..cubicTo(centre - 26, 0, centre - 28, notchDepth, centre, notchDepth)
       ..cubicTo(
@@ -292,20 +282,33 @@ class _DockPainter extends CustomPainter {
         centre + FloatingNavigationBar._notchHalfWidth,
         0,
       )
-      ..lineTo(width - radius, 0)
-      ..quadraticBezierTo(width, 0, width, radius)
-      ..lineTo(width, height - radius)
-      ..quadraticBezierTo(width, height, width - radius, height)
-      ..lineTo(radius, height)
-      ..quadraticBezierTo(0, height, 0, height - radius)
-      ..lineTo(0, radius)
-      ..quadraticBezierTo(0, 0, radius, 0)
+      ..lineTo(width, 0)
+      ..lineTo(width, height)
+      ..lineTo(0, height)
       ..close();
   }
 
+  Path _topBorderPath(Size size) {
+    final width = size.width;
+    final centre = width / 2;
+    const notchDepth = 40.0;
+
+    return Path()
+      ..moveTo(0, 0.5)
+      ..lineTo(centre - FloatingNavigationBar._notchHalfWidth, 0.5)
+      ..cubicTo(centre - 26, 0.5, centre - 28, notchDepth, centre, notchDepth)
+      ..cubicTo(
+        centre + 28,
+        notchDepth,
+        centre + 26,
+        0.5,
+        centre + FloatingNavigationBar._notchHalfWidth,
+        0.5,
+      )
+      ..lineTo(width, 0.5);
+  }
+
   @override
-  bool shouldRepaint(covariant _DockPainter old) =>
-      old.fillColor != fillColor ||
-      old.borderColor != borderColor ||
-      old.shadowColor != shadowColor;
+  bool shouldRepaint(covariant _BottomBarPainter old) =>
+      old.fillColor != fillColor || old.borderColor != borderColor;
 }
