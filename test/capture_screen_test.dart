@@ -9,7 +9,7 @@ import 'package:tanu_app/services/storage_service.dart';
 import 'package:tanu_app/widgets/waveform_visualizer.dart';
 
 /// Proves the Home wireframe renders with the real widgets, disconnected:
-/// [greeting + date | pendant pill] -> [waveform] -> [Today timeline].
+/// [TANU + Home | pendant pill] -> [waveform] -> [Today timeline].
 /// Filesystem work runs in runAsync (async dart:io stalls in this
 /// environment's FakeAsync test zone). No backend is exercised.
 void main() {
@@ -30,8 +30,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    // 1. Header row: greeting/date on the left, compact pendant pill right.
-    expect(find.textContaining('Good '), findsOneWidget);
+    // 1. Shared header: TANU mark + Home title, compact pendant pill right.
+    expect(find.text('TANU'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
     expect(find.byIcon(Icons.bluetooth_rounded), findsOneWidget);
     expect(find.text('Connect'), findsOneWidget);
     // No battery percentage while disconnected.
@@ -44,7 +45,7 @@ void main() {
     // 3. Today timeline section is always present.
     expect(find.text('Today'), findsOneWidget);
 
-    // Home carries zero search bars and no legacy wordmark header.
+    // Home carries zero search bars and no legacy capture controls.
     expect(find.byType(TextField), findsNothing);
     expect(find.text('Capture'), findsNothing);
     expect(find.text('Scan'), findsNothing);

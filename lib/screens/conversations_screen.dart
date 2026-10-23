@@ -4,12 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../abstractions/audio_source.dart';
 import '../models/transcript.dart';
+import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/rag_provider.dart';
 import '../theme/tanu_colors.dart';
 import '../widgets/conversation_tile.dart';
+import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
 import '../widgets/pinned_header.dart';
 import 'chat_screen.dart';
 import 'trash_screen.dart';
@@ -174,7 +178,9 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final sessions = convState.conversations;
     final processingIds = convState.processingIds;
     final notifier = ref.read(conversationProvider.notifier);
-    final bottomInset = MediaQuery.paddingOf(context).bottom + 50 + 16;
+    final status =
+        ref.watch(pendantStatusProvider).value ?? const PendantStatus();
+    final bottomInset = MediaQuery.paddingOf(context).bottom + 96;
     final query = _query.text.trim().toLowerCase();
 
     final visible = sessions.where((s) {
@@ -269,48 +275,57 @@ class ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                     );
                   },
                 ),
+                PendantStatusPill(
+                  status: status,
+                  onTap: () => showDevicePickerSheet(context),
+                ),
               ],
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 980),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                for (final filter in _LibraryFilter.values) ...[
-                                  _LibraryFilterChip(
-                                    label: filter.label,
-                                    selected: _filter == filter,
-                                    onTap: () {
-                                      HapticFeedback.selectionClick();
-                                      setState(() => _filter = filter);
-                                    },
-                                  ),
-                                  if (filter != _LibraryFilter.values.last)
-                                    const SizedBox(width: 6),
+                    child: SizedBox(
+                      height: 44,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  for (final filter
+                                      in _LibraryFilter.values) ...[
+                                    _LibraryFilterChip(
+                                      label: filter.label,
+                                      selected: _filter == filter,
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        setState(() => _filter = filter);
+                                      },
+                                    ),
+                                    if (filter != _LibraryFilter.values.last)
+                                      const SizedBox(width: 8),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        _HeaderCircleButton(
-                          icon: _searchOpen
-                              ? Icons.close_rounded
-                              : Icons.search_rounded,
-                          tooltip: _searchOpen
-                              ? 'Close search'
-                              : 'Search memories',
-                          onTap: _toggleSearch,
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          _HeaderCircleButton(
+                            icon: _searchOpen
+                                ? Icons.close_rounded
+                                : Icons.search_rounded,
+                            tooltip: _searchOpen
+                                ? 'Close search'
+                                : 'Search memories',
+                            onTap: _toggleSearch,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -478,22 +493,27 @@ class _LibraryFilterChip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        color: background,
-        shape: StadiumBorder(side: BorderSide(color: borderColor)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const StadiumBorder(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            child: Text(
-              label,
-              maxLines: 1,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: foreground,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                letterSpacing: 0.1,
+      child: SizedBox(
+        height: 44,
+        child: Material(
+          color: background,
+          shape: StadiumBorder(side: BorderSide(color: borderColor)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const StadiumBorder(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: foreground,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    letterSpacing: 0.1,
+                  ),
+                ),
               ),
             ),
           ),

@@ -9,6 +9,8 @@ import '../providers/conversation_provider.dart';
 import '../providers/stt_model_provider.dart';
 import '../theme/tanu_colors.dart';
 import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
+import '../widgets/pinned_header.dart';
 import '../widgets/waveform_visualizer.dart';
 import 'chat_screen.dart';
 
@@ -89,15 +91,6 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _openDevicePicker() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const DevicePickerSheet(),
-    );
-  }
-
   void _openTranscript() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -105,40 +98,6 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
         builder: (_) => const ChatPage(),
       ),
     );
-  }
-
-  String _greeting(DateTime now) {
-    if (now.hour < 12) return 'Good morning';
-    if (now.hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
-  String _dateLabel(DateTime now) {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${weekdays[now.weekday - 1]}, '
-        '${months[now.month - 1]} ${now.day}';
   }
 
   bool _isToday(DateTime time, DateTime now) {
@@ -173,214 +132,58 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async =>
-              ref.read(conversationProvider.notifier).reloadFromStorage(),
-          child: CustomScrollView(
-            controller: _scroll,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+      body: RefreshIndicator(
+        onRefresh: () async =>
+            ref.read(conversationProvider.notifier).reloadFromStorage(),
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            PinnedHeader(
+              title: 'Home',
+              actions: [
+                PendantStatusPill(
+                  status: status,
+                  onTap: () => showDevicePickerSheet(context),
+                ),
+              ],
             ),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: bottomInset),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _HomeHeader(
-                        greeting: _greeting(now),
-                        dateLabel: _dateLabel(now),
-                        status: status,
-                        onPendantTap: _openDevicePicker,
-                      ),
-                      const SizedBox(height: 16),
-                      if (live) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _LiveConversationBanner(
-                            listening: conversation.isListening,
-                            onTap: _openTranscript,
-                          ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
+                    if (live) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _LiveConversationBanner(
+                          listening: conversation.isListening,
+                          onTap: _openTranscript,
                         ),
-                        const SizedBox(height: 4),
-                      ],
-                      WaveformVisualizer(
-                        level: conversation.micLevel,
-                        listening: conversation.isListening,
-                        transcribing: conversation.liveTranscript
-                            .trim()
-                            .isNotEmpty,
                       ),
-                      const SizedBox(height: 8),
-                      _TodayFeed(
-                        sessions: todaySessions,
-                        processingIds: conversation.processingIds,
-                      ),
+                      const SizedBox(height: 4),
                     ],
-                  ),
+                    WaveformVisualizer(
+                      level: conversation.micLevel,
+                      listening: conversation.isListening,
+                      transcribing: conversation.liveTranscript
+                          .trim()
+                          .isNotEmpty,
+                    ),
+                    const SizedBox(height: 8),
+                    _TodayFeed(
+                      sessions: todaySessions,
+                      processingIds: conversation.processingIds,
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Header row: time-based salutation and date on the left, compact pendant
-/// connection/battery pill on the right.
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.greeting,
-    required this.dateLabel,
-    required this.status,
-    required this.onPendantTap,
-  });
-
-  final String greeting;
-  final String dateLabel;
-  final PendantStatus status;
-  final VoidCallback onPendantTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.tanuColors;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(greeting, style: textTheme.displayMedium),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  dateLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: c.textMuted,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
             ),
-          ),
-          const SizedBox(width: 12),
-          _PendantPill(status: status, onTap: onPendantTap),
-        ],
-      ),
-    );
-  }
-}
-
-class _PendantPill extends StatelessWidget {
-  const _PendantPill({required this.status, required this.onTap});
-
-  final PendantStatus status;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.tanuColors;
-    final connected = status.isConnected;
-    final reconnecting =
-        status.state == PendantState.reconnecting ||
-        status.state == PendantState.scanning ||
-        status.state == PendantState.connecting;
-
-    final dotColor = connected
-        ? c.success
-        : reconnecting
-        ? c.primary
-        : c.danger;
-    final label = connected
-        ? 'Pendant'
-        : reconnecting
-        ? 'Syncing'
-        : 'Connect';
-    final battery = connected ? status.batteryPercent : null;
-
-    return Semantics(
-      button: true,
-      label: connected
-          ? 'Pendant connected${battery == null ? '' : ', $battery percent battery'}. Tap to manage.'
-          : 'Connect pendant. Tap to manage.',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        child: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: c.surface,
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(color: c.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: dotColor,
-                  boxShadow: connected
-                      ? [
-                          BoxShadow(
-                            color: dotColor.withValues(alpha: 0.35),
-                            blurRadius: 6,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-              if (battery != null) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '$battery%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: c.textMuted,
-                  ),
-                ),
-              ],
-              const SizedBox(width: 8),
-              Icon(
-                Icons.bluetooth_rounded,
-                size: 14,
-                color: connected ? c.primary : c.textMuted,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: connected ? c.primary : c.textMuted,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );

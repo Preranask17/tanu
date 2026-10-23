@@ -26,7 +26,7 @@ class FloatingNavItem {
   final bool scrollsToTopOnRepeat;
 }
 
-/// Grounded, edge-to-edge bottom navigation bar with a notched centre action.
+/// Grounded, edge-to-edge bottom navigation bar with a raised centre action.
 ///
 /// Pure presentation: destinations and callbacks come from the scaffold.
 class FloatingNavigationBar extends StatelessWidget {
@@ -44,7 +44,7 @@ class FloatingNavigationBar extends StatelessWidget {
   final VoidCallback? onAddTap;
 
   static const _barHeight = 62.0;
-  static const _notchHalfWidth = 42.0;
+  static const _fabClearance = 84.0;
   static const _fabSize = 52.0;
   static const _totalHeight = 78.0;
 
@@ -87,7 +87,7 @@ class FloatingNavigationBar extends StatelessWidget {
                         onTap: () => onTabSelected(items[1].pageIndex),
                       ),
                     ),
-                    const SizedBox(width: _notchHalfWidth * 2),
+                    const SizedBox(width: _fabClearance),
                     Expanded(
                       child: _NavItem(
                         item: items[2],
@@ -246,66 +246,20 @@ class _BottomBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawPath(
-      _barPath(size),
+    canvas.drawRect(
+      Offset.zero & size,
       Paint()
         ..isAntiAlias = true
         ..color = fillColor,
     );
-    canvas.drawPath(
-      _topBorderPath(size),
+    canvas.drawLine(
+      const Offset(0, 0.5),
+      Offset(size.width, 0.5),
       Paint()
         ..isAntiAlias = true
-        ..style = PaintingStyle.stroke
         ..strokeWidth = 1
         ..color = borderColor,
     );
-  }
-
-  Path _barPath(Size size) {
-    final width = size.width;
-    final height = size.height;
-    final centre = width / 2;
-    const notchDepth = 40.0;
-
-    // The notch is tuned to the 52px FAB with a few pixels of breathing room
-    // around its lower edge while keeping horizontal tangents at both ends.
-    return Path()
-      ..moveTo(0, 0)
-      ..lineTo(centre - FloatingNavigationBar._notchHalfWidth, 0)
-      ..cubicTo(centre - 26, 0, centre - 28, notchDepth, centre, notchDepth)
-      ..cubicTo(
-        centre + 28,
-        notchDepth,
-        centre + 26,
-        0,
-        centre + FloatingNavigationBar._notchHalfWidth,
-        0,
-      )
-      ..lineTo(width, 0)
-      ..lineTo(width, height)
-      ..lineTo(0, height)
-      ..close();
-  }
-
-  Path _topBorderPath(Size size) {
-    final width = size.width;
-    final centre = width / 2;
-    const notchDepth = 40.0;
-
-    return Path()
-      ..moveTo(0, 0.5)
-      ..lineTo(centre - FloatingNavigationBar._notchHalfWidth, 0.5)
-      ..cubicTo(centre - 26, 0.5, centre - 28, notchDepth, centre, notchDepth)
-      ..cubicTo(
-        centre + 28,
-        notchDepth,
-        centre + 26,
-        0.5,
-        centre + FloatingNavigationBar._notchHalfWidth,
-        0.5,
-      )
-      ..lineTo(width, 0.5);
   }
 
   @override

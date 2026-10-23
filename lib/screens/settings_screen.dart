@@ -16,6 +16,7 @@ import '../providers/stt_model_provider.dart';
 import '../services/storage_service.dart';
 import '../theme/tanu_colors.dart';
 import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
 import '../widgets/page_layout.dart';
 import '../widgets/pinned_header.dart';
 
@@ -31,7 +32,15 @@ class SettingsScreen extends ConsumerWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
-          const PinnedHeader(title: 'Settings'),
+          PinnedHeader(
+            title: 'Settings',
+            actions: [
+              PendantStatusPill(
+                status: status,
+                onTap: () => showDevicePickerSheet(context),
+              ),
+            ],
+          ),
           SliverToBoxAdapter(
             child: TanuPageRail(
               bottom: 0,
@@ -869,11 +878,7 @@ class _PendantDashboard extends StatelessWidget {
                     context,
                   ).read(pendantDisconnectProvider)();
                 } else {
-                  showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => const DevicePickerSheet(),
-                  );
+                  showDevicePickerSheet(context);
                 }
               },
               child: Text(

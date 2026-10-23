@@ -5,10 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../abstractions/agent_engine.dart';
+import '../abstractions/audio_source.dart';
 import '../models/transcript.dart';
+import '../providers/ble_provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/rag_provider.dart';
 import '../services/rag/vector_store.dart';
+import '../widgets/device_picker_sheet.dart';
+import '../widgets/device_status_controls.dart';
+import '../widgets/pinned_header.dart';
 import 'chat_screen.dart';
 
 /// Cross-memory Q&A over the RAG pipeline: ask anything about your saved
@@ -91,63 +96,91 @@ class _AskScreenState extends ConsumerState<AskScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final status =
+        ref.watch(pendantStatusProvider).value ?? const PendantStatus();
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Recall')),
       body: Column(
         children: [
           Expanded(
-            child: _messages.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text(
-                        'Ask anything about your memories — “What did I decide about the project?”',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Color(0xFF888888), height: 1.5),
+            child: CustomScrollView(
+              controller: _scrollCtrl,
+              slivers: [
+                PinnedHeader(
+                  title: 'Recall',
+                  actions: [
+                    PendantStatusPill(
+                      status: status,
+                      onTap: () => showDevicePickerSheet(context),
+                    ),
+                  ],
+                ),
+                if (_messages.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text(
+                          'Ask anything about your memories — “What did I decide about the project?”',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF888888),
+                            height: 1.5,
+                          ),
+                        ),
                       ),
                     ),
                   )
-                : ListView.builder(
-                    controller: _scrollCtrl,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, i) {
-                      final sources = _answerSources[i];
-                      return Column(
-                        crossAxisAlignment:
-                            _messages[i].role == 'user'
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
-                        children: [
-                          Align(
-                            alignment: _messages[i].role == 'user'
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _messages[i].role == 'user'
-                              ? (isDark
-                                  ? const Color(0xFF333333)
-                                  : const Color(0xFFE5E5E5))
-                              : (isDark
-                                  ? const Color(0xFF111111)
-                                  : const Color(0xFFFFFFFF)),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(_messages[i].content,
-                            style: const TextStyle(fontSize: 15, height: 1.4)),
-                      ),
-                          ),
-                          if (sources != null && sources.isNotEmpty)
-                            _SourceChips(sources: sources),
-                        ],
-                      );
-                    },
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, i) {
+                        final sources = _answerSources[i];
+                        return Column(
+                          crossAxisAlignment: _messages[i].role == 'user'
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Align(
+                              alignment: _messages[i].role == 'user'
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _messages[i].role == 'user'
+                                      ? (isDark
+                                            ? const Color(0xFF333333)
+                                            : const Color(0xFFE5E5E5))
+                                      : (isDark
+                                            ? const Color(0xFF111111)
+                                            : const Color(0xFFFFFFFF)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  _messages[i].content,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (sources != null && sources.isNotEmpty)
+                              _SourceChips(sources: sources),
+                          ],
+                        );
+                      }, childCount: _messages.length),
+                    ),
                   ),
+              ],
+            ),
           ),
           if (_busy)
             const Padding(

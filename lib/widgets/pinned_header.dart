@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../screens/welcome/tanu_wordmark.dart';
 import '../theme/tanu_colors.dart';
+import 'tanu_brand_mark.dart';
 
 /// Pinned variant of the shared page header: logo top-left with status
 /// actions top-right, page heading below — all pinned so it stays fixed
@@ -32,7 +32,7 @@ class PinnedHeader extends StatelessWidget {
       scrolledUnderElevation: 0,
       titleSpacing: 20,
       centerTitle: false,
-      title: const TanuWordmark(height: 28),
+      title: const TanuBrandMark(),
       actions: [
         for (var i = 0; i < actions.length; i++) ...[
           if (i > 0) const SizedBox(width: 10),

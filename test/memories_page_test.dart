@@ -8,7 +8,7 @@ import 'package:tanu_app/models/conversation.dart';
 import 'package:tanu_app/models/transcript.dart';
 import 'package:tanu_app/providers/conversation_provider.dart';
 import 'package:tanu_app/screens/conversations_screen.dart';
-import 'package:tanu_app/screens/welcome/tanu_wordmark.dart';
+import 'package:tanu_app/widgets/tanu_brand_mark.dart';
 import 'package:tanu_app/services/storage_service.dart';
 
 class _FakeConversationNotifier extends ConversationNotifier {
@@ -43,7 +43,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // Shared header: wordmark + headline + trash action.
-    expect(find.byType(TanuWordmark), findsOneWidget);
+    expect(find.byType(TanuBrandMark), findsOneWidget);
     expect(find.text('Library'), findsOneWidget);
     expect(find.byIcon(Icons.delete_outline), findsWidgets);
     // Compact sort/filter row; the search field stays collapsed until asked.

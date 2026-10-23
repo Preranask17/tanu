@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../screens/welcome/tanu_wordmark.dart';
+import 'tanu_brand_mark.dart';
 
 /// Consistent page header used by Capture, Memories and Settings.
 ///
@@ -31,7 +31,7 @@ class PageHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const TanuWordmark(height: 28),
+              const TanuBrandMark(),
               const Spacer(),
               for (var i = 0; i < actions.length; i++) ...[
                 if (i > 0) const SizedBox(width: 10),

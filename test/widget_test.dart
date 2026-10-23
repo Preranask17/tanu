@@ -65,7 +65,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     // Main tab scaffold: Home / Recall / Library / Settings destinations with
     // the compact pendant status pill visible. Matches the current UI copy.
-    expect(find.text('Pendant'), findsWidgets);
+    expect(find.text('90%'), findsWidgets);
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Recall'), findsWidgets);
     expect(find.text('Library'), findsWidgets);

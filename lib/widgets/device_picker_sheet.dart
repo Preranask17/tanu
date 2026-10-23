@@ -7,6 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ble_device.dart';
 import '../providers/ble_provider.dart';
 
+/// Opens the existing pendant picker with a transparent scrim so its rounded
+/// surface sits cleanly over any screen. Presentation only.
+Future<void> showDevicePickerSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const DevicePickerSheet(),
+  );
+}
+
 /// Bottom sheet that scans for nearby BLE devices and lets the user pick the
 /// pendant. The device name is never assumed — anything connectable shows up.
 class DevicePickerSheet extends ConsumerStatefulWidget {
